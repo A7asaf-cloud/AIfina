@@ -60,6 +60,45 @@ export const ImportTab: React.FC<ImportTabProps> = ({
     }
   };
 
+  const compressImage = (base64Str: string, maxWidth = 1200, maxHeight = 1200, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(base64Str);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   // Handle OCR receipt/bank screenshot image upload
   const handleOcrImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,12 +109,13 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
     const reader = new FileReader();
     reader.onload = async () => {
-      const base64 = reader.result as string;
-      setOcrImage(base64);
+      const originalBase64 = reader.result as string;
+      setOcrImage(originalBase64);
 
       try {
+        const compressedBase64 = await compressImage(originalBase64);
         const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-        const cleanBase64 = base64.includes(',') ? base64.split(',').pop() : base64;
+        const cleanBase64 = compressedBase64.includes(',') ? compressedBase64.split(',').pop() : compressedBase64;
         
         let localPromptText = `אתה אלגוריתם חכם לזיהוי עסקאות פיננסיות וקבלה. חלץ את כל העסקאות מהתמונה.
 החזר אך ורק מערך JSON תקין במבנה הבא ללא טקסט נוסף וללא markdown:
@@ -140,7 +180,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
           method: 'POST',
           headers,
           body: JSON.stringify({
-            imageBase64: base64,
+            imageBase64: compressedBase64,
             mimeType: file.type || 'image/jpeg',
             docType: ocrDocType,
           }),

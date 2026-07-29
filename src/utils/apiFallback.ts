@@ -8,24 +8,47 @@ export async function generateGeminiContentClient(apiKey: string, contents: any)
 
   for (const model of models) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ contents }),
-      });
+      const baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      
+      // 1. Try Direct Call
+      try {
+        const res = await fetch(baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contents }),
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          return text;
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return text;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP error! status: ${res.status}`);
         }
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error?.message || `HTTP error! status: ${res.status}`);
+      } catch (directErr: any) {
+        console.warn(`Direct client Gemini call for ${model} failed, trying via CORS proxy...`, directErr.message || directErr);
+        
+        // 2. Try via CORS Proxy
+        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(baseUrl)}`;
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contents }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return text;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP error via proxy! status: ${res.status}`);
+        }
       }
     } catch (e: any) {
       console.warn(`Client Gemini model ${model} failed:`, e.message || e);
