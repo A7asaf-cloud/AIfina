@@ -29,6 +29,7 @@ export interface UserProfile {
   pensionEmp: number; // employee % e.g. 6.0
   pensionEr: number;  // employer % e.g. 14.83
   createdAt: string;
+  onboardingDone?: boolean;
 }
 
 export interface Transaction {

@@ -3,8 +3,7 @@ import { Transaction } from '../types';
 import { parseExcelOrCsvFile } from '../utils/bankParsers';
 import { categorize } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
-import { generateGeminiContentClient, getApiUrl } from '../utils/apiFallback';
-import { CONFIG } from '../config';
+import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
   FileSpreadsheet,
   Camera,
@@ -172,32 +171,9 @@ export const ImportTab: React.FC<ImportTabProps> = ({
           }
         };
 
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (customKey) {
-          headers['x-gemini-api-key'] = customKey;
-        }
-
         let resultData: any;
-        if (!CONFIG.API_SERVER_URL) {
-          const clientOcrResult = await handleClientOcr(customKey);
-          resultData = { success: true, result: clientOcrResult };
-        } else {
-          const response = await fetch(getApiUrl('/api/ocr'), {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              imageBase64: compressedBase64,
-              mimeType: file.type || 'image/jpeg',
-              docType: ocrDocType,
-            }),
-          });
-          
-          if (response.ok) {
-            resultData = await response.json();
-          } else {
-            throw new Error(`שרת ה-API החזיר שגיאה: ${response.status}`);
-          }
-        }
+        const clientOcrResult = await handleClientOcr(customKey);
+        resultData = { success: true, result: clientOcrResult };
 
         const data = resultData;
         if (data.success && data.result) {

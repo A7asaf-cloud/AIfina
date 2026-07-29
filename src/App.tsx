@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState } from './types';
 import { StorageService } from './services/storage';
-import { getApiUrl } from './utils/apiFallback';
-import { GithubDbService } from './services/githubDb';
+
 import { AuthScreen } from './components/AuthScreen';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
@@ -23,54 +22,14 @@ export default function App() {
   // Initialize session
   useEffect(() => {
     const initializeAndSync = async () => {
-      // 1. Sync accounts from server
-      try {
-        const res = await fetch(getApiUrl('/api/auth/accounts'));
-        if (res.status === 404) {
-          await GithubDbService.syncAccountsFromGithub();
-        } else if (res.ok) {
-          const serverAccounts = await res.json();
-          // Update local storage with fresh records from server
-          localStorage.setItem('fil_users_list', JSON.stringify(serverAccounts));
-        }
-      } catch (e) {
-        console.error('Failed to sync accounts from server:', e);
-        try {
-          await GithubDbService.syncAccountsFromGithub();
-        } catch (gitErr) {
-          console.error('Failed to sync accounts from GitHub:', gitErr);
-        }
-      }
-
       const activeId = StorageService.getActiveUserId();
       const accounts = StorageService.getAccounts();
 
       if (activeId) {
         const found = accounts.find((a) => a.id === activeId);
         if (found) {
-          // 2. Sync active user data from server
-          try {
-            const dataRes = await fetch(getApiUrl(`/api/user/load/${found.id}`));
-            if (dataRes.status === 404) {
-              await GithubDbService.syncUserDataFromGithub(found.id);
-            } else if (dataRes.ok) {
-              const serverData = await dataRes.json();
-              if (serverData && serverData.profile) {
-                localStorage.setItem('fil_u_data_' + found.id, JSON.stringify(serverData));
-              }
-            }
-          } catch (e) {
-            console.error('Failed to sync user data from server:', e);
-            try {
-              await GithubDbService.syncUserDataFromGithub(found.id);
-            } catch (gitErr) {
-              console.error('Failed to sync user data from GitHub:', gitErr);
-            }
-          }
-
           setActiveUser(found);
           loadUserData(found.id);
-          return;
         }
       }
     };
@@ -93,40 +52,21 @@ export default function App() {
   };
 
   const handleAuthSuccess = async (account: UserAccount) => {
-    // Sync latest user data from server on login
-    try {
-      const dataRes = await fetch(getApiUrl(`/api/user/load/${account.id}`));
-      if (dataRes.status === 404) {
-        await GithubDbService.syncUserDataFromGithub(account.id);
-      } else if (dataRes.ok) {
-        const serverData = await dataRes.json();
-        if (serverData && serverData.profile) {
-          localStorage.setItem('fil_u_data_' + account.id, JSON.stringify(serverData));
-        }
-      }
-    } catch (e) {
-      console.error('Failed to sync user data on login:', e);
-      try {
-        await GithubDbService.syncUserDataFromGithub(account.id);
-      } catch (gitErr) {
-        console.error('Failed to sync user data on login from GitHub:', gitErr);
-      }
-    }
-
     setActiveUser(account);
     const data = StorageService.getUserData(account.id);
     setAppData(data);
 
-    if (!data.profile || !data.profile.netSalary) {
+    if (!data.profile || !data.profile.onboardingDone) {
       setNeedsOnboarding(true);
     }
   };
 
   const handleOnboardingDone = (newProfile: UserProfile) => {
     if (!activeUser) return;
-    const updated = { ...appData!, profile: newProfile };
+    const doneProfile = { ...newProfile, onboardingDone: true };
+    const updated = { ...appData!, profile: doneProfile };
     setAppData(updated);
-    StorageService.saveUserData(activeUser.id, { profile: newProfile });
+    StorageService.saveUserData(activeUser.id, { profile: doneProfile });
     setNeedsOnboarding(false);
   };
 
@@ -194,9 +134,43 @@ export default function App() {
 
   const handleResetData = () => {
     if (!activeUser) return;
-    localStorage.removeItem('fil_u_data_' + activeUser.id);
+    // Explicitly save clean zero-state data
+    const cleanData = {
+      profile: {
+        name: activeUser.displayName || 'משתמש',
+        netSalary: 0,
+        grossSalary: 0,
+        salaryDay: 10,
+        creditDay: 1,
+        bankBalance: 0,
+        creditDebt: 0,
+        rent: 0,
+        rentDay: 1,
+        hasKeren: false,
+        kerenEmp: 0,
+        kerenEr: 0,
+        hasPension: false,
+        pensionEmp: 0,
+        pensionEr: 0,
+        createdAt: new Date().toISOString(),
+        onboardingDone: true,
+      },
+      transactions: [],
+      budgetPlan: appData?.budgetPlan || [],
+      investments: {
+        kerenValue: 0,
+        pensionValue: 0,
+        savings: [],
+        moneyMarket: [],
+        portfolioHoldings: [],
+        portfolioCash: 0,
+        portfolioHistory: [],
+      },
+      snapshots: {},
+    };
     localStorage.removeItem('fil_sal_m_' + activeUser.id);
-    loadUserData(activeUser.id);
+    StorageService.saveUserData(activeUser.id, cleanData);
+    setAppData(cleanData as any);
   };
 
   const handleImportBackup = (parsedData: any) => {

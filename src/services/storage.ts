@@ -15,8 +15,8 @@ import {
 } from '../types';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
-import { getApiUrl } from '../utils/apiFallback';
-import { GithubDbService } from './githubDb';
+
+
 
 const KEYS = {
   USERS: 'fil_users_list',
@@ -43,6 +43,7 @@ const DEMO_PROFILE: UserProfile = {
   pensionEmp: 6.0,
   pensionEr: 14.83,
   createdAt: new Date().toISOString(),
+  onboardingDone: true,
 };
 
 const DEMO_TRANSACTIONS: Transaction[] = [
@@ -214,15 +215,9 @@ export class StorageService {
     this.saveUserData(newId, initData);
     this.setActiveUserId(newId);
 
-    // Sync register to server in the background
-    fetch(getApiUrl('/api/auth/register'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account: newAccount, initData }),
-    }).catch((err) => console.error('Failed to register on server:', err));
 
-    // Sync to GitHub database
-    GithubDbService.saveAccountToGithub(newAccount, initData);
+
+
 
     return newAccount;
   }
@@ -267,12 +262,46 @@ export class StorageService {
     } catch (e) {
       console.error('Error loading user data:', e);
     }
-    // Fallback default
+    // For the demo account, return demo data; for real users return empty defaults
+    if (userId === 'demo_user_id') {
+      return {
+        profile: DEMO_PROFILE,
+        transactions: DEMO_TRANSACTIONS,
+        budgetPlan: DEFAULT_BUDGET_PLAN,
+        investments: DEMO_INVESTMENTS,
+        snapshots: {},
+      };
+    }
     return {
-      profile: DEMO_PROFILE,
-      transactions: DEMO_TRANSACTIONS,
+      profile: {
+        name: 'משתמש חדש',
+        netSalary: 0,
+        grossSalary: 0,
+        salaryDay: 10,
+        creditDay: 1,
+        bankBalance: 0,
+        creditDebt: 0,
+        rent: 0,
+        rentDay: 1,
+        hasKeren: false,
+        kerenEmp: 0,
+        kerenEr: 0,
+        hasPension: false,
+        pensionEmp: 0,
+        pensionEr: 0,
+        createdAt: new Date().toISOString(),
+      },
+      transactions: [],
       budgetPlan: DEFAULT_BUDGET_PLAN,
-      investments: DEMO_INVESTMENTS,
+      investments: {
+        kerenValue: 0,
+        pensionValue: 0,
+        savings: [],
+        moneyMarket: [],
+        portfolioHoldings: [],
+        portfolioCash: 0,
+        portfolioHistory: [],
+      },
       snapshots: {},
     };
   }
@@ -283,15 +312,8 @@ export class StorageService {
       const updated = { ...current, ...data };
       localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify(updated));
 
-      // Asynchronously sync to server
-      fetch(getApiUrl('/api/user/save'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, data: updated }),
-      }).catch((err) => console.error('Failed to save to server:', err));
 
-      // Asynchronously sync to GitHub database
-      GithubDbService.saveUserDataToGithub(userId, updated);
+
     } catch (e) {
       console.error('Error saving user data:', e);
     }

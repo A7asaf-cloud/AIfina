@@ -15,16 +15,16 @@ export const Onboarding: React.FC<OnboardingProps> = ({ initialProfile, onDone }
 
   const [d, setD] = useState({
     name: initialProfile.name || '',
-    netSalary: initialProfile.netSalary ? String(initialProfile.netSalary) : '15000',
-    grossSalary: initialProfile.grossSalary ? String(initialProfile.grossSalary) : '19000',
+    netSalary: initialProfile.netSalary ? String(initialProfile.netSalary) : '0',
+    grossSalary: initialProfile.grossSalary ? String(initialProfile.grossSalary) : '0',
     salaryDay: initialProfile.salaryDay || 10,
     creditDay: initialProfile.creditDay || 1,
-    bankBalance: initialProfile.bankBalance ? String(initialProfile.bankBalance) : '10000',
+    bankBalance: initialProfile.bankBalance ? String(initialProfile.bankBalance) : '0',
     creditDebt: initialProfile.creditDebt ? String(initialProfile.creditDebt) : '0',
-    rent: initialProfile.rent ? String(initialProfile.rent) : '4500',
+    rent: initialProfile.rent ? String(initialProfile.rent) : '0',
     rentDay: initialProfile.rentDay || 1,
-    hasKeren: initialProfile.hasKeren ?? true,
-    hasPension: initialProfile.hasPension ?? true,
+    hasKeren: initialProfile.hasKeren ?? false,
+    hasPension: initialProfile.hasPension ?? false,
   });
 
   const set = (key: string, value: any) => {

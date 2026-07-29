@@ -3,8 +3,7 @@ import { UserProfile, Transaction, BudgetPlanItem, StockHolding } from '../types
 import { calcBudget, spentPerBudget } from '../utils/categories';
 import { fmtILS, fmtUSD, fmtDate, daysUntil } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
-import { generateGeminiContentClient, getApiUrl } from '../utils/apiFallback';
-import { CONFIG } from '../config';
+import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
   Wallet,
   TrendingUp,
@@ -89,49 +88,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     try {
       const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (customKey) {
-        headers['x-gemini-api-key'] = customKey;
-      }
-
-      if (!CONFIG.API_SERVER_URL) {
-        const insights = await handleClientFallback(customKey);
-        setAiInsights(insights);
+      if (!customKey) {
+        setAiError('מפתח GEMINI_API_KEY חסר. הגדר אותו תחילה בהגדרות.');
         return;
       }
-
-      const res = await fetch(getApiUrl('/api/ai-advisor'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          netSalary: net,
-          monthExpense,
-          monthIncome,
-          safeToSpend,
-          stockVal: stockPortfolioVal + portfolioCash,
-          topCategories,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.insights) && data.insights.length > 0) {
-          setAiInsights(data.insights);
-        } else {
-          setAiError(data.error || 'לא ניתן לקבל תובנות כעת');
-        }
-      } else {
-        throw new Error(`שרת ה-API החזיר שגיאה: ${res.status}`);
-      }
+      const insights = await handleClientFallback(customKey);
+      setAiInsights(insights);
     } catch (err: any) {
-      // Direct client fallback if server is unreachable
-      try {
-        const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-        const insights = await handleClientFallback(customKey);
-        setAiInsights(insights);
-      } catch (clientErr: any) {
-        setAiError(clientErr.message || 'שגיאה בחיבור לשרת ה-AI');
-      }
+      setAiError(err.message || 'שגיאה בחיבור לשרת ה-AI');
     } finally {
       setAiLoading(false);
     }
