@@ -98,51 +98,119 @@ async function startServer() {
     }
   });
   app.get("/api/stock-quote/:symbol", async (req, res) => {
-    let rawSymbol = (req.params.symbol || "AAPL").toUpperCase().trim();
-    let symbol = rawSymbol.replace(/^\$/, "");
-    if (symbol === "TA35") symbol = "TA35.TA";
-    if (symbol === "BTC") symbol = "BTC-USD";
-    if (symbol === "ETH") symbol = "ETH-USD";
-    const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
-    for (const host of hosts) {
-      try {
-        const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-        const response = await fetch(url, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json"
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const result = data.chart?.result?.[0];
-          if (result) {
-            const meta = result.meta;
-            let currentPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
-            let prevClose = meta.chartPreviousClose || currentPrice;
-            let currency = meta.currency || "USD";
-            if (currency === "ILA") {
-              currentPrice = currentPrice / 100;
-              prevClose = prevClose / 100;
-              currency = "ILS";
+    let rawParam = req.params.symbol || "AAPL";
+    try {
+      rawParam = decodeURIComponent(rawParam);
+    } catch (e) {
+    }
+    let symbol = rawParam.replace(/^\$/, "").trim();
+    console.log("=== Stock Quote Request ===", { rawParam: req.params.symbol, decoded: symbol });
+    if (!symbol) {
+      return res.json({ success: false, error: "\u05E1\u05D9\u05DE\u05D5\u05DC \u05E8\u05D9\u05E7" });
+    }
+    const HEBREW_MAP = {
+      "\u05D8\u05E1\u05DC\u05D4": "TSLA",
+      "\u05D0\u05E0\u05D1\u05D9\u05D3\u05D9\u05D4": "NVDA",
+      "\u05D0\u05E4\u05DC": "AAPL",
+      "\u05D0\u05DE\u05D6\u05D5\u05DF": "AMZN",
+      "\u05DE\u05D9\u05E7\u05E8\u05D5\u05E1\u05D5\u05E4\u05D8": "MSFT",
+      "\u05D2\u05D5\u05D2\u05DC": "GOOGL",
+      "\u05DE\u05D8\u05D4": "META",
+      "\u05E4\u05D9\u05D9\u05E1\u05D1\u05D5\u05E7": "META",
+      "\u05D8\u05D1\u05E2": "TEVA",
+      "\u05D0\u05DC\u05D1\u05D9\u05D8": "ESLT",
+      "\u05D0\u05D9\u05E0\u05D8\u05DC": "INTC",
+      "\u05D3\u05D9\u05E1\u05E0\u05D9": "DIS",
+      "\u05E0\u05D8\u05E4\u05DC\u05D9\u05E7\u05E1": "NFLX",
+      "\u05E0\u05D9\u05D9\u05E7\u05D9": "NKE",
+      "\u05E4\u05D9\u05D9\u05E4\u05D0\u05DC": "PYPL",
+      "\u05D1\u05D5\u05D0\u05D9\u05E0\u05D2": "BA",
+      "\u05D1\u05D9\u05D8\u05E7\u05D5\u05D9\u05DF": "BTC-USD",
+      "\u05D0\u05EA\u05E8\u05D9\u05D5\u05DD": "ETH-USD",
+      "\u05DC\u05D0\u05D5\u05DE\u05D9": "LUMI.TA",
+      "\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD": "POLI.TA",
+      "\u05E9\u05D5\u05E4\u05E8\u05E1\u05DC": "SAE.TA",
+      "\u05D0\u05DC \u05E2\u05DC": "ELAL.TA",
+      "\u05D0\u05DC\u05E2\u05DC": "ELAL.TA",
+      "\u05E0\u05D9\u05D9\u05E1": "NICE",
+      "\u05D8\u05D0\u05D5\u05D0\u05E8": "TSEM",
+      "\u05E1\u05E4\u05D9\u05D9": "SPY",
+      "\u05D0\u05E1 \u05D0\u05E0\u05D3 \u05E4\u05D9": "SPY",
+      "TA35": "TA35.TA",
+      "BTC": "BTC-USD",
+      "ETH": "ETH-USD"
+    };
+    const mappedSymbol = HEBREW_MAP[symbol] || HEBREW_MAP[symbol.toLowerCase()] || symbol.toUpperCase();
+    console.log("Lookup result:", { symbol, mappedSymbol, mapMatch: HEBREW_MAP[symbol] });
+    async function fetchChartData(ticker) {
+      const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
+      for (const host of hosts) {
+        try {
+          const url = `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+          const response = await fetch(url, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Accept": "application/json"
             }
-            const changePercent = prevClose ? (currentPrice - prevClose) / prevClose * 100 : 0;
-            const companyName = meta.shortName || meta.longName || symbol;
-            return res.json({
-              success: true,
-              symbol,
-              price: parseFloat(currentPrice.toFixed(2)),
-              prevClose: parseFloat(prevClose.toFixed(2)),
-              changePercent: parseFloat(changePercent.toFixed(2)),
-              currency,
-              companyName,
-              lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
-            });
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const result = data.chart?.result?.[0];
+            if (result) {
+              const meta = result.meta;
+              let currentPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
+              let prevClose = meta.chartPreviousClose || currentPrice;
+              let currency = meta.currency || "USD";
+              if (currency === "ILA") {
+                currentPrice = currentPrice / 100;
+                prevClose = prevClose / 100;
+                currency = "ILS";
+              }
+              const changePercent = prevClose ? (currentPrice - prevClose) / prevClose * 100 : 0;
+              const companyName = meta.shortName || meta.longName || ticker;
+              if (currentPrice > 0) {
+                return {
+                  success: true,
+                  symbol: meta.symbol || ticker,
+                  price: parseFloat(currentPrice.toFixed(2)),
+                  prevClose: parseFloat(prevClose.toFixed(2)),
+                  changePercent: parseFloat(changePercent.toFixed(2)),
+                  currency,
+                  companyName,
+                  lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+                };
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Error fetching chart for ${ticker} on ${host}:`, e);
+        }
+      }
+      return null;
+    }
+    let quote = await fetchChartData(mappedSymbol);
+    if (quote) {
+      return res.json(quote);
+    }
+    try {
+      const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=1`;
+      const searchRes = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        }
+      });
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const foundSymbol = searchData.quotes?.[0]?.symbol;
+        if (foundSymbol) {
+          quote = await fetchChartData(foundSymbol);
+          if (quote) {
+            return res.json(quote);
           }
         }
-      } catch (e) {
-        console.error(`Stock quote fetch error for ${symbol} on ${host}:`, e);
       }
+    } catch (e) {
+      console.error(`Yahoo Search error for ${symbol}:`, e);
     }
     return res.json({
       success: false,
