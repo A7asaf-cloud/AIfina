@@ -98,8 +98,8 @@ async function startServer() {
     }
   });
   app.get("/api/stock-quote/:symbol", async (req, res) => {
-    let symbol = (req.params.symbol || "AAPL").toUpperCase().trim();
-    if (symbol === "TEVA") symbol = "TEVA";
+    let rawSymbol = (req.params.symbol || "AAPL").toUpperCase().trim();
+    let symbol = rawSymbol.replace(/^\$/, "");
     if (symbol === "TA35") symbol = "TA35.TA";
     if (symbol === "BTC") symbol = "BTC-USD";
     if (symbol === "ETH") symbol = "ETH-USD";
@@ -109,7 +109,7 @@ async function startServer() {
         const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
         const response = await fetch(url, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "application/json"
           }
         });
@@ -118,11 +118,16 @@ async function startServer() {
           const result = data.chart?.result?.[0];
           if (result) {
             const meta = result.meta;
-            const currentPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
-            const prevClose = meta.chartPreviousClose || currentPrice;
+            let currentPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
+            let prevClose = meta.chartPreviousClose || currentPrice;
+            let currency = meta.currency || "USD";
+            if (currency === "ILA") {
+              currentPrice = currentPrice / 100;
+              prevClose = prevClose / 100;
+              currency = "ILS";
+            }
             const changePercent = prevClose ? (currentPrice - prevClose) / prevClose * 100 : 0;
             const companyName = meta.shortName || meta.longName || symbol;
-            const currency = meta.currency || "USD";
             return res.json({
               success: true,
               symbol,
