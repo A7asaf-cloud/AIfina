@@ -2,6 +2,8 @@
  * Client-side API Fallbacks for FinanceIL (useful when hosted on static platforms like GitHub Pages)
  */
 
+import { CONFIG } from '../config';
+
 export async function generateGeminiContentClient(apiKey: string, contents: any): Promise<string> {
   const models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
   let lastError: any = null;
@@ -285,7 +287,7 @@ export async function fetchStockQuoteClientSide(symbol: string) {
 }
 
 export function getApiUrl(path: string): string {
-  const customServer = localStorage.getItem('fil_api_server_url') || '';
+  const customServer = CONFIG.API_SERVER_URL;
   if (customServer) {
     const base = customServer.endsWith('/') ? customServer.slice(0, -1) : customServer;
     return base + path;
