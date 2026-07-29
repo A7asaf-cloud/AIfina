@@ -165,20 +165,20 @@ export class StorageService {
     const newId = 'u_' + Date.now();
     const defaultProfile: UserProfile = {
       name: displayName.trim() || 'משתמש חדש',
-      netSalary: 14000,
-      grossSalary: 18000,
+      netSalary: 0,
+      grossSalary: 0,
       salaryDay: 10,
       creditDay: 1,
-      bankBalance: 10000,
+      bankBalance: 0,
       creditDebt: 0,
-      rent: 4500,
+      rent: 0,
       rentDay: 1,
-      hasKeren: true,
-      kerenEmp: 2.5,
-      kerenEr: 7.5,
-      hasPension: true,
-      pensionEmp: 6.0,
-      pensionEr: 14.83,
+      hasKeren: false,
+      kerenEmp: 0,
+      kerenEr: 0,
+      hasPension: false,
+      pensionEmp: 0,
+      pensionEr: 0,
       createdAt: new Date().toISOString(),
     };
 
@@ -197,18 +197,7 @@ export class StorageService {
     // Initialize user empty data
     const initData: UserAppData = {
       profile: defaultProfile,
-      transactions: [
-        {
-          id: Date.now(),
-          description: 'מאזן פתיחה',
-          amount: 10000,
-          date: new Date().toISOString().split('T')[0],
-          cat: 'הכנסה',
-          color: '#10B981',
-          emoji: '💰',
-          account: 'בנק',
-        },
-      ],
+      transactions: [],
       budgetPlan: DEFAULT_BUDGET_PLAN,
       investments: {
         kerenValue: 0,
