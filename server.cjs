@@ -64,42 +64,85 @@ async function startServer() {
       }
     });
   });
-  app.get("/api/stock-quote/:symbol", async (req, res) => {
-    const symbol = (req.params.symbol || "AAPL").toUpperCase().trim();
+  app.post("/api/test-ai", async (req, res) => {
     try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "application/json"
-        }
+      const apiKey = req.headers["x-gemini-api-key"] || req.body.geminiApiKey || process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({
+          success: false,
+          error: "\u05DE\u05E4\u05EA\u05D7 GEMINI_API_KEY \u05D7\u05E1\u05E8. \u05D0\u05E0\u05D0 \u05D4\u05D6\u05DF \u05DE\u05E4\u05EA\u05D7 \u05D1\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA."
+        });
+      }
+      const ai = new import_genai.GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: '\u05EA\u05D2\u05D9\u05D1 \u05D1\u05DE\u05D9\u05DC\u05D4 \u05D0\u05D7\u05EA \u05D1\u05DC\u05D1\u05D3: "OK"'
       });
-      if (response.ok) {
-        const data = await response.json();
-        const result = data.chart?.result?.[0];
-        if (result) {
-          const meta = result.meta;
-          const currentPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
-          const prevClose = meta.chartPreviousClose || currentPrice;
-          const changePercent = prevClose ? (currentPrice - prevClose) / prevClose * 100 : 0;
-          return res.json({
-            success: true,
-            symbol,
-            price: parseFloat(currentPrice.toFixed(2)),
-            prevClose: parseFloat(prevClose.toFixed(2)),
-            changePercent: parseFloat(changePercent.toFixed(2)),
-            currency: meta.currency || "USD",
-            lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
-          });
-        }
+      if (response.text) {
+        return res.json({
+          success: true,
+          message: "\u05DE\u05E4\u05EA\u05D7 \u05D4-Gemini API \u05EA\u05E7\u05D9\u05DF \u05D5\u05E4\u05E2\u05D9\u05DC \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4! \u{1F916}\u2728"
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "\u05EA\u05D2\u05D5\u05D1\u05D4 \u05E8\u05D5\u05E7\u05D4 \u05DE\u05E9\u05E8\u05EA AI."
+        });
       }
     } catch (e) {
-      console.error(`Stock quote fetch error for ${symbol}:`, e);
+      console.error("Test AI Key Error:", e);
+      return res.status(400).json({
+        success: false,
+        error: `\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D0\u05D9\u05DE\u05D5\u05EA \u05DE\u05E4\u05EA\u05D7: ${e.message || "\u05D4\u05DE\u05E4\u05EA\u05D7 \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF \u05D0\u05D5 \u05D7\u05E1\u05D5\u05DD"}`
+      });
+    }
+  });
+  app.get("/api/stock-quote/:symbol", async (req, res) => {
+    let symbol = (req.params.symbol || "AAPL").toUpperCase().trim();
+    if (symbol === "TEVA") symbol = "TEVA";
+    if (symbol === "TA35") symbol = "TA35.TA";
+    if (symbol === "BTC") symbol = "BTC-USD";
+    if (symbol === "ETH") symbol = "ETH-USD";
+    const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
+    for (const host of hosts) {
+      try {
+        const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.chart?.result?.[0];
+          if (result) {
+            const meta = result.meta;
+            const currentPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
+            const prevClose = meta.chartPreviousClose || currentPrice;
+            const changePercent = prevClose ? (currentPrice - prevClose) / prevClose * 100 : 0;
+            const companyName = meta.shortName || meta.longName || symbol;
+            const currency = meta.currency || "USD";
+            return res.json({
+              success: true,
+              symbol,
+              price: parseFloat(currentPrice.toFixed(2)),
+              prevClose: parseFloat(prevClose.toFixed(2)),
+              changePercent: parseFloat(changePercent.toFixed(2)),
+              currency,
+              companyName,
+              lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
+        }
+      } catch (e) {
+        console.error(`Stock quote fetch error for ${symbol} on ${host}:`, e);
+      }
     }
     return res.json({
       success: false,
       symbol,
-      error: "Could not fetch live stock price"
+      error: `\u05DC\u05D0 \u05E0\u05D9\u05EA\u05DF \u05DC\u05D4\u05D1\u05D9\u05D0 \u05DE\u05D7\u05D9\u05E8 \u05E9\u05D5\u05E7 \u05D1\u05DC\u05D9\u05D9\u05D1 \u05E2\u05D1\u05D5\u05E8 ${symbol}`
     });
   });
   app.post("/api/ocr", async (req, res) => {
