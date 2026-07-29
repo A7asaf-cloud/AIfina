@@ -64,29 +64,58 @@ async function startServer() {
       }
     });
   });
+  function getGeminiApiKey(req) {
+    let key = req.headers["x-gemini-api-key"] || req.body?.geminiApiKey;
+    if (key && typeof key === "string") {
+      key = key.trim();
+    }
+    if (key && key !== "undefined" && key !== "null" && key.length > 5) {
+      return key;
+    }
+    return process.env.GEMINI_API_KEY;
+  }
+  async function generateGeminiContent(ai, params) {
+    const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
+    let lastError = null;
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: params.contents,
+          ...params.config ? { config: params.config } : {}
+        });
+        if (response && response.text) {
+          return response;
+        }
+      } catch (e) {
+        console.warn(`Gemini model ${modelName} failed:`, e.message || e);
+        lastError = e;
+      }
+    }
+    throw lastError || new Error("\u05DB\u05DC \u05D3\u05D2\u05DE\u05D9 Gemini \u05E0\u05DB\u05E9\u05DC\u05D5 \u05D1\u05DE\u05E2\u05E0\u05D4");
+  }
   app.post("/api/test-ai", async (req, res) => {
     try {
-      const apiKey = req.headers["x-gemini-api-key"] || req.body.geminiApiKey || process.env.GEMINI_API_KEY;
+      const apiKey = getGeminiApiKey(req);
       if (!apiKey) {
         return res.status(400).json({
           success: false,
-          error: "\u05DE\u05E4\u05EA\u05D7 GEMINI_API_KEY \u05D7\u05E1\u05E8. \u05D0\u05E0\u05D0 \u05D4\u05D6\u05DF \u05DE\u05E4\u05EA\u05D7 \u05D1\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA."
+          error: "\u05DE\u05E4\u05EA\u05D7 GEMINI_API_KEY \u05D7\u05E1\u05E8. \u05E0\u05D9\u05EA\u05DF \u05DC\u05D4\u05D2\u05D3\u05D9\u05E8 \u05D0\u05D5\u05EA\u05D5 \u05D1\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA \u05D4\u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4 \u05D0\u05D5 \u05D1\u05DE\u05E9\u05EA\u05E0\u05D9 \u05D4\u05E9\u05E8\u05EA."
         });
       }
       const ai = new import_genai.GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: '\u05EA\u05D2\u05D9\u05D1 \u05D1\u05DE\u05D9\u05DC\u05D4 \u05D0\u05D7\u05EA \u05D1\u05DC\u05D1\u05D3: "OK"'
+      const response = await generateGeminiContent(ai, {
+        contents: '\u05EA\u05D2\u05D9\u05D1 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u05D1\u05DE\u05D9\u05DC\u05D4 \u05D0\u05D7\u05EA \u05D1\u05DC\u05D1\u05D3: "OK"'
       });
-      if (response.text) {
+      if (response && response.text) {
         return res.json({
           success: true,
-          message: "\u05DE\u05E4\u05EA\u05D7 \u05D4-Gemini API \u05EA\u05E7\u05D9\u05DF \u05D5\u05E4\u05E2\u05D9\u05DC \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4! \u{1F916}\u2728"
+          message: "\u05DE\u05E4\u05EA\u05D7 \u05D4-Gemini API \u05EA\u05E7\u05D9\u05DF, \u05E4\u05E2\u05D9\u05DC \u05D5\u05DE\u05D2\u05D9\u05D1 \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4! \u{1F916}\u2728"
         });
       } else {
         return res.status(400).json({
           success: false,
-          error: "\u05EA\u05D2\u05D5\u05D1\u05D4 \u05E8\u05D5\u05E7\u05D4 \u05DE\u05E9\u05E8\u05EA AI."
+          error: "\u05EA\u05D2\u05D5\u05D1\u05D4 \u05E8\u05D9\u05E7\u05D4 \u05DE\u05E9\u05E8\u05EA \u05D4-AI."
         });
       }
     } catch (e) {
@@ -346,7 +375,7 @@ async function startServer() {
   });
   app.post("/api/ocr", async (req, res) => {
     try {
-      const apiKey = req.headers["x-gemini-api-key"] || req.body.geminiApiKey || process.env.GEMINI_API_KEY;
+      const apiKey = getGeminiApiKey(req);
       if (!apiKey) {
         return res.status(400).json({
           error: "\u05DE\u05E4\u05EA\u05D7 GEMINI_API_KEY \u05D7\u05E1\u05E8. \u05E0\u05D9\u05EA\u05DF \u05DC\u05D4\u05D2\u05D3\u05D9\u05E8 \u05D0\u05D5\u05EA\u05D5 \u05D1\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA \u05D4\u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4 \u05D0\u05D5 \u05D1\u05DE\u05E9\u05EA\u05E0\u05D9 \u05D4\u05E9\u05E8\u05EA."
@@ -354,8 +383,9 @@ async function startServer() {
       }
       const { imageBase64, mimeType, docType } = req.body;
       if (!imageBase64) {
-        return res.status(400).json({ error: "Missing imageBase64 data" });
+        return res.status(400).json({ error: "\u05D7\u05E1\u05E8 \u05E7\u05D5\u05D1\u05E5/\u05EA\u05DE\u05D5\u05E0\u05D4 \u05DC\u05E2\u05D9\u05D1\u05D5\u05D3 (imageBase64)" });
       }
+      const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",").pop() : imageBase64;
       const ai = new import_genai.GoogleGenAI({ apiKey });
       let promptText = `\u05D0\u05EA\u05D4 \u05D0\u05DC\u05D2\u05D5\u05E8\u05D9\u05EA\u05DD \u05D7\u05DB\u05DD \u05DC\u05D6\u05D9\u05D4\u05D5\u05D9 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05E4\u05D9\u05E0\u05E0\u05E1\u05D9\u05D5\u05EA \u05D5\u05E7\u05D1\u05DC\u05D4. \u05D7\u05DC\u05E5 \u05D0\u05EA \u05DB\u05DC \u05D4\u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05DE\u05D4\u05EA\u05DE\u05D5\u05E0\u05D4.
 \u05D4\u05D7\u05D6\u05E8 \u05D0\u05DA \u05D5\u05E8\u05E7 \u05DE\u05E2\u05E8\u05DA JSON \u05EA\u05E7\u05D9\u05DF \u05D1\u05DE\u05D1\u05E0\u05D4 \u05D4\u05D1\u05D0 \u05DC\u05DC\u05D0 \u05D8\u05E7\u05E1\u05D8 \u05E0\u05D5\u05E1\u05E3 \u05D5\u05DC\u05DC\u05D0 markdown:
@@ -369,7 +399,7 @@ async function startServer() {
         promptText = `\u05D7\u05DC\u05E5 \u05D0\u05EA \u05DB\u05DC \u05E0\u05D9\u05D9\u05E8\u05D5\u05EA \u05D4\u05E2\u05E8\u05DA (\u05DE\u05E0\u05D9\u05D5\u05EA/\u05EA\u05E2\u05D5\u05D3\u05D5\u05EA \u05E1\u05DC) \u05DE\u05EA\u05DE\u05D5\u05E0\u05EA \u05EA\u05D9\u05E7 \u05D4\u05D4\u05E9\u05E7\u05E2\u05D5\u05EA.
 \u05D4\u05D7\u05D6\u05E8 \u05D0\u05DA \u05D5\u05E8\u05E7 \u05DE\u05E2\u05E8\u05DA JSON \u05D1\u05DE\u05D1\u05E0\u05D4 \u05D4\u05D1\u05D0:
 [{"symbol":"TICKER","name":"\u05E9\u05DD \u05D4\u05D7\u05D1\u05E8\u05D4","shares":number,"avgCost":number,"currentPrice":number}]
-- symbol: \u05D4\u05E1\u05D9\u05DE\u05D5\u05DC \u05D4\u05D1\u05D9\u05E0\u05DC\u05D0\u05D5\u05DE\u05D9 (\u05DB\u05D2\u05D5\u05DF NVDA, AAPL, TEVA.TA)
+- symbol: \u05D4\u05E1\u05D9\u05DE\u05D5\u05DC \u05D4\u05D1\u05D9\u05E0\u05DC\u05D0\u05D5\u05DE\u05D9 (\u05DB\u05D2\u05D5\u05DF NVDA, AAPL, TEVA)
 - avgCost: \u05DE\u05D7\u05D9\u05E8 \u05E8\u05DB\u05D9\u05E9\u05D4 \u05DE\u05DE\u05D5\u05E6\u05E2 \u05DC\u05DE\u05E0\u05D9\u05D4 \u05D1\u05D3\u05D5\u05DC\u05E8\u05D9\u05DD
 - currentPrice: \u05DE\u05D7\u05D9\u05E8 \u05E0\u05D5\u05DB\u05D7\u05D9 \u05DC\u05DE\u05E0\u05D9\u05D4`;
       } else if (docType === "keren" || docType === "pension") {
@@ -377,15 +407,14 @@ async function startServer() {
 \u05D4\u05D7\u05D6\u05E8 \u05D0\u05DA \u05D5\u05E8\u05E7 JSON \u05EA\u05E7\u05D9\u05DF:
 {"value":number, "ytd":number}`;
       }
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+      const response = await generateGeminiContent(ai, {
         contents: [
           {
             parts: [
               { text: promptText },
               {
                 inlineData: {
-                  data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
+                  data: cleanBase64,
                   mimeType: mimeType || "image/jpeg"
                 }
               }
@@ -415,6 +444,44 @@ async function startServer() {
     } catch (error) {
       console.error("OCR Error:", error);
       return res.status(500).json({ error: error.message || "Error processing OCR" });
+    }
+  });
+  app.post("/api/ai-advisor", async (req, res) => {
+    try {
+      const apiKey = getGeminiApiKey(req);
+      if (!apiKey) {
+        return res.status(400).json({
+          error: "\u05DE\u05E4\u05EA\u05D7 GEMINI_API_KEY \u05D7\u05E1\u05E8. \u05E0\u05D9\u05EA\u05DF \u05DC\u05D4\u05D2\u05D3\u05D9\u05E8 \u05D0\u05D5\u05EA\u05D5 \u05D1\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA."
+        });
+      }
+      const { netSalary, monthExpense, monthIncome, safeToSpend, stockVal, topCategories } = req.body;
+      const promptText = `\u05D0\u05EA\u05D4 \u05D9\u05D5\u05E2\u05E5 \u05E4\u05D9\u05E0\u05E0\u05E1\u05D9 \u05D0\u05D9\u05E9\u05D9 \u05D5\u05D7\u05DB\u05DD. \u05E0\u05EA\u05D7 \u05D0\u05EA \u05D4\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05D4\u05E4\u05D9\u05E0\u05E0\u05E1\u05D9\u05D9\u05DD \u05E9\u05DC \u05D4\u05DE\u05E9\u05EA\u05DE\u05E9:
+- \u05DE\u05E9\u05DB\u05D5\u05E8\u05EA \u05E0\u05D8\u05D5: \u20AA${netSalary || 0}
+- \u05D4\u05DB\u05E0\u05E1\u05D5\u05EA \u05D4\u05D7\u05D5\u05D3\u05E9: \u20AA${monthIncome || 0}
+- \u05D4\u05D5\u05E6\u05D0\u05D5\u05EA \u05D4\u05D7\u05D5\u05D3\u05E9: \u20AA${monthExpense || 0}
+- \u05D9\u05EA\u05E8\u05D4 \u05E4\u05E0\u05D5\u05D9\u05D4 \u05DC\u05EA\u05E7\u05E6\u05D9\u05D1: \u20AA${safeToSpend || 0}
+- \u05E9\u05D5\u05D5\u05D9 \u05EA\u05D9\u05E7 \u05D4\u05E9\u05E7\u05E2\u05D5\u05EA: $${stockVal || 0}
+- \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05DE\u05D5\u05D1\u05D9\u05DC\u05D5\u05EA: ${JSON.stringify(topCategories || [])}
+
+\u05EA\u05DF 3 \u05EA\u05D5\u05D1\u05E0\u05D5\u05EA/\u05D4\u05DE\u05DC\u05E6\u05D5\u05EA \u05E4\u05D9\u05E0\u05E0\u05E1\u05D9\u05D5\u05EA \u05E7\u05E6\u05E8\u05D5\u05EA, \u05DE\u05DE\u05D5\u05E7\u05D3\u05D5\u05EA \u05D5\u05DE\u05E2\u05E9\u05D9\u05D5\u05EA \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA.
+\u05D4\u05D7\u05D6\u05E8 \u05D0\u05DA \u05D5\u05E8\u05E7 JSON \u05EA\u05E7\u05D9\u05DF \u05D1\u05DE\u05D1\u05E0\u05D4 \u05D4\u05D1\u05D0 \u05DC\u05DC\u05D0 markdown:
+{"insights":["\u05EA\u05D5\u05D1\u05E0\u05D4 1", "\u05EA\u05D5\u05D1\u05E0\u05D4 2", "\u05EA\u05D5\u05D1\u05E0\u05D4 3"]}`;
+      const ai = new import_genai.GoogleGenAI({ apiKey });
+      const response = await generateGeminiContent(ai, {
+        contents: promptText
+      });
+      const responseText = response.text || "";
+      let cleanedText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const firstBrace = cleanedText.indexOf("{");
+      const lastBrace = cleanedText.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const jsonResult = JSON.parse(cleanedText.substring(firstBrace, lastBrace + 1));
+        return res.json({ success: true, insights: jsonResult.insights || [] });
+      }
+      return res.json({ success: true, insights: [responseText] });
+    } catch (error) {
+      console.error("AI Advisor Error:", error);
+      return res.status(500).json({ error: error.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E0\u05D9\u05EA\u05D5\u05D7 AI" });
     }
   });
   if (process.env.NODE_ENV !== "production") {
