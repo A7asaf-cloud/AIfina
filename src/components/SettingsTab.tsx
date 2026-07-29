@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile, BudgetPlanItem, UserAccount } from '../types';
 import { DEFAULT_BUDGET_PLAN } from '../utils/categories';
+import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
   User,
   PieChart,
@@ -75,14 +76,40 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         },
         body: JSON.stringify({ geminiApiKey: keyToTest }),
       });
+      
+      if (res.status === 404) {
+        // Run client-side fallback
+        const text = await generateGeminiContentClient(keyToTest, [
+          { role: 'user', parts: [{ text: 'תגיב בעברית במילה אחת בלבד: "OK"' }] }
+        ]);
+        if (text && text.toLowerCase().includes('ok')) {
+          setTestResult({ success: true, message: 'מפתח ה-Gemini API תקין ופעיל ישירות מהדפדפן (מצב אופליין)! 🤖✨' });
+        } else {
+          setTestResult({ success: false, message: 'התקבלה תשובה לא תקינה מה-API של גוגל' });
+        }
+        return;
+      }
+      
       const data = await res.json();
       if (data.success) {
         setTestResult({ success: true, message: data.message || 'המפתח תקין ופעיל!' });
       } else {
         setTestResult({ success: false, message: data.error || 'המפתח אינו תקין' });
       }
-    } catch {
-      setTestResult({ success: false, message: 'שגיאה בחיבור לשרת הבדיקה' });
+    } catch (err: any) {
+      // If server is not reachable, try client-side direct call
+      try {
+        const text = await generateGeminiContentClient(keyToTest, [
+          { role: 'user', parts: [{ text: 'תגיב בעברית במילה אחת בלבד: "OK"' }] }
+        ]);
+        if (text && text.toLowerCase().includes('ok')) {
+          setTestResult({ success: true, message: 'מפתח ה-Gemini API תקין ופעיל ישירות מהדפדפן (מצב אופליין)! 🤖✨' });
+        } else {
+          setTestResult({ success: false, message: 'התקבלה תשובה לא תקינה מה-API של גוגל' });
+        }
+      } catch (clientErr: any) {
+        setTestResult({ success: false, message: clientErr.message || 'שגיאה באימות מפתח ה-Gemini API ישירות מהדפדפן' });
+      }
     } finally {
       setTestingKey(false);
     }

@@ -3,6 +3,7 @@ import { UserProfile, Transaction, BudgetPlanItem, StockHolding } from '../types
 import { calcBudget, spentPerBudget } from '../utils/categories';
 import { fmtILS, fmtUSD, fmtDate, daysUntil } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
+import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
   Wallet,
   TrendingUp,
@@ -45,24 +46,52 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const fetchAiInsights = async () => {
     setAiLoading(true);
     setAiError(null);
+    
+    // Construct local prompt text in case we need client-side generation
+    const catTotals: Record<string, number> = {};
+    transactions
+      .filter((t) => t.amount < 0)
+      .forEach((t) => {
+        catTotals[t.cat] = (catTotals[t.cat] || 0) + Math.abs(t.amount);
+      });
+    const topCategories = Object.entries(catTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([cat, amt]) => ({ category: cat, amount: amt }));
+
+    const localPromptText = `אתה יועץ פיננסי אישי וחכם. נתח את הנתונים הפיננסיים של המשתמש:
+- משכורת נטו: ₪${net}
+- הכנסות החודש: ₪${monthIncome}
+- הוצאות החודש: ₪${monthExpense}
+- יתרה פנויה לתקציב: ₪${safeToSpend}
+- שווי תיק השקעות: $${stockPortfolioVal + portfolioCash}
+- קטגוריות מובילות: ${JSON.stringify(topCategories)}
+
+תן 3 תובנות/המלצות פיננסיות קצרות, ממוקדות ומעשיות בעברית.
+החזר אך ורק JSON תקין במבנה הבא ללא markdown:
+{"insights":["תובנה 1", "תובנה 2", "תובנה 3"]}`;
+
+    const handleClientFallback = async (key: string) => {
+      if (!key) throw new Error('מפתח GEMINI_API_KEY חסר. הגדר אותו תחילה בהגדרות.');
+      const text = await generateGeminiContentClient(key, [
+        { role: 'user', parts: [{ text: localPromptText }] }
+      ]);
+      let cleanedText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const firstBrace = cleanedText.indexOf('{');
+      const lastBrace = cleanedText.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const jsonResult = JSON.parse(cleanedText.substring(firstBrace, lastBrace + 1));
+        return jsonResult.insights || [];
+      }
+      return [text];
+    };
+
     try {
       const customKey = localStorage.getItem('fil_gemini_api_key') || '';
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (customKey) {
         headers['x-gemini-api-key'] = customKey;
       }
-
-      // Calculate top spending categories
-      const catTotals: Record<string, number> = {};
-      transactions
-        .filter((t) => t.amount < 0)
-        .forEach((t) => {
-          catTotals[t.cat] = (catTotals[t.cat] || 0) + Math.abs(t.amount);
-        });
-      const topCategories = Object.entries(catTotals)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([cat, amt]) => ({ category: cat, amount: amt }));
 
       const res = await fetch('/api/ai-advisor', {
         method: 'POST',
@@ -77,14 +106,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }),
       });
 
+      if (res.status === 404) {
+        const insights = await handleClientFallback(customKey);
+        setAiInsights(insights);
+        return;
+      }
+
       const data = await res.json();
       if (data.success && Array.isArray(data.insights) && data.insights.length > 0) {
         setAiInsights(data.insights);
       } else {
         setAiError(data.error || 'לא ניתן לקבל תובנות כעת');
       }
-    } catch {
-      setAiError('שגיאה בחיבור לשרת ה-AI');
+    } catch (err: any) {
+      // Direct client fallback if server is unreachable
+      try {
+        const customKey = localStorage.getItem('fil_gemini_api_key') || '';
+        const insights = await handleClientFallback(customKey);
+        setAiInsights(insights);
+      } catch (clientErr: any) {
+        setAiError(clientErr.message || 'שגיאה בחיבור לשרת ה-AI');
+      }
     } finally {
       setAiLoading(false);
     }

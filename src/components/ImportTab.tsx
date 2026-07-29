@@ -3,6 +3,7 @@ import { Transaction } from '../types';
 import { parseExcelOrCsvFile } from '../utils/bankParsers';
 import { categorize } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
+import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
   FileSpreadsheet,
   Camera,
@@ -74,6 +75,62 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
       try {
         const customKey = localStorage.getItem('fil_gemini_api_key') || '';
+        const cleanBase64 = base64.includes(',') ? base64.split(',').pop() : base64;
+        
+        let localPromptText = `אתה אלגוריתם חכם לזיהוי עסקאות פיננסיות וקבלה. חלץ את כל העסקאות מהתמונה.
+החזר אך ורק מערך JSON תקין במבנה הבא ללא טקסט נוסף וללא markdown:
+[{"date":"YYYY-MM-DD","description":"שם בית העסק","amount":number}]
+חוקים:
+- סכום שלילי = הוצאה / חיוב.
+- סכום חיובי = הכנסה / זיכוי.
+- אם אין שנה, השתמש בשנה הנוכחית (${new Date().getFullYear()}).
+- חלץ את כל השורות שגלויות בתמונה.`;
+
+        if (ocrDocType === 'stocks') {
+          localPromptText = `חלץ את כל ניירות הערך (מניות/תעודות סל) מתמונת תיק ההשקעות.
+החזר אך ורק מערך JSON במבנה הבא:
+[{"symbol":"TICKER","name":"שם החברה","shares":number,"avgCost":number,"currentPrice":number}]
+- symbol: הסימול הבינלאומי (כגון NVDA, AAPL, TEVA)
+- avgCost: מחיר רכישה ממוצע למניה בדולרים
+- currentPrice: מחיר נוכחי למניה`;
+        } else if (ocrDocType === 'keren' || ocrDocType === 'pension') {
+          localPromptText = `חלץ את השווי הכולל (בשקלים) והתשואה המתוארת בדוח/צילום המסך.
+החזר אך ורק JSON תקין:
+{"value":number, "ytd":number}`;
+        }
+
+        const handleClientOcr = async (key: string) => {
+          if (!key) throw new Error('מפתח GEMINI_API_KEY חסר. הגדר אותו תחילה בהגדרות.');
+          const text = await generateGeminiContentClient(key, [
+            {
+              role: 'user',
+              parts: [
+                { text: localPromptText },
+                {
+                  inlineData: {
+                    data: cleanBase64 || '',
+                    mimeType: file.type || 'image/jpeg'
+                  }
+                }
+              ]
+            }
+          ]);
+          
+          let cleanedText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const firstBracket = cleanedText.indexOf('[');
+          const lastBracket = cleanedText.lastIndexOf(']');
+          const firstBrace = cleanedText.indexOf('{');
+          const lastBrace = cleanedText.lastIndexOf('}');
+
+          if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+            return JSON.parse(cleanedText.substring(firstBracket, lastBracket + 1));
+          } else if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            return JSON.parse(cleanedText.substring(firstBrace, lastBrace + 1));
+          } else {
+            return JSON.parse(cleanedText);
+          }
+        };
+
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (customKey) {
           headers['x-gemini-api-key'] = customKey;
@@ -89,7 +146,15 @@ export const ImportTab: React.FC<ImportTabProps> = ({
           }),
         });
 
-        const data = await response.json();
+        let resultData: any;
+        if (response.status === 404) {
+          const clientOcrResult = await handleClientOcr(customKey);
+          resultData = { success: true, result: clientOcrResult };
+        } else {
+          resultData = await response.json();
+        }
+
+        const data = resultData;
         if (data.success && data.result) {
           if (ocrDocType === 'stocks' && Array.isArray(data.result)) {
             const newHoldings = data.result.map((s: any, idx: number) => ({

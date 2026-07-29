@@ -8,6 +8,7 @@ import {
   StockHistoryItem,
 } from '../types';
 import { fmtILS, fmtUSD, fmtDate } from '../utils/formatters';
+import { fetchStockQuoteClientSide } from '../utils/apiFallback';
 import {
   TrendingUp,
   Briefcase,
@@ -121,18 +122,31 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
       const updatedHoldings = await Promise.all(
         holdings.map(async (holding) => {
           try {
-            const res = await fetch(`/api/stock-quote/${encodeURIComponent(holding.symbol)}`);
-            const contentType = res.headers.get('content-type') || '';
-            if (res.ok && contentType.includes('application/json')) {
-              const data = await res.json();
-              if (data.success && data.price) {
-                return {
-                  ...holding,
-                  currentPrice: data.price,
-                  changePercent: data.changePercent,
-                  name: data.companyName || holding.name,
-                };
+            let data: any;
+            try {
+              const res = await fetch(`/api/stock-quote/${encodeURIComponent(holding.symbol)}`);
+              const contentType = res.headers.get('content-type') || '';
+              if (res.status === 404) {
+                data = await fetchStockQuoteClientSide(holding.symbol);
+              } else if (res.ok && contentType.includes('application/json')) {
+                data = await res.json();
               }
+            } catch (e) {
+              // Direct client-side quote fetch fallback if server is unreachable
+              try {
+                data = await fetchStockQuoteClientSide(holding.symbol);
+              } catch (err) {
+                console.error(`Failed client-side fetch for ${holding.symbol}:`, err);
+              }
+            }
+
+            if (data && data.success && data.price) {
+              return {
+                ...holding,
+                currentPrice: data.price,
+                changePercent: data.changePercent,
+                name: data.companyName || holding.name,
+              };
             }
           } catch (e) {
             console.error(`Failed to fetch price for ${holding.symbol}:`, e);
@@ -167,34 +181,47 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
     if (!cleanSym) return;
     setIsFetchingQuote(true);
     setQuoteMessage(null);
+    
+    let data: any;
     try {
-      const res = await fetch(`/api/stock-quote/${encodeURIComponent(cleanSym)}`);
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        if (data.success && data.price) {
-          setBuyPrice(String(data.price));
-          if (data.symbol && data.symbol !== cleanSym) {
-            setBuySymbol(data.symbol);
-          }
-          if (data.companyName) {
-            setBuyName(data.companyName);
-          }
-          setQuoteMessage({
-            success: true,
-            text: `🟢 מחיר שוק בלייב: $${data.price} (${data.companyName || data.symbol})`,
-          });
-          return;
+      try {
+        const res = await fetch(`/api/stock-quote/${encodeURIComponent(cleanSym)}`);
+        const contentType = res.headers.get('content-type') || '';
+        if (res.status === 404) {
+          data = await fetchStockQuoteClientSide(cleanSym);
+        } else if (res.ok && contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          throw new Error('Not found');
         }
+      } catch {
+        // Direct client fallback if server is unreachable
+        data = await fetchStockQuoteClientSide(cleanSym);
       }
+
+      if (data && data.success && data.price) {
+        setBuyPrice(String(data.price));
+        if (data.symbol && data.symbol !== cleanSym) {
+          setBuySymbol(data.symbol);
+        }
+        if (data.companyName) {
+          setBuyName(data.companyName);
+        }
+        const curSymbol = data.currency === 'ILS' ? '₪' : '$';
+        setQuoteMessage({
+          success: true,
+          text: `🟢 מחיר שוק בלייב: ${curSymbol}${data.price} (${data.companyName || data.symbol})`,
+        });
+      } else {
+        setQuoteMessage({
+          success: false,
+          text: `לא נמצא מחיר בלייב עבור ${cleanSym} — תוכל להזין מחיר ידנית`,
+        });
+      }
+    } catch (err: any) {
       setQuoteMessage({
         success: false,
-        text: `לא נמצא מחיר בלייב עבור ${cleanSym} — תוכל להזין מחיר ידנית`,
-      });
-    } catch {
-      setQuoteMessage({
-        success: false,
-        text: `שגיאה בחיבור לשרת מחירי השוק`,
+        text: `לא נמצא מחיר עבור ${cleanSym} — תוכל להזין מחיר ידנית`,
       });
     } finally {
       setIsFetchingQuote(false);
