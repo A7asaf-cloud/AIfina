@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { UserProfile, BudgetPlanItem, UserAccount } from '../types';
 import { DEFAULT_BUDGET_PLAN } from '../utils/categories';
-import { generateGeminiContentClient } from '../utils/apiFallback';
+import { generateGeminiContentClient, getApiUrl } from '../utils/apiFallback';
+import { CONFIG } from '../config';
 import {
   User,
   PieChart,
@@ -91,8 +92,25 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setTestingKey(true);
     setTestResult(null);
     const keyToTest = geminiKeyInput.trim() || localStorage.getItem('fil_gemini_api_key') || '';
+    
+    const runClientTest = async () => {
+      const text = await generateGeminiContentClient(keyToTest, [
+        { role: 'user', parts: [{ text: 'תגיב בעברית במילה אחת בלבד: "OK"' }] }
+      ]);
+      if (text && text.toLowerCase().includes('ok')) {
+        setTestResult({ success: true, message: 'מפתח ה-Gemini API תקין ופעיל ישירות מהדפדפן (מצב אופליין)! 🤖✨' });
+      } else {
+        setTestResult({ success: false, message: 'התקבלה תשובה לא תקינה מה-API של גוגל' });
+      }
+    };
+
     try {
-      const res = await fetch('/api/test-ai', {
+      if (!CONFIG.API_SERVER_URL) {
+        await runClientTest();
+        return;
+      }
+
+      const res = await fetch(getApiUrl('/api/test-ai'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -101,36 +119,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         body: JSON.stringify({ geminiApiKey: keyToTest }),
       });
       
-      if (res.status === 404) {
-        // Run client-side fallback
-        const text = await generateGeminiContentClient(keyToTest, [
-          { role: 'user', parts: [{ text: 'תגיב בעברית במילה אחת בלבד: "OK"' }] }
-        ]);
-        if (text && text.toLowerCase().includes('ok')) {
-          setTestResult({ success: true, message: 'מפתח ה-Gemini API תקין ופעיל ישירות מהדפדפן (מצב אופליין)! 🤖✨' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setTestResult({ success: true, message: data.message || 'המפתח תקין ופעיל!' });
         } else {
-          setTestResult({ success: false, message: 'התקבלה תשובה לא תקינה מה-API של גוגל' });
+          setTestResult({ success: false, message: data.error || 'המפתח אינו תקין' });
         }
-        return;
-      }
-      
-      const data = await res.json();
-      if (data.success) {
-        setTestResult({ success: true, message: data.message || 'המפתח תקין ופעיל!' });
       } else {
-        setTestResult({ success: false, message: data.error || 'המפתח אינו תקין' });
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
     } catch (err: any) {
-      // If server is not reachable, try client-side direct call
+      // Direct client fallback if server is unreachable
       try {
-        const text = await generateGeminiContentClient(keyToTest, [
-          { role: 'user', parts: [{ text: 'תגיב בעברית במילה אחת בלבד: "OK"' }] }
-        ]);
-        if (text && text.toLowerCase().includes('ok')) {
-          setTestResult({ success: true, message: 'מפתח ה-Gemini API תקין ופעיל ישירות מהדפדפן (מצב אופליין)! 🤖✨' });
-        } else {
-          setTestResult({ success: false, message: 'התקבלה תשובה לא תקינה מה-API של גוגל' });
-        }
+        await runClientTest();
       } catch (clientErr: any) {
         setTestResult({ success: false, message: clientErr.message || 'שגיאה באימות מפתח ה-Gemini API ישירות מהדפדפן' });
       }

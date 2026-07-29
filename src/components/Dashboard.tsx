@@ -3,7 +3,8 @@ import { UserProfile, Transaction, BudgetPlanItem, StockHolding } from '../types
 import { calcBudget, spentPerBudget } from '../utils/categories';
 import { fmtILS, fmtUSD, fmtDate, daysUntil } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
-import { generateGeminiContentClient } from '../utils/apiFallback';
+import { generateGeminiContentClient, getApiUrl } from '../utils/apiFallback';
+import { CONFIG } from '../config';
 import {
   Wallet,
   TrendingUp,
@@ -93,7 +94,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         headers['x-gemini-api-key'] = customKey;
       }
 
-      const res = await fetch('/api/ai-advisor', {
+      if (!CONFIG.API_SERVER_URL) {
+        const insights = await handleClientFallback(customKey);
+        setAiInsights(insights);
+        return;
+      }
+
+      const res = await fetch(getApiUrl('/api/ai-advisor'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -106,17 +113,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }),
       });
 
-      if (res.status === 404) {
-        const insights = await handleClientFallback(customKey);
-        setAiInsights(insights);
-        return;
-      }
-
-      const data = await res.json();
-      if (data.success && Array.isArray(data.insights) && data.insights.length > 0) {
-        setAiInsights(data.insights);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.insights) && data.insights.length > 0) {
+          setAiInsights(data.insights);
+        } else {
+          setAiError(data.error || 'לא ניתן לקבל תובנות כעת');
+        }
       } else {
-        setAiError(data.error || 'לא ניתן לקבל תובנות כעת');
+        throw new Error(`שרת ה-API החזיר שגיאה: ${res.status}`);
       }
     } catch (err: any) {
       // Direct client fallback if server is unreachable
