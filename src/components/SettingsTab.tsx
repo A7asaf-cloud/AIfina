@@ -13,6 +13,7 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  Database,
 } from 'lucide-react';
 
 interface SettingsTabProps {
@@ -63,6 +64,25 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
     setKeySavedToast(true);
     setTimeout(() => setKeySavedToast(false), 3000);
+  };
+
+  // GitHub Sync Token State
+  const [githubTokenInput, setGithubTokenInput] = useState(() => {
+    return localStorage.getItem('fil_github_token') || '';
+  });
+  const [showGithubToken, setShowGithubToken] = useState(false);
+  const [githubTokenSavedToast, setGithubTokenSavedToast] = useState(false);
+
+  const handleSaveGithubToken = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = githubTokenInput.trim();
+    if (trimmed) {
+      localStorage.setItem('fil_github_token', trimmed);
+    } else {
+      localStorage.removeItem('fil_github_token');
+    }
+    setGithubTokenSavedToast(true);
+    setTimeout(() => setGithubTokenSavedToast(false), 3000);
   };
 
 
@@ -298,6 +318,54 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             שמור מפתח Gemini API ✓
           </button>
         </div>
+      </form>
+
+      {/* GitHub Sync Database Configuration */}
+      <form onSubmit={handleSaveGithubToken} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <h3 className="font-bold text-white text-base flex items-center gap-2">
+          <span>סנכרון ענן לחשבון (ריבוי מכשירים)</span>
+          <Database className="w-4 h-4 text-emerald-400" />
+        </h3>
+
+        <p className="text-slate-400 text-xs leading-relaxed">
+          הזן את מפתח הגישה שלך (GitHub Token) כדי לאפשר סנכרון אוטומטי של החשבון והמידע שלך מכל מכשיר (בדומה לאינסטגרם) ללא צורך בהקמת שרת.
+        </p>
+
+        {githubTokenSavedToast && (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
+            <span>מפתח הסנכרון נשמר בהצלחה!</span>
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-slate-300">
+            מפתח גישה לסנכרון (GitHub Token)
+          </label>
+          <div className="relative">
+            <input
+              type={showGithubToken ? 'text' : 'password'}
+              value={githubTokenInput}
+              onChange={(e) => setGithubTokenInput(e.target.value)}
+              placeholder="הדבק כאן: ghp_..."
+              className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2.5 pl-10 text-white text-sm outline-none font-mono text-left"
+            />
+            <button
+              type="button"
+              onClick={() => setShowGithubToken(!showGithubToken)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              {showGithubToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all"
+        >
+          שמור מפתח סנכרון ענן ✓
+        </button>
       </form>
 
 

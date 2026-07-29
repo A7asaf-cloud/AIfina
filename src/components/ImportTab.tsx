@@ -263,7 +263,8 @@ export const ImportTab: React.FC<ImportTabProps> = ({
           setErrorMsg(data.error || 'Gemini AI לא הצליח לזהות נתונים בתמונה זו. נסה תמונה ברורה יותר.');
         }
       } catch (err: any) {
-        setErrorMsg('שגיאה בחיבור לשרת ה-AI. אנא ודא שהמפתח תקין בשרת.');
+        console.error('OCR import error:', err);
+        setErrorMsg(err.message || 'שגיאה בחיבור לשרת ה-AI. אנא ודא שהמפתח תקין בשרת.');
       } finally {
         setOcrScanning(false);
       }

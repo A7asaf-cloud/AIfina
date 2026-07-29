@@ -16,6 +16,7 @@ import {
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
 import { getApiUrl } from '../utils/apiFallback';
+import { GithubDbService } from './githubDb';
 
 const KEYS = {
   USERS: 'fil_users_list',
@@ -231,6 +232,9 @@ export class StorageService {
       body: JSON.stringify({ account: newAccount, initData }),
     }).catch((err) => console.error('Failed to register on server:', err));
 
+    // Sync to GitHub database
+    GithubDbService.saveAccountToGithub(newAccount, initData);
+
     return newAccount;
   }
 
@@ -296,6 +300,9 @@ export class StorageService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, data: updated }),
       }).catch((err) => console.error('Failed to save to server:', err));
+
+      // Asynchronously sync to GitHub database
+      GithubDbService.saveUserDataToGithub(userId, updated);
     } catch (e) {
       console.error('Error saving user data:', e);
     }
