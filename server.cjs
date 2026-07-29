@@ -70,7 +70,8 @@ async function startServer() {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
       const response = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json"
         }
       });
       if (response.ok) {
@@ -87,7 +88,8 @@ async function startServer() {
             price: parseFloat(currentPrice.toFixed(2)),
             prevClose: parseFloat(prevClose.toFixed(2)),
             changePercent: parseFloat(changePercent.toFixed(2)),
-            currency: meta.currency || "USD"
+            currency: meta.currency || "USD",
+            lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
           });
         }
       }
@@ -102,9 +104,11 @@ async function startServer() {
   });
   app.post("/api/ocr", async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = req.headers["x-gemini-api-key"] || req.body.geminiApiKey || process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.status(400).json({ error: "GEMINI_API_KEY variable is missing in environment" });
+        return res.status(400).json({
+          error: "\u05DE\u05E4\u05EA\u05D7 GEMINI_API_KEY \u05D7\u05E1\u05E8. \u05E0\u05D9\u05EA\u05DF \u05DC\u05D4\u05D2\u05D3\u05D9\u05E8 \u05D0\u05D5\u05EA\u05D5 \u05D1\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA \u05D4\u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4 \u05D0\u05D5 \u05D1\u05DE\u05E9\u05EA\u05E0\u05D9 \u05D4\u05E9\u05E8\u05EA."
+        });
       }
       const { imageBase64, mimeType, docType } = req.body;
       if (!imageBase64) {
@@ -132,7 +136,7 @@ async function startServer() {
 {"value":number, "ytd":number}`;
       }
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: [
           {
             parts: [
