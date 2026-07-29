@@ -283,3 +283,12 @@ export async function fetchStockQuoteClientSide(symbol: string) {
     error: `לא ניתן להביא מחיר שוק עבור ${symbol} במצב אופליין`,
   };
 }
+
+export function getApiUrl(path: string): string {
+  const customServer = localStorage.getItem('fil_api_server_url') || '';
+  if (customServer) {
+    const base = customServer.endsWith('/') ? customServer.slice(0, -1) : customServer;
+    return base + path;
+  }
+  return path;
+}

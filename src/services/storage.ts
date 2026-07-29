@@ -15,6 +15,7 @@ import {
 } from '../types';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
+import { getApiUrl } from '../utils/apiFallback';
 
 const KEYS = {
   USERS: 'fil_users_list',
@@ -224,7 +225,7 @@ export class StorageService {
     this.setActiveUserId(newId);
 
     // Sync register to server in the background
-    fetch('/api/auth/register', {
+    fetch(getApiUrl('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ account: newAccount, initData }),
@@ -290,7 +291,7 @@ export class StorageService {
       localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify(updated));
 
       // Asynchronously sync to server
-      fetch('/api/user/save', {
+      fetch(getApiUrl('/api/user/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, data: updated }),

@@ -13,12 +13,15 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  Server,
+  Globe,
 } from 'lucide-react';
 
 interface SettingsTabProps {
   profile: UserProfile;
   budgetPlan: BudgetPlanItem[];
   account: UserAccount;
+  appData: any;
   onUpdateProfile: (p: UserProfile) => void;
   onUpdateBudget: (plan: BudgetPlanItem[]) => void;
   onLogout: () => void;
@@ -30,6 +33,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   profile,
   budgetPlan,
   account,
+  appData,
   onUpdateProfile,
   onUpdateBudget,
   onLogout,
@@ -61,6 +65,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
     setKeySavedToast(true);
     setTimeout(() => setKeySavedToast(false), 3000);
+  };
+
+  // Sync Server API URL State
+  const [apiServerUrl, setApiServerUrl] = useState(() => {
+    return localStorage.getItem('fil_api_server_url') || '';
+  });
+  const [apiServerSavedToast, setApiServerSavedToast] = useState(false);
+
+  const handleSaveApiServerUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = apiServerUrl.trim();
+    if (trimmed) {
+      localStorage.setItem('fil_api_server_url', trimmed);
+    } else {
+      localStorage.removeItem('fil_api_server_url');
+    }
+    setApiServerSavedToast(true);
+    setTimeout(() => setApiServerSavedToast(false), 3000);
   };
 
   const handleTestGeminiKey = async () => {
@@ -142,8 +164,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const exportBackupJSON = () => {
     const fullData = {
-      profile: p,
-      budgetPlan: bPlan,
+      ...appData,
       exportDate: new Date().toISOString(),
     };
     const jsonStr = JSON.stringify(fullData, null, 2);
@@ -165,9 +186,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed.profile) {
+        if (parsed.profile || parsed.transactions) {
           onImportBackupData(parsed);
-          alert('הנתונים שוחזרו בהצלחה!');
+          alert('כל הנתונים (פרופיל, תקציב, עסקאות והשקעות) שוחזרו בהצלחה!');
         }
       } catch {
         alert('קובץ גיבוי לא תקין');
@@ -295,6 +316,50 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             שמור מפתח Gemini API ✓
           </button>
         </div>
+      </form>
+
+      {/* Custom API Server Sync Section */}
+      <form onSubmit={handleSaveApiServerUrl} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <h3 className="font-bold text-white text-base flex items-center gap-2">
+          <span>שרת סנכרון חיצוני (עבור ריבוי מכשירים)</span>
+          <Server className="w-4 h-4 text-indigo-400" />
+        </h3>
+
+        <p className="text-slate-400 text-xs leading-relaxed">
+          כדי לסנכרן את החשבון והנתונים שלך בין מכשירים שונים באופן אוטומטי, הזן את כתובת השרת שבו רצה האפליקציה (למשל השרת המקומי או שרת מרוחק ב-Render/Railway).
+        </p>
+
+        {apiServerSavedToast && (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
+            <span>כתובת השרת נשמרה בהצלחה!</span>
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-slate-300">
+            כתובת שרת ה-API
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={apiServerUrl}
+              onChange={(e) => setApiServerUrl(e.target.value)}
+              placeholder="למשל: http://localhost:3000"
+              className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 pl-10 text-white text-sm outline-none font-mono text-left"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+              <Globe className="w-4 h-4" />
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all"
+        >
+          שמור כתובת שרת סנכרון ✓
+        </button>
       </form>
 
       {/* Profile Form */}

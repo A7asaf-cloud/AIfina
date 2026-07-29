@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState } from './types';
 import { StorageService } from './services/storage';
+import { getApiUrl } from './utils/apiFallback';
 import { AuthScreen } from './components/AuthScreen';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
@@ -23,7 +24,7 @@ export default function App() {
     const initializeAndSync = async () => {
       // 1. Sync accounts from server
       try {
-        const res = await fetch('/api/auth/accounts');
+        const res = await fetch(getApiUrl('/api/auth/accounts'));
         if (res.ok) {
           const serverAccounts = await res.json();
           // Update local storage with fresh records from server
@@ -41,7 +42,7 @@ export default function App() {
         if (found) {
           // 2. Sync active user data from server
           try {
-            const dataRes = await fetch(`/api/user/load/${found.id}`);
+            const dataRes = await fetch(getApiUrl(`/api/user/load/${found.id}`));
             if (dataRes.ok) {
               const serverData = await dataRes.json();
               if (serverData && serverData.profile) {
@@ -79,7 +80,7 @@ export default function App() {
   const handleAuthSuccess = async (account: UserAccount) => {
     // Sync latest user data from server on login
     try {
-      const dataRes = await fetch(`/api/user/load/${account.id}`);
+      const dataRes = await fetch(getApiUrl(`/api/user/load/${account.id}`));
       if (dataRes.ok) {
         const serverData = await dataRes.json();
         if (serverData && serverData.profile) {
@@ -282,6 +283,7 @@ export default function App() {
             profile={appData.profile}
             budgetPlan={appData.budgetPlan}
             account={activeUser}
+            appData={appData}
             onUpdateProfile={handleUpdateProfile}
             onUpdateBudget={handleUpdateBudget}
             onLogout={handleLogout}
