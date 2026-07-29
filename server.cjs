@@ -27,7 +27,139 @@ var import_path = __toESM(require("path"), 1);
 var import_vite = require("vite");
 var import_genai = require("@google/genai");
 var import_dotenv = __toESM(require("dotenv"), 1);
+var import_fs = __toESM(require("fs"), 1);
 import_dotenv.default.config();
+var DATA_DIR = import_path.default.join(process.cwd(), "data");
+if (!import_fs.default.existsSync(DATA_DIR)) {
+  import_fs.default.mkdirSync(DATA_DIR, { recursive: true });
+}
+var USERS_FILE = import_path.default.join(DATA_DIR, "users.json");
+function readUsersOnServer() {
+  if (!import_fs.default.existsSync(USERS_FILE)) {
+    const demoProfile = {
+      name: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
+      netSalary: 16500,
+      grossSalary: 22e3,
+      salaryDay: 10,
+      creditDay: 1,
+      bankBalance: 24500,
+      creditDebt: 4200,
+      rent: 4800,
+      rentDay: 1,
+      hasKeren: true,
+      kerenEmp: 2.5,
+      kerenEr: 7.5,
+      hasPension: true,
+      pensionEmp: 6,
+      pensionEr: 14.83,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const hashString = (str) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash |= 0;
+      }
+      return hash.toString();
+    };
+    const demoAccount = {
+      id: "demo_user_id",
+      username: "demo",
+      passwordHash: hashString("123456"),
+      displayName: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
+      email: "demo@finance.il",
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      profile: demoProfile
+    };
+    const defaultBudgetPlan = [
+      { key: "\u05D3\u05D9\u05D5\u05E8", pct: 30, color: "#64748B", emoji: "\u{1F3E0}" },
+      { key: "\u05DE\u05D6\u05D5\u05DF \u05D5\u05E9\u05D5\u05E7", pct: 15, color: "#22C55E", emoji: "\u{1F6D2}" },
+      { key: "\u05EA\u05D7\u05D1\u05D5\u05E8\u05D4", pct: 10, color: "#3B82F6", emoji: "\u{1F68C}" },
+      { key: "\u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA", pct: 8, color: "#EAB308", emoji: "\u{1F4A1}" },
+      { key: "\u05D1\u05E8\u05D9\u05D0\u05D5\u05EA", pct: 5, color: "#14B8A6", emoji: "\u{1F3E5}" },
+      { key: "\u05D1\u05D9\u05D3\u05D5\u05E8", pct: 7, color: "#EC4899", emoji: "\u{1F3AC}" },
+      { key: "\u05D7\u05D9\u05E1\u05DB\u05D5\u05DF", pct: 15, color: "#F59E0B", emoji: "\u{1F4B0}" },
+      { key: "\u05E9\u05D5\u05E0\u05D5\u05EA", pct: 10, color: "#9CA3AF", emoji: "\u{1F4E6}" }
+    ];
+    const demoData = {
+      profile: demoProfile,
+      transactions: [
+        { id: 101, description: "\u05DE\u05E9\u05DB\u05D5\u05E8\u05EA \u05D7\u05D5\u05D3\u05E9\u05D9\u05EA", amount: 16500, date: "2026-07-10", cat: "\u05D4\u05DB\u05E0\u05E1\u05D4", color: "#10B981", emoji: "\u{1F4B0}", account: "\u05D1\u05E0\u05E7 \u05D4\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD", auto: true },
+        { id: 102, description: "\u05E9\u05DB\u05E8 \u05D3\u05D9\u05E8\u05D4 - \u05D9\u05D5\u05DC\u05D9", amount: -4800, date: "2026-07-01", cat: "\u05D3\u05D9\u05D5\u05E8", color: "#64748B", emoji: "\u{1F3E0}", account: "\u05D4\u05D5\u05E8\u05D0\u05EA \u05E7\u05D1\u05E2" },
+        { id: 103, description: "\u05E9\u05D5\u05E4\u05E8\u05E1\u05DC \u05D3\u05D9\u05DC \u05E8\u05E2\u05E0\u05E0\u05D4", amount: -680, date: "2026-07-24", cat: "\u05E1\u05D5\u05E4\u05E8\u05DE\u05E8\u05E7\u05D8", color: "#22C55E", emoji: "\u{1F6D2}", account: "Max" },
+        { id: 104, description: "\u05D5\u05D5\u05DC\u05D8 - \u05D2'\u05D9\u05E8\u05E3 \u05E1\u05D5\u05E9\u05D9", amount: -185, date: "2026-07-26", cat: "\u05DE\u05E1\u05E2\u05D3\u05D5\u05EA \u05D5\u05E7\u05E4\u05D4", color: "#F97316", emoji: "\u{1F37D}\uFE0F", account: "Max" },
+        { id: 105, description: "\u05D7\u05D1\u05E8\u05EA \u05D4\u05D7\u05E9\u05DE\u05DC", amount: -340, date: "2026-07-15", cat: "\u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA \u05D1\u05D9\u05EA", color: "#EAB308", emoji: "\u{1F4A1}", account: "\u05D1\u05E0\u05E7 \u05D4\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD" },
+        { id: 106, description: "\u05E4\u05D6 - \u05D3\u05DC\u05E7 \u05DE\u05EA\u05D7\u05DD \u05E9\u05E4\u05D9\u05D9\u05DD", amount: -290, date: "2026-07-20", cat: "\u05D3\u05DC\u05E7 \u05D5\u05E8\u05DB\u05D1", color: "#84CC16", emoji: "\u26FD", account: "Max" },
+        { id: 107, description: "\u05E1\u05D5\u05E4\u05E8-\u05E4\u05D0\u05E8\u05DD \u05E7\u05E0\u05D9\u05D5\u05DF \u05E8\u05E0\u05E0\u05D9\u05DD", amount: -145, date: "2026-07-22", cat: "\u05D1\u05E8\u05D9\u05D0\u05D5\u05EA", color: "#14B8A6", emoji: "\u{1F3E5}", account: "Max" },
+        { id: 108, description: "\u05E4\u05E8\u05D8\u05E0\u05E8 \u05EA\u05E7\u05E9\u05D5\u05E8\u05EA", amount: -120, date: "2026-07-05", cat: "\u05EA\u05E7\u05E9\u05D5\u05E8\u05EA", color: "#06B6D4", emoji: "\u{1F4F1}", account: "\u05D4\u05D5\u05E8\u05D0\u05EA \u05E7\u05D1\u05E2" },
+        { id: 109, description: "\u05E0\u05D8\u05E4\u05DC\u05D9\u05E7\u05E1 \u05D7\u05D5\u05D3\u05E9\u05D9", amount: -65, date: "2026-07-03", cat: "\u05D1\u05D9\u05D3\u05D5\u05E8", color: "#EC4899", emoji: "\u{1F3AC}", account: "Max" },
+        { id: 110, description: "\u05D6\u05D0\u05E8\u05D4 \u05E7\u05E0\u05D9\u05D5\u05DF \u05E2\u05D6\u05E8\u05D9\u05D0\u05DC\u05D9", amount: -390, date: "2026-07-18", cat: "\u05E7\u05E0\u05D9\u05D5\u05EA", color: "#F59E0B", emoji: "\u{1F6CD}\uFE0F", account: "Max" }
+      ],
+      budgetPlan: defaultBudgetPlan,
+      investments: {
+        kerenValue: 84500,
+        kerenYTD: 6.8,
+        pensionValue: 24e4,
+        pensionYTD: 8.2,
+        savings: [
+          { id: 1, name: '\u05E4\u05E7"\u05DE \u05D7\u05D5\u05D3\u05E9\u05D9 \u05DE\u05EA\u05D7\u05D3\u05E9', bank: "\u05D1\u05E0\u05E7 \u05D4\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD", value: 35e3, rate: 4.2 }
+        ],
+        moneyMarket: [
+          { id: 101, name: "\u05DE\u05D2\u05D3\u05DC \u05E9\u05E7\u05DC\u05D9\u05DD \u05DB\u05E1\u05E4\u05D9\u05EA", value: 5e4, yield: 4.6 }
+        ],
+        portfolioHoldings: [
+          { id: 201, symbol: "NVDA", name: "NVIDIA Corporation", shares: 25, avgCost: 110, color: "#22C55E" },
+          { id: 202, symbol: "AAPL", name: "Apple Inc.", shares: 15, avgCost: 195, color: "#3B82F6" },
+          { id: 203, symbol: "TEVA.TA", name: "Teva Pharmaceutical", shares: 300, avgCost: 14.5, color: "#8B5CF6" }
+        ],
+        portfolioCash: 2500,
+        portfolioHistory: [
+          { id: 1, type: "deposit", amount: 5e3, date: "2026-01-15" },
+          { id: 2, type: "buy", symbol: "NVDA", shares: 25, price: 110, cost: 2750, date: "2026-02-10" }
+        ]
+      },
+      snapshots: {
+        kerenValue: [
+          { date: "2026-01-01", value: 78e3 },
+          { date: "2026-04-01", value: 81200 },
+          { date: "2026-07-01", value: 84500 }
+        ],
+        pensionValue: [
+          { date: "2026-01-01", value: 22e4 },
+          { date: "2026-04-01", value: 231e3 },
+          { date: "2026-07-01", value: 24e4 }
+        ]
+      }
+    };
+    import_fs.default.writeFileSync(USERS_FILE, JSON.stringify([demoAccount], null, 2), "utf8");
+    import_fs.default.writeFileSync(import_path.default.join(DATA_DIR, "user_data_demo_user_id.json"), JSON.stringify(demoData, null, 2), "utf8");
+    return [demoAccount];
+  }
+  try {
+    return JSON.parse(import_fs.default.readFileSync(USERS_FILE, "utf8"));
+  } catch (e) {
+    return [];
+  }
+}
+function writeUsersOnServer(users) {
+  import_fs.default.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+}
+function readUserDataOnServer(userId) {
+  const filePath = import_path.default.join(DATA_DIR, `user_data_${userId}.json`);
+  if (!import_fs.default.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(import_fs.default.readFileSync(filePath, "utf8"));
+  } catch (e) {
+    return null;
+  }
+}
+function writeUserDataOnServer(userId, data) {
+  const filePath = import_path.default.join(DATA_DIR, `user_data_${userId}.json`);
+  import_fs.default.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+}
 async function startServer() {
   const app = (0, import_express.default)();
   const PORT = 3e3;
@@ -75,7 +207,7 @@ async function startServer() {
     return process.env.GEMINI_API_KEY;
   }
   async function generateGeminiContent(ai, params) {
-    const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
+    const modelsToTry = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
     let lastError = null;
     for (const modelName of modelsToTry) {
       try {
@@ -126,6 +258,79 @@ async function startServer() {
       });
     }
   });
+  async function fetchGoogleQuote(symbol) {
+    let cleanSymbol = symbol.trim();
+    let exchange = "";
+    if (cleanSymbol.endsWith(".TA")) {
+      cleanSymbol = cleanSymbol.replace(".TA", "");
+      exchange = "TLV";
+    } else if (cleanSymbol.includes(":")) {
+      const parts = cleanSymbol.split(":");
+      cleanSymbol = parts[0];
+      exchange = parts[1];
+    }
+    const exchangesToTry = exchange ? [exchange] : ["NASDAQ", "NYSE", "TLV"];
+    for (const ex of exchangesToTry) {
+      try {
+        const url = `https://www.google.com/finance/quote/${encodeURIComponent(cleanSymbol)}:${ex}?hl=en`;
+        const res = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html"
+          }
+        });
+        if (!res.ok) continue;
+        const html = await res.text();
+        const pdsbrcRegex = /jsname="Pdsbrc"[^>]*>\s*<span>([^<]+)<\/span>/gi;
+        let match;
+        const prices = [];
+        while ((match = pdsbrcRegex.exec(html)) !== null) {
+          prices.push({ value: match[1], index: match.index });
+        }
+        const currencyRegex = /(?:[\$\₪\€\£]|[A-Z]{3})[\s\u00A0]*[0-9,]+\.[0-9]+/i;
+        const mainPriceObj = prices.find((p) => currencyRegex.test(p.value));
+        if (!mainPriceObj) continue;
+        const mainPriceString = mainPriceObj.value;
+        const mainPriceIndex = mainPriceObj.index;
+        const subHtml = html.substring(mainPriceIndex, mainPriceIndex + 2e3);
+        const absChangeMatch = subHtml.match(/jsname="xnruHf"[^>]*>\s*<span[^>]*>\s*<span[^>]*>([^<]+)<\/span>/i) || subHtml.match(/jsname="xnruHf"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/i);
+        const pctChangeMatch = subHtml.match(/jsname="vY9t3b"[^>]*>\s*<span[^>]*>\s*<span[^>]*>([^<]+)<\/span>/i) || subHtml.match(/jsname="vY9t3b"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/i);
+        let isNegative = subHtml.includes("arrow_downward") || pctChangeMatch && pctChangeMatch[1].includes("-");
+        let sign = isNegative ? -1 : 1;
+        const numMatch = mainPriceString.match(/[0-9,]+\.[0-9]+/);
+        const curMatch = mainPriceString.match(/^[^\s\u00A0\d]+/);
+        if (numMatch) {
+          const rawPrice = parseFloat(numMatch[0].replace(/,/g, ""));
+          let currency = curMatch ? curMatch[0].trim() : "USD";
+          let price = rawPrice;
+          if (currency === "ILA") {
+            price = price / 100;
+            currency = "ILS";
+          }
+          if (currency === "$") currency = "USD";
+          if (currency === "\u20AA") currency = "ILS";
+          const pctChangeText = pctChangeMatch ? pctChangeMatch[1].replace(/[+\-%\s]/g, "").trim() : "0";
+          const changePercent = parseFloat(pctChangeText) * sign;
+          const nameMatch = html.match(/<div class="zzDeGe">([^<]+)<\/div>/i) || html.match(/class="gO24Ff">([^<]+)<\/div>/i);
+          const companyName = nameMatch ? nameMatch[1].trim() : cleanSymbol;
+          return {
+            success: true,
+            symbol,
+            price: parseFloat(price.toFixed(2)),
+            prevClose: parseFloat((price / (1 + changePercent / 100)).toFixed(2)),
+            changePercent: parseFloat(changePercent.toFixed(2)),
+            currency,
+            companyName,
+            apiSource: `Google Finance Scraped (${ex})`,
+            lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+          };
+        }
+      } catch (e) {
+        console.error(`Google scrape error for ${cleanSymbol} on ${ex}:`, e);
+      }
+    }
+    return null;
+  }
   app.get("/api/stock-quote/:symbol", async (req, res) => {
     let rawParam = req.params.symbol || "AAPL";
     try {
@@ -267,6 +472,10 @@ async function startServer() {
     if (quote) {
       return res.json(quote);
     }
+    quote = await fetchGoogleQuote(mappedSymbol);
+    if (quote) {
+      return res.json(quote);
+    }
     try {
       const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=1`;
       const searchRes = await fetch(searchUrl, {
@@ -278,7 +487,7 @@ async function startServer() {
         const searchData = await searchRes.json();
         const foundSymbol = searchData.quotes?.[0]?.symbol;
         if (foundSymbol) {
-          quote = await fetchYahooChart(foundSymbol);
+          quote = await fetchYahooChart(foundSymbol) || await fetchGoogleQuote(foundSymbol);
           if (quote) {
             return res.json(quote);
           }
@@ -410,6 +619,7 @@ async function startServer() {
       const response = await generateGeminiContent(ai, {
         contents: [
           {
+            role: "user",
             parts: [
               { text: promptText },
               {
@@ -482,6 +692,66 @@ async function startServer() {
     } catch (error) {
       console.error("AI Advisor Error:", error);
       return res.status(500).json({ error: error.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E0\u05D9\u05EA\u05D5\u05D7 AI" });
+    }
+  });
+  app.get("/api/auth/accounts", (req, res) => {
+    try {
+      const users = readUsersOnServer();
+      const safeUsers = users.map((u) => ({
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        createdAt: u.createdAt,
+        profile: u.profile
+      }));
+      res.json(safeUsers);
+    } catch (e) {
+      res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05DE\u05E9\u05EA\u05DE\u05E9\u05D9\u05DD" });
+    }
+  });
+  app.post("/api/auth/register", (req, res) => {
+    try {
+      const { account, initData } = req.body;
+      if (!account || !account.username) {
+        return res.status(400).json({ error: "\u05E0\u05EA\u05D5\u05E0\u05D9 \u05D7\u05E9\u05D1\u05D5\u05DF \u05D7\u05E1\u05E8\u05D9\u05DD" });
+      }
+      const users = readUsersOnServer();
+      const exists = users.some((u) => u.username.toLowerCase() === account.username.toLowerCase());
+      if (exists) {
+        return res.status(400).json({ error: "\u05E9\u05DD \u05D4\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DB\u05D1\u05E8 \u05E7\u05D9\u05D9\u05DD \u05D1\u05E9\u05E8\u05EA" });
+      }
+      users.push(account);
+      writeUsersOnServer(users);
+      if (initData) {
+        writeUserDataOnServer(account.id, initData);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E8\u05D9\u05E9\u05D5\u05DD \u05DE\u05E9\u05EA\u05DE\u05E9 \u05D1\u05E9\u05E8\u05EA" });
+    }
+  });
+  app.get("/api/user/load/:userId", (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const data = readUserDataOnServer(userId);
+      if (!data) {
+        return res.status(404).json({ error: "\u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0\u05D5 \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05E2\u05D1\u05D5\u05E8 \u05DE\u05E9\u05EA\u05DE\u05E9 \u05D6\u05D4" });
+      }
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD" });
+    }
+  });
+  app.post("/api/user/save", (req, res) => {
+    try {
+      const { userId, data } = req.body;
+      if (!userId || !data) {
+        return res.status(400).json({ error: "\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05D7\u05E1\u05E8\u05D9\u05DD \u05DC\u05E9\u05DE\u05D9\u05E8\u05D4" });
+      }
+      writeUserDataOnServer(userId, data);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E9\u05DE\u05D9\u05E8\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD" });
     }
   });
   if (process.env.NODE_ENV !== "production") {
