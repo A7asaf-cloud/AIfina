@@ -179,8 +179,11 @@ export default function App() {
     StorageService.saveUserData(activeUser.id, parsedData);
   };
 
-  // Auth gate — AuthContext handles the session check
-  if (authLoading) {
+  // Auth gate:
+  // - If we have a cached user (from localStorage) → show app immediately, validate in background
+  // - If no cache and still loading → brief spinner
+  // - If loading done and no user → show login page
+  if (authLoading && !authUser) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
@@ -209,7 +212,7 @@ export default function App() {
   }).format(new Date());
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-x-hidden">
       {/* Top Fixed Header */}
       <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 px-4 py-4">
         <div className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto flex items-center justify-between gap-3">

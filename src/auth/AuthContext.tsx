@@ -19,27 +19,40 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const CACHE_KEY = 'fil_auth_user';
 
+// In-memory token (not persisted — security: not in localStorage)
 let _memToken: string | null = null;
-
 export function setMemToken(t: string | null) { _memToken = t; }
 export function getMemToken(): string | null   { return _memToken; }
 
+function getCachedUser(): AuthUser | null {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { return null; }
+}
+function setCachedUser(u: AuthUser | null) {
+  if (u) localStorage.setItem(CACHE_KEY, JSON.stringify(u));
+  else localStorage.removeItem(CACHE_KEY);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]               = useState<AuthUser | null>(null);
+  // Start with cached user immediately — no loading flash on refresh
+  const [user, setUser]               = useState<AuthUser | null>(getCachedUser);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  // isLoading = true only while we're validating the cached session in background
   const [isLoading, setIsLoading]     = useState(true);
 
   const applySession = useCallback((token: string, userData: AuthUser) => {
     _memToken = token;
     setAccessToken(token);
     setUser(userData);
+    setCachedUser(userData);
   }, []);
 
   const clearSession = useCallback(() => {
     _memToken = null;
     setAccessToken(null);
     setUser(null);
+    setCachedUser(null);
   }, []);
 
   const fetchMe = useCallback(async (token: string): Promise<AuthUser> => {
@@ -57,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applySession(access_token, userData);
       return true;
     } catch {
+      // Only clear if we had no cached user — avoid flash-of-logout
       clearSession();
       return false;
     }
@@ -68,12 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fragmentToken = params.get('access_token');
 
     if (fragmentToken) {
+      // Google OAuth callback
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       fetchMe(fragmentToken)
         .then(u => applySession(fragmentToken, u))
         .catch(clearSession)
         .finally(() => setIsLoading(false));
     } else {
+      // Silent refresh in background — UI already shows from cache
       silentRefresh().finally(() => setIsLoading(false));
     }
   }, []); // eslint-disable-line

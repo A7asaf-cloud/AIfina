@@ -684,13 +684,13 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
         </div>
       )}
 
-      {/* Navigation Sub-Tabs */}
+      {/* Navigation Sub-Tabs — scrollable, each button fixed size */}
       <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl overflow-x-auto scrollbar-hide gap-1">
         {SUB_TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveSubTab(t.id)}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`shrink-0 py-2 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeSubTab === t.id
                 ? 'bg-emerald-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -705,66 +705,51 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
       {activeSubTab === 'stocks' && (
         <div className="space-y-4">
           {/* Summary Hero */}
-          <div className="bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-950 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-xs font-semibold text-slate-400">📊 תיק מניות מסחר</span>
-                <h2 className="text-3xl sm:text-4xl font-black text-white font-num mt-1">
+          <div className="bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-950 border border-slate-800 rounded-3xl p-5 shadow-xl relative overflow-hidden">
+            {/* Value + action buttons — wrap on narrow screens */}
+            <div className="flex flex-wrap justify-between items-start gap-3">
+              <div className="min-w-0">
+                <span className="text-xs font-semibold text-slate-400">📊 תיק מניות</span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white font-num mt-1 break-all">
                   {fmtUSD(totalPortUSD)}
                 </h2>
-                <div className="text-xs text-slate-400 font-num mt-0.5">
-                  {fmtILS(totalPortILS)} (שער מט״ח ₪{usdRate.toFixed(2)})
+                <div className="text-[11px] text-slate-400 font-num mt-0.5">
+                  {fmtILS(totalPortILS)} · ₪{usdRate.toFixed(2)}/$
                   {lastRefreshedTime && (
-                    <span className="text-[10px] text-emerald-400 font-sans block mt-0.5 font-semibold">
-                      🟢 עכשיו מעודכן בלייב ({lastRefreshedTime})
-                    </span>
+                    <span className="text-emerald-400 font-semibold mr-1">🟢 {lastRefreshedTime}</span>
                   )}
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 justify-end">
-                <button
-                  onClick={handleRefreshStockPrices}
-                  disabled={isRefreshing}
-                  className="px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 text-xs font-bold rounded-xl border border-indigo-500/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="רענן מחירי שוק מניות בזמן אמת"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span>{isRefreshing ? 'מעדכן...' : 'רענן מחירי שוק'}</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={handleRefreshStockPrices} disabled={isRefreshing}
+                  className="px-2.5 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 text-xs font-bold rounded-xl border border-indigo-500/30 flex items-center gap-1 cursor-pointer disabled:opacity-50">
+                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshing ? '...' : 'רענן'}</span>
                 </button>
-                <button
-                  onClick={() => setShowDepositModal(true)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold rounded-xl border border-slate-700 cursor-pointer"
-                >
-                  💵 הפקד $
+                <button onClick={() => setShowDepositModal(true)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold rounded-xl border border-slate-700 cursor-pointer">
+                  💵 הפקד
                 </button>
-                <button
-                  onClick={() => setShowBuyModal(true)}
-                  className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold rounded-xl shadow-md cursor-pointer"
-                >
-                  🟢 קנה נייר
+                <button onClick={() => setShowBuyModal(true)}
+                  className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold rounded-xl shadow-md cursor-pointer">
+                  🟢 קנה
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-slate-800/80 text-xs">
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                <div className="text-slate-400 text-[10px]">עלות רכישה</div>
-                <div className="font-bold text-white font-num mt-0.5">
-                  {fmtUSD(totalStockCostBasisUSD)}
-                </div>
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-800/80 text-xs">
+              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                <div className="text-slate-400 text-[10px]">עלות</div>
+                <div className="font-bold text-white font-num mt-0.5 text-[11px] break-all">{fmtUSD(totalStockCostBasisUSD)}</div>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                <div className="text-slate-400 text-[10px]">שווי מניות</div>
-                <div className="font-bold text-emerald-400 font-num mt-0.5">
-                  {fmtUSD(totalStockValUSD)}
-                </div>
+              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                <div className="text-slate-400 text-[10px]">שווי</div>
+                <div className="font-bold text-emerald-400 font-num mt-0.5 text-[11px] break-all">{fmtUSD(totalStockValUSD)}</div>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                <div className="text-slate-400 text-[10px]">מזומן פנוי</div>
-                <div className="font-bold text-white font-num mt-0.5">
-                  {fmtUSD(cashUSD)}
-                </div>
+              <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                <div className="text-slate-400 text-[10px]">מזומן</div>
+                <div className="font-bold text-white font-num mt-0.5 text-[11px] break-all">{fmtUSD(cashUSD)}</div>
               </div>
             </div>
           </div>
@@ -809,16 +794,16 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                       </div>
 
                       {/* Row 2: details + actions */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-[11px] text-slate-500 leading-relaxed">
-                          <span>{h.shares} יח׳ · מחיר: ${livePrice.toFixed(2)} · ממוצע: ${h.avgCost.toFixed(2)}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-[11px] text-slate-500 leading-relaxed min-w-0 break-words">
+                          <span>{h.shares} יח׳ · ${livePrice.toFixed(2)} · ממוצע ${h.avgCost.toFixed(2)}</span>
                           {h.changePercent !== undefined && (
-                            <span className={`mr-2 font-bold ${h.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                              · היום: {h.changePercent >= 0 ? '+' : ''}{h.changePercent.toFixed(2)}%
+                            <span className={`mr-1 font-bold ${h.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              · {h.changePercent >= 0 ? '+' : ''}{h.changePercent.toFixed(2)}%
                             </span>
                           )}
                         </div>
-                        <div className="flex gap-1.5 flex-shrink-0">
+                        <div className="flex gap-1.5 shrink-0">
                           <button onClick={() => openSellModal(h)}
                             className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-lg transition-all cursor-pointer">
                             מכור

@@ -159,23 +159,23 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   return (
     <div className="space-y-6 pb-24 text-right animate-fade-in">
       {/* User Session Info Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-lg shrink-0">
             👤
           </div>
-          <div>
-            <h3 className="font-bold text-white text-base">{account.displayName || account.username}</h3>
-            <span className="text-xs text-slate-400 font-num">שם משתמש: {account.username}</span>
+          <div className="min-w-0">
+            <h3 className="font-bold text-white text-sm truncate">{account.displayName || account.email || account.username}</h3>
+            <span className="text-xs text-slate-400 truncate block max-w-full">{account.email || account.username}</span>
           </div>
         </div>
 
         <button
           onClick={onLogout}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-xl transition-all cursor-pointer"
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-xl transition-all cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
-          <span>התנתק</span>
+          <span>יציאה</span>
         </button>
       </div>
 
@@ -188,18 +188,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       {/* Gemini API Key Configuration Card */}
       <form onSubmit={handleSaveGeminiKey} className="bg-slate-900 border border-indigo-500/30 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex justify-between items-center">
-          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1 border ${
+        <div className="flex flex-wrap-reverse items-center justify-between gap-2">
+          <span className={`shrink-0 text-[10px] font-extrabold px-2 py-1 rounded-full flex items-center gap-1 border ${
             geminiKeyInput.trim()
               ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
               : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
           }`}>
             <Sparkles className="w-3 h-3" />
-            <span>{geminiKeyInput.trim() ? 'מפתח מוגדר' : 'טרם הוגדר מפתח'}</span>
+            <span>{geminiKeyInput.trim() ? 'מוגדר ✓' : 'לא הוגדר'}</span>
           </span>
-          <h3 className="font-bold text-white text-base flex items-center gap-2">
-            <span>הגדרת מפתח Gemini API (בינה מלאכותית)</span>
-            <Key className="w-4 h-4 text-indigo-400" />
+          <h3 className="font-bold text-white text-sm flex items-center gap-1.5 min-w-0">
+            <Key className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span className="truncate">מפתח Gemini API</span>
           </h3>
         </div>
 

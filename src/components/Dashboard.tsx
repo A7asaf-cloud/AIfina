@@ -260,31 +260,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* AI Financial Insights Card */}
       <div className="bg-gradient-to-br from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-3xl p-5 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             onClick={fetchAiInsights}
             disabled={aiLoading}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-600/20"
+            className="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-600/20"
           >
             {aiLoading ? (
               <>
                 <span className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                <span>מנתח נתונים...</span>
+                <span>מנתח...</span>
               </>
             ) : (
               <>
                 <span>✨</span>
-                <span>{aiInsights ? 'רענן ניתוח' : 'קבל ניתוח AI בלייב'}</span>
+                <span>{aiInsights ? 'רענן' : 'קבל ניתוח AI'}</span>
               </>
             )}
           </button>
 
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-              <span>תובנות פיננסיות אישיות</span>
-              <span className="text-indigo-400 text-xs px-2 py-0.5 bg-indigo-500/20 rounded-full border border-indigo-500/30 font-num">
-                Gemini AI
-              </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="text-sm font-bold text-white truncate">תובנות פיננסיות</h3>
+            <span className="text-indigo-400 text-[10px] px-1.5 py-0.5 bg-indigo-500/20 rounded-full border border-indigo-500/30 shrink-0">
+              Gemini AI
+            </span>
             </h3>
             <span className="text-lg">🤖</span>
           </div>
