@@ -206,26 +206,31 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative">
       {/* Top Fixed Header */}
-      <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 px-4 py-3">
-        <div className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-right">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-lg">
+      <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 px-4 py-4">
+        <div className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto flex items-center justify-between gap-3">
+          {/* Logo */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-xl">
               💎
             </div>
             <div>
               <h1 className="text-sm font-black text-white leading-tight">FinanceIL</h1>
-              <p className="text-[10px] text-slate-400 capitalize">{currentMonthYear}</p>
+              <p className="text-[10px] text-slate-500">{currentMonthYear}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="text-right">
-              <span className="block text-xs font-bold text-slate-200 truncate max-w-[120px]">
+          {/* User info */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="text-right min-w-0">
+              <span className="block text-xs font-semibold text-slate-200 truncate max-w-[110px]">
                 {appData.profile.name}
               </span>
-              <span className="block text-[10px] text-emerald-400 font-num">
-                {fmtILS(appData.profile.netSalary)}
+              <span className="block text-[11px] text-emerald-400 font-bold">
+                {fmtILS(appData.profile.netSalary)} / חודש
               </span>
+            </div>
+            <div className="w-9 h-9 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-sm shrink-0">
+              {(appData.profile.name || '?')[0]}
             </div>
           </div>
         </div>
@@ -240,7 +245,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto px-4 pt-4">
+      <main className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto px-4 pt-5 pb-28">
         {activeTab === 'dashboard' && (
           <Dashboard
             profile={appData.profile}

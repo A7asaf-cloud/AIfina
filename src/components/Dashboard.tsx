@@ -163,43 +163,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .slice(0, 6);
 
   return (
-    <div className="space-y-6 pb-24 text-right animate-fade-in">
+    <div className="space-y-4 text-right animate-fade-in">
       {/* Hero Card: Safe To Spend */}
       <div
-        className={`bg-gradient-to-br ${cardBgGradient} border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden`}
+        className={`bg-gradient-to-br ${cardBgGradient} border border-slate-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden`}
       >
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              שלום {profile.name} 👋 · יתרה פנויה לתקציב
-            </span>
-            <h2 className={`text-4xl sm:text-5xl font-black mt-1 ${spendColorClass} font-num tracking-tight`}>
+        {/* Greeting */}
+        <div className="flex justify-between items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-slate-400 mb-0.5">
+              שלום {profile.name} 👋
+            </p>
+            <p className="text-xs text-slate-500 mb-3">יתרה פנויה לתקציב החודש</p>
+            <h2 className={`text-3xl sm:text-4xl font-black ${spendColorClass} font-num tracking-tight leading-none`}>
               {fmtILS(safeToSpend)}
             </h2>
           </div>
-          <div className="p-3 bg-slate-800/80 border border-slate-700/50 rounded-2xl text-slate-300">
-            <Wallet className="w-6 h-6" />
+          <div className="p-2.5 bg-slate-800/80 border border-slate-700/50 rounded-2xl text-slate-300 shrink-0">
+            <Wallet className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Income vs Expense Pills */}
-        <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-slate-800/80">
+        {/* Income vs Expense */}
+        <div className="grid grid-cols-2 gap-2.5 mt-5 pt-4 border-t border-slate-800/80">
           <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-              <span>הכנסות החודש</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>הכנסות</span>
             </div>
-            <div className="text-base font-bold text-white font-num">
+            <div className="text-sm font-bold text-white font-num">
               {fmtILS(monthIncome || net)}
             </div>
           </div>
 
           <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
-              <TrendingDown className="w-3.5 h-3.5 text-red-400" />
-              <span>הוצאות החודש</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-1.5">
+              <TrendingDown className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span>הוצאות</span>
             </div>
-            <div className="text-base font-bold text-white font-num">
+            <div className="text-sm font-bold text-white font-num">
               {fmtILS(monthExpense)}
             </div>
           </div>
@@ -208,30 +210,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Countdown Timers Strip */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-emerald-400 font-bold mb-0.5">💰 משכורת</div>
-            <div className="text-sm font-extrabold text-white">
-              {daysToSalary === 0 ? 'נכנסת היום! 🎉' : `בעוד ${daysToSalary} ימים`}
+        <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <Calendar className="w-4 h-4" />
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">כל ה-{profile.salaryDay} בחודש</div>
+            <span className="text-[11px] text-emerald-400 font-bold">💰 משכורת</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-            <Calendar className="w-5 h-5" />
+          <div className="text-sm font-extrabold text-white leading-snug">
+            {daysToSalary === 0 ? 'נכנסת היום! 🎉' : `בעוד ${daysToSalary} ימים`}
           </div>
+          <div className="text-[11px] text-slate-500 mt-1">כל ה-{profile.salaryDay} בחודש</div>
         </div>
 
-        <div className="bg-slate-900 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-red-400 font-bold mb-0.5">💳 חיוב אשראי</div>
-            <div className="text-sm font-extrabold text-white">
-              {daysToCredit === 0 ? 'חיוב היום! ⚠️' : `בעוד ${daysToCredit} ימים`}
+        <div className="bg-slate-900 border border-red-500/20 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center">
+              <CreditCard className="w-4 h-4" />
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">צבור: {fmtILS(creditCardAccumulated)}</div>
+            <span className="text-[11px] text-red-400 font-bold">💳 אשראי</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center font-bold">
-            <CreditCard className="w-5 h-5" />
+          <div className="text-sm font-extrabold text-white leading-snug">
+            {daysToCredit === 0 ? 'חיוב היום! ⚠️' : `בעוד ${daysToCredit} ימים`}
           </div>
+          <div className="text-[11px] text-slate-500 mt-1">צבור: {fmtILS(creditCardAccumulated)}</div>
         </div>
       </div>
 
@@ -330,36 +332,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </h3>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {budget.map((b) => {
             const currentSpent = spent[b.key] || 0;
             const pct = Math.min(100, b.amount ? (currentSpent / b.amount) * 100 : 0);
             const isOver = currentSpent > b.amount;
 
             return (
-              <div key={b.key} className="space-y-1">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-slate-300">
+              <div key={b.key} className="space-y-1.5">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-300 shrink-0">
                     {b.emoji} {b.key}
                   </span>
-                  <div className="flex items-center gap-1">
-                    <span className={`font-num ${isOver ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                      {fmtILS(currentSpent)} / {fmtILS(b.amount)}
-                    </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
                     {isOver && (
-                      <span className="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                      <span className="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-lg text-[10px] font-bold shrink-0">
                         חריגה!
                       </span>
                     )}
+                    <span className={`text-[11px] font-num truncate ${isOver ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                      {fmtILS(currentSpent)} / {fmtILS(b.amount)}
+                    </span>
                   </div>
                 </div>
-                <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div className="h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
                   <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${pct}%`,
-                      backgroundColor: isOver ? '#EF4444' : b.color,
-                    }}
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${pct}%`, backgroundColor: isOver ? '#EF4444' : b.color }}
                   />
                 </div>
               </div>
@@ -385,26 +384,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
             אין עסקאות עדיין — לייבא קובץ אקסל או להוסיף בלחיצה על (+)
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/80">
+          <div className="divide-y divide-slate-800/60">
             {recentTxs.map((tx) => {
               const isIncome = tx.amount > 0;
               return (
-                <div key={tx.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div key={tx.id} className="py-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg flex-shrink-0"
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-base flex-shrink-0"
                       style={{ backgroundColor: tx.color + '20' }}
                     >
                       {tx.emoji}
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-white truncate leading-snug">
                         {tx.description}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                        <span>{fmtDate(tx.date)}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] text-slate-500">{fmtDate(tx.date)}</span>
                         <span
-                          className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                          className="px-2 py-0.5 rounded-full text-[10px] font-semibold truncate max-w-[80px]"
                           style={{ backgroundColor: tx.color + '20', color: tx.color }}
                         >
                           {tx.cat}
@@ -413,13 +412,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                   </div>
 
-                  <div
-                    className={`text-sm font-bold font-num flex-shrink-0 ${
-                      isIncome ? 'text-emerald-400' : 'text-slate-200'
-                    }`}
-                  >
-                    {isIncome ? '+' : ''}
-                    {fmtILS(tx.amount)}
+                  <div className={`text-sm font-bold font-num flex-shrink-0 ${isIncome ? 'text-emerald-400' : 'text-slate-200'}`}>
+                    {isIncome ? '+' : ''}{fmtILS(tx.amount)}
                   </div>
                 </div>
               );
