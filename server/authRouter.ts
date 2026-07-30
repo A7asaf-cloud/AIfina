@@ -196,16 +196,21 @@ authRouter.post('/refresh', (req: Request, res: Response) => {
 
   try {
     const payload = verifyRefreshToken(token);
-    const user = findAuthUserById(payload.sub);
-    if (!user) throw new Error('user not found');
 
-    // Check logout-all: token version must match current user version
+    let user = findAuthUserById(payload.sub);
+
+    // If user file was wiped (e.g. AI Studio restart) — recreate from JWT claims
+    if (!user) {
+      user = makeUser({ id: payload.sub, email: payload.email, tokenVersion: 0 });
+      saveAuthUser(user);
+    }
+
+    // Check logout-all: token version must match
     if ((payload.ver ?? 0) !== (user.tokenVersion || 0)) {
       clearCookie(res);
       return res.status(401).json({ detail: 'Token בוטל — יש להתחבר מחדש' });
     }
 
-    // Rotate: issue new refresh token
     const accessToken = issueSession(res, user);
     return res.json({ access_token: accessToken });
   } catch {

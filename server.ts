@@ -204,7 +204,7 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey });
       const prompt = `סווג כל תיאור עסקה לאחת מהקטגוריות הבאות בלבד. אל תמציא קטגוריות חדשות.
 
-קטגוריות: סופרמרקט | מסעדות וקפה | ארנונה | בידור | תקשורת | דלק ורכב | תחבורה | חשבונות בית | ביטוח | בריאות | קניות | דיור | הכנסה | אחר
+קטגוריות: הכנסה | מזון ושוק | דיור | תחבורה | חשבונות | בריאות | בידור | קניות | חיסכון | שונות
 
 תיאורים:
 ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
@@ -219,7 +219,10 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
       const first = clean.indexOf('{');
       const last  = clean.lastIndexOf('}');
       const json  = JSON.parse(clean.substring(first, last + 1));
-      return res.json({ results: json.results || [] });
+      // Normalize categories to match exactly
+      const VALID = ['הכנסה','מזון ושוק','דיור','תחבורה','חשבונות','בריאות','בידור','קניות','חיסכון','שונות'];
+      const normalized = (json.results || []).map((c: string) => VALID.includes(c) ? c : 'שונות');
+      return res.json({ results: normalized });
     } catch (e: any) {
       console.error('Categorize error:', e);
       return res.status(500).json({ error: e.message });
