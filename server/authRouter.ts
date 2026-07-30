@@ -158,7 +158,7 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
   const clientId     = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri  = GOOGLE_REDIRECT_URI();
-  const frontendUrl  = process.env.FRONTEND_URL || 'https://aifina.ai.studio';
+  const frontendUrl  = process.env.FRONTEND_URL || 'https://aifina.ai.studio/';
 
   if (!clientId || !clientSecret) return res.status(501).send('Google OAuth לא מוגדר');
 

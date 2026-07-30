@@ -117,9 +117,25 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         const customKey = localStorage.getItem('fil_gemini_api_key') || '';
         const cleanBase64 = compressedBase64.includes(',') ? compressedBase64.split(',').pop() : compressedBase64;
         
-        let localPromptText = `אתה אלגוריתם חכם לזיהוי עסקאות פיננסיות וקבלה. חלץ את כל העסקאות מהתמונה.
+        let localPromptText = `אתה אלגוריתם חכם לזיהוי וסיווג עסקאות פיננסיות. חלץ את כל העסקאות מהתמונה וסווג כל אחת לקטגוריה המתאימה.
 החזר אך ורק מערך JSON תקין במבנה הבא ללא טקסט נוסף וללא markdown:
-[{"date":"YYYY-MM-DD","description":"שם בית העסק","amount":number}]
+[{"date":"YYYY-MM-DD","description":"שם בית העסק","amount":number,"cat":"קטגוריה","emoji":"אמוג'י"}]
+
+קטגוריות אפשריות (בחר את המתאים ביותר):
+- הכנסה (משכורת, העברה נכנסת) 💰
+- דיור (שכר דירה, ועד בית, ארנונה) 🏠
+- סופרמרקט (שופרסל, רמי לוי, מגה, יינות ביתן) 🛒
+- מסעדות וקפה (אוכל בחוץ, קפה, פיצה, סושי, וולט, טיב טעם) 🍽️
+- דלק ורכב (פז, סונול, דלק, חניה, ביטוח רכב) ⛽
+- תחבורה (אוטובוס, רכבת, מונית) 🚌
+- חשבונות בית (חשמל, מים, גז, אינטרנט) 💡
+- תקשורת (פלאפון, סלולר, HOT, YES) 📱
+- בריאות (רופא, תרופות, ביטוח בריאות, סופר-פארם) 🏥
+- קניות (ביגוד, נעליים, אמזון, אלקטרוניקה) 🛍️
+- בידור (קולנוע, נטפליקס, ספוטיפיי, משחקים) 🎬
+- חיסכון (קרן, פיקדון, השקעה) 💎
+- שונות (כל דבר אחר) 📦
+
 חוקים:
 - סכום שלילי = הוצאה / חיוב.
 - סכום חיובי = הכנסה / זיכוי.
@@ -224,15 +240,16 @@ export const ImportTab: React.FC<ImportTabProps> = ({
             ]);
           } else if (Array.isArray(data.result)) {
             const txs: Transaction[] = data.result.map((r: any, idx: number) => {
-              const catInfo = categorize(r.description || '');
+              // Use AI-returned category first, fall back to local keyword matching
+              const catInfo = categorize(r.cat || r.description || '');
               return {
                 id: Date.now() + idx + Math.random(),
                 description: r.description || 'עסקה שזוהתה',
                 amount: parseFloat(r.amount) || 0,
                 date: r.date || new Date().toISOString().split('T')[0],
-                cat: catInfo.cat,
+                cat: r.cat || catInfo.cat,
                 color: catInfo.color,
-                emoji: catInfo.emoji,
+                emoji: r.emoji || catInfo.emoji,
                 account: 'צילום מסך',
               };
             });
