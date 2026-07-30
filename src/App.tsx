@@ -3,6 +3,7 @@ import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, Inv
 import { StorageService } from './services/storage';
 import { useAuth } from './auth/AuthContext';
 import AuthPage from './auth/AuthPage';
+import { setTokenProvider } from './services/storage';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { TransactionsTab } from './components/TransactionsTab';
@@ -13,7 +14,12 @@ import { BottomNav } from './components/BottomNav';
 import { fmtILS } from './utils/formatters';
 
 export default function App() {
-  const { user: authUser, isLoading: authLoading, logout: authLogout, logoutAll: authLogoutAll } = useAuth();
+  const { user: authUser, accessToken, isLoading: authLoading, logout: authLogout, logoutAll: authLogoutAll } = useAuth();
+
+  // Register token provider so StorageService can sync data to server
+  useEffect(() => {
+    setTokenProvider(() => accessToken);
+  }, [accessToken]);
 
   const [appData, setAppData] = useState<UserAppData | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -33,17 +39,25 @@ export default function App() {
 
   // Load user data whenever the authenticated user changes
   useEffect(() => {
-    if (!authUser) { setAppData(null); setNeedsOnboarding(false); return; }
+    if (!authUser || !accessToken) { setAppData(null); setNeedsOnboarding(false); return; }
     StorageService.setActiveUserId(authUser.id);
-    const data = StorageService.getUserData(authUser.id);
-    setAppData(data);
-    if (!data.profile || !data.profile.onboardingDone) setNeedsOnboarding(true);
-    const autoSalaryTx = StorageService.checkAutoSalary(authUser.id);
-    if (autoSalaryTx) {
-      setSalaryToast(autoSalaryTx.amount);
-      setTimeout(() => setSalaryToast(null), 5000);
-      setAppData(StorageService.getUserData(authUser.id));
-    }
+
+    // Load from server first (cross-device sync), fall back to localStorage
+    StorageService.loadFromServer(authUser.id, accessToken).then(serverData => {
+      if (serverData) {
+        // Server is source of truth — update localStorage
+        localStorage.setItem(`fil_u_data_${authUser.id}`, JSON.stringify(serverData));
+      }
+      const data = StorageService.getUserData(authUser.id);
+      setAppData(data);
+      if (!data.profile || !data.profile.onboardingDone) setNeedsOnboarding(true);
+      const autoSalaryTx = StorageService.checkAutoSalary(authUser.id);
+      if (autoSalaryTx) {
+        setSalaryToast(autoSalaryTx.amount);
+        setTimeout(() => setSalaryToast(null), 5000);
+        setAppData(StorageService.getUserData(authUser.id));
+      }
+    });
   }, [authUser?.id]); // eslint-disable-line
 
   const handleOnboardingDone = (newProfile: UserProfile) => {

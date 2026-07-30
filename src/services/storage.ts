@@ -25,6 +25,10 @@ const KEYS = {
   DATA_PREFIX: 'fil_u_data_',
 };
 
+// Token provider — set from AuthContext so StorageService can call authenticated server endpoints
+let _tokenProvider: (() => string | null) | null = null;
+export function setTokenProvider(fn: () => string | null) { _tokenProvider = fn; }
+
 // Seed sample demo data
 const DEMO_PROFILE: UserProfile = {
   name: 'ישראל ישראלי',
@@ -312,10 +316,31 @@ export class StorageService {
       const updated = { ...current, ...data };
       localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify(updated));
 
-
-
+      // Fire-and-forget server sync so data is available on all devices
+      const token = _tokenProvider?.();
+      if (token) {
+        fetch('/api/user/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          credentials: 'include',
+          body: JSON.stringify({ userId, data: updated }),
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error('Error saving user data:', e);
+    }
+  }
+
+  static async loadFromServer(userId: string, token: string): Promise<UserAppData | null> {
+    try {
+      const res = await fetch(`/api/user/load/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
     }
   }
 
