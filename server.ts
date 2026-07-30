@@ -1,9 +1,12 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { authRouter } from './server/authRouter';
+import { decodeAccessToken } from './server/authUtils';
 
 dotenv.config();
 
@@ -158,6 +161,29 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: '20mb' }));
+  app.use(cookieParser());
+
+  // ── Auth routes ──────────────────────────────────────────────────────────────
+  app.use('/auth', authRouter);
+
+  // ── JWT middleware (enabled when JWT_SECRET is set) ───────────────────────────
+  app.use((req, res, next) => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return next();                              // auth disabled
+    if (!req.path.startsWith('/api/')) return next();       // only guard /api/*
+    const pub = ['/api/health', '/api/forex', '/api/market-summary', '/api/stock-quote'];
+    if (pub.some(p => req.path.startsWith(p))) return next(); // public endpoints
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ detail: 'לא מאומת' });
+    try {
+      const payload = decodeAccessToken(auth.slice(7));
+      (req as any).userId    = payload.sub;
+      (req as any).userEmail = payload.email;
+      next();
+    } catch {
+      return res.status(401).json({ detail: 'Token לא תקין או שפג תוקפו' });
+    }
+  });
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {

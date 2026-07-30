@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState } from './types';
 import { StorageService } from './services/storage';
-
-import { AuthScreen } from './components/AuthScreen';
+import { useAuth } from './auth/AuthContext';
+import AuthPage from './auth/AuthPage';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { TransactionsTab } from './components/TransactionsTab';
@@ -13,53 +13,38 @@ import { BottomNav } from './components/BottomNav';
 import { fmtILS } from './utils/formatters';
 
 export default function App() {
-  const [activeUser, setActiveUser] = useState<UserAccount | null>(null);
+  const { user: authUser, isLoading: authLoading, logout: authLogout, logoutAll: authLogoutAll } = useAuth();
+
   const [appData, setAppData] = useState<UserAppData | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [salaryToast, setSalaryToast] = useState<number | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
-  // Initialize session
+  // Build UserAccount-compatible object from JWT user for StorageService compatibility
+  const activeUser: UserAccount | null = authUser ? {
+    id: authUser.id,
+    username: authUser.email,
+    passwordHash: '',
+    displayName: authUser.name || authUser.email.split('@')[0],
+    email: authUser.email,
+    createdAt: '',
+    profile: appData?.profile ?? ({} as UserProfile),
+  } : null;
+
+  // Load user data whenever the authenticated user changes
   useEffect(() => {
-    const initializeAndSync = async () => {
-      const activeId = StorageService.getActiveUserId();
-      const accounts = StorageService.getAccounts();
-
-      if (activeId) {
-        const found = accounts.find((a) => a.id === activeId);
-        if (found) {
-          setActiveUser(found);
-          loadUserData(found.id);
-        }
-      }
-    };
-
-    initializeAndSync();
-  }, []);
-
-  const loadUserData = (userId: string) => {
-    const data = StorageService.getUserData(userId);
+    if (!authUser) { setAppData(null); setNeedsOnboarding(false); return; }
+    StorageService.setActiveUserId(authUser.id);
+    const data = StorageService.getUserData(authUser.id);
     setAppData(data);
-
-    // Check auto salary insertion
-    const autoSalaryTx = StorageService.checkAutoSalary(userId);
+    if (!data.profile || !data.profile.onboardingDone) setNeedsOnboarding(true);
+    const autoSalaryTx = StorageService.checkAutoSalary(authUser.id);
     if (autoSalaryTx) {
       setSalaryToast(autoSalaryTx.amount);
       setTimeout(() => setSalaryToast(null), 5000);
-      // Reload refreshed data
-      setAppData(StorageService.getUserData(userId));
+      setAppData(StorageService.getUserData(authUser.id));
     }
-  };
-
-  const handleAuthSuccess = async (account: UserAccount) => {
-    setActiveUser(account);
-    const data = StorageService.getUserData(account.id);
-    setAppData(data);
-
-    if (!data.profile || !data.profile.onboardingDone) {
-      setNeedsOnboarding(true);
-    }
-  };
+  }, [authUser?.id]); // eslint-disable-line
 
   const handleOnboardingDone = (newProfile: UserProfile) => {
     if (!activeUser) return;
@@ -126,11 +111,7 @@ export default function App() {
     StorageService.saveUserData(activeUser.id, { investments: updatedInv });
   };
 
-  const handleLogout = () => {
-    StorageService.logout();
-    setActiveUser(null);
-    setAppData(null);
-  };
+  const handleLogout = () => { authLogout(); StorageService.logout(); setAppData(null); };
 
   const handleResetData = () => {
     if (!activeUser) return;
@@ -179,10 +160,19 @@ export default function App() {
     StorageService.saveUserData(activeUser.id, parsedData);
   };
 
-  // Render AuthScreen if user is not logged in
-  if (!activeUser || !appData) {
-    return <AuthScreen onSuccess={handleAuthSuccess} />;
+  // Auth gate — AuthContext handles the session check
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-500">טוען...</p>
+        </div>
+      </div>
+    );
   }
+  if (!authUser) return <AuthPage />;
+  if (!appData) return null;
 
   // Render Onboarding if required
   if (needsOnboarding) {
