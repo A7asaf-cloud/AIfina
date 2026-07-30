@@ -191,6 +191,41 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // ── AI transaction categorization for CSV imports ──────────────────────────
+  app.post('/api/categorize', async (req, res) => {
+    try {
+      const apiKey = getGeminiApiKey(req);
+      if (!apiKey) return res.status(400).json({ error: 'מפתח Gemini חסר' });
+
+      const { descriptions } = req.body;
+      if (!Array.isArray(descriptions) || descriptions.length === 0)
+        return res.status(400).json({ error: 'רשימת תיאורים חסרה' });
+
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = `סווג כל תיאור עסקה לאחת מהקטגוריות הבאות בלבד. אל תמציא קטגוריות חדשות.
+
+קטגוריות: סופרמרקט | מסעדות וקפה | ארנונה | בידור | תקשורת | דלק ורכב | תחבורה | חשבונות בית | ביטוח | בריאות | קניות | דיור | הכנסה | אחר
+
+תיאורים:
+${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
+
+החזר JSON בלבד (ללא markdown):
+{"results":["קטגוריה לתיאור 1","קטגוריה לתיאור 2",...]}
+חייב להיות בדיוק ${descriptions.length} קטגוריות לפי הסדר.`;
+
+      const response = await generateGeminiContent(ai, { contents: prompt });
+      const text = response.text || '';
+      const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const first = clean.indexOf('{');
+      const last  = clean.lastIndexOf('}');
+      const json  = JSON.parse(clean.substring(first, last + 1));
+      return res.json({ results: json.results || [] });
+    } catch (e: any) {
+      console.error('Categorize error:', e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── Israeli pension/keren fund search ──────────────────────────────────────
   app.get('/api/funds/search', async (req, res) => {
     const q = String(req.query.q || '').trim();

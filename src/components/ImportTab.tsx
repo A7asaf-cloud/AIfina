@@ -53,38 +53,33 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         return;
       }
 
-      // Re-categorize transactions that got "אחר" using Gemini
-      const uncategorized = parsed.filter(t => t.cat === 'אחר');
-      if (uncategorized.length > 0) {
+      // Re-categorize ALL transactions using server-side Gemini
+      // (catches both keyword misses and improves accuracy overall)
+      const customKey = localStorage.getItem('fil_gemini_api_key') || '';
+      if (customKey && parsed.length > 0) {
         try {
-          const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-          if (customKey) {
-            const descriptions = uncategorized.map(t => t.description);
-            const prompt = `סווג כל תיאור עסקה לאחת מהקטגוריות הבאות בלבד:
-סופרמרקט | מסעדות וקפה | ארנונה | בידור | תקשורת | דלק ורכב | תחבורה | חשבונות בית | ביטוח | בריאות | קניות | דיור | הכנסה | אחר
+          const descriptions = parsed.map(t => t.description);
+          const res2 = await fetch('/api/categorize', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-gemini-api-key': customKey,
+            },
+            body: JSON.stringify({ descriptions }),
+          });
 
-תיאורים לסיווג:
-${descriptions.map((d, i) => `${i + 1}. ${d}`).join('\n')}
+          if (res2.ok) {
+            const data = await res2.json();
+            const cats: string[] = data.results || [];
 
-החזר JSON בלבד ללא markdown:
-{"results": ["קטגוריה1", "קטגוריה2", ...]}
-(בדיוק ${descriptions.length} קטגוריות לפי הסדר)`;
-
-            const text = await generateGeminiContentClient(customKey, [
-              { role: 'user', parts: [{ text: prompt }] }
-            ]);
-            const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const json = JSON.parse(clean.substring(clean.indexOf('{'), clean.lastIndexOf('}') + 1));
-            const cats: string[] = json.results || [];
-
-            if (cats.length === uncategorized.length) {
-              const catMap = new Map<string | number, string>();
-              uncategorized.forEach((t, i) => { if (cats[i] && cats[i] !== 'אחר') catMap.set(t.id, cats[i]); });
-
-              const recategorized = parsed.map(t => {
-                const newCat = catMap.get(t.id);
-                if (!newCat) return t;
-                const rule = CAT_RULES.find(r => r.cat === newCat);
+            if (cats.length === parsed.length) {
+              const recategorized = parsed.map((t, i) => {
+                const aiCat = (cats[i] || '').trim();
+                if (!aiCat || aiCat === 'אחר') return t;
+                // Exact match first
+                let rule = CAT_RULES.find(r => r.cat === aiCat);
+                // Partial match fallback
+                if (!rule) rule = CAT_RULES.find(r => aiCat.includes(r.cat) || r.cat.includes(aiCat));
                 return rule ? { ...t, cat: rule.cat, color: rule.color, emoji: rule.emoji } : t;
               });
               setPreviewTxs(recategorized);
@@ -92,7 +87,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join('\n')}
             }
           }
         } catch (aiErr) {
-          console.warn('AI re-categorization failed, using keyword results:', aiErr);
+          console.warn('AI categorization failed, using keyword results:', aiErr);
         }
       }
 
