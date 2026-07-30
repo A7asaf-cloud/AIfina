@@ -38,6 +38,7 @@ var import_crypto2 = __toESM(require("crypto"), 1);
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
 var JWT_SECRET = () => process.env.JWT_SECRET || "aifina-default-secret-key-change-in-production";
+var GOOGLE_REDIRECT_URI = () => process.env.GOOGLE_REDIRECT_URI || "https://aifina.ai.studio/auth/google/callback";
 var ACCESS_EXPIRE_SEC = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || "15") * 60;
 function hashOtp(email, code) {
   return import_crypto.default.createHash("sha256").update(`${email.toLowerCase().trim()}:${code}`).digest("hex");
@@ -331,7 +332,7 @@ authRouter.get("/google", (req, res) => {
   if (!clientId) return res.status(501).json({ detail: "Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8" });
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/auth/google/callback",
+    redirect_uri: GOOGLE_REDIRECT_URI(),
     response_type: "code",
     scope: "openid email profile",
     access_type: "offline",
@@ -343,8 +344,8 @@ authRouter.get("/google/callback", async (req, res) => {
   const code = req.query.code;
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/auth/google/callback";
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const redirectUri = GOOGLE_REDIRECT_URI();
+  const frontendUrl = process.env.FRONTEND_URL || "https://aifina.ai.studio";
   if (!clientId || !clientSecret) return res.status(501).send("Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8");
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
