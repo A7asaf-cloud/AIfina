@@ -29,6 +29,96 @@ interface InvestmentsTabProps {
   onUpdateInvestments: (data: Partial<InvestmentState>) => void;
 }
 
+function FundCard({ fund, balance, onClear }: {
+  fund: { id: string; name: string; company: string; track: string; ytdReturn: number; threeYearAvg: number; fiveYearAvg: number; monthlyReturns: { month: string; returnPct: number }[]; source: string };
+  balance: number;
+  onClear: () => void;
+}) {
+  const gain = balance * (fund.ytdReturn / 100);
+  const last6 = fund.monthlyReturns.slice(-6);
+
+  const MONTH_HE: Record<string, string> = {
+    '01': 'ינו', '02': 'פבר', '03': 'מרץ', '04': 'אפר',
+    '05': 'מאי', '06': 'יונ', '07': 'יול', '08': 'אוג',
+    '09': 'ספט', '10': 'אוק', '11': 'נוב', '12': 'דצמ',
+  };
+
+  return (
+    <div className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
+      <div className="flex justify-between items-start">
+        <button onClick={onClear} className="text-xs text-slate-500 hover:text-slate-300 transition">✕ שנה קרן</button>
+        <div className="text-right">
+          <div className="text-sm font-bold text-white">{fund.name}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{fund.company} · {fund.track}</div>
+          {fund.source === 'static' && (
+            <div className="text-[10px] text-amber-400 mt-0.5">* נתוני 2024 — מקור: דוחות ציבוריים</div>
+          )}
+        </div>
+      </div>
+
+      {/* Returns summary */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-slate-900 rounded-xl p-2.5 text-center">
+          <div className="text-[10px] text-slate-500">תשואה 2024</div>
+          <div className={`text-sm font-black font-num ${fund.ytdReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {fund.ytdReturn >= 0 ? '+' : ''}{fund.ytdReturn}%
+          </div>
+        </div>
+        <div className="bg-slate-900 rounded-xl p-2.5 text-center">
+          <div className="text-[10px] text-slate-500">ממוצע 3 שנים</div>
+          <div className="text-sm font-black font-num text-blue-400">+{fund.threeYearAvg}%</div>
+        </div>
+        <div className="bg-slate-900 rounded-xl p-2.5 text-center">
+          <div className="text-[10px] text-slate-500">ממוצע 5 שנים</div>
+          <div className="text-sm font-black font-num text-indigo-400">+{fund.fiveYearAvg}%</div>
+        </div>
+      </div>
+
+      {/* P&L calculation */}
+      {balance > 0 && (
+        <div className={`rounded-xl p-3 border ${gain >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-400">יתרה נוכחית</span>
+            <span className="font-bold text-white font-num">{fmtILS(balance)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-bold mt-1">
+            <span className={gain >= 0 ? 'text-emerald-400' : 'text-red-400'}>רווח/הפסד 2024</span>
+            <span className={`font-num ${gain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {gain >= 0 ? '+' : ''}{fmtILS(gain)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly returns bar chart */}
+      {last6.length > 0 && (
+        <div>
+          <div className="text-[10px] text-slate-500 mb-2">תשואות חודשיות (6 חודשים אחרונים)</div>
+          <div className="flex items-end gap-1.5 h-10">
+            {last6.map((m) => {
+              const monthKey = m.month.split('-')[1];
+              const isPos = m.returnPct >= 0;
+              const height = Math.min(100, Math.abs(m.returnPct) * 8);
+              return (
+                <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5">
+                  <div className="text-[9px] font-num text-slate-400">{m.returnPct > 0 ? '+' : ''}{m.returnPct.toFixed(1)}%</div>
+                  <div className="w-full flex items-end justify-center" style={{ height: '24px' }}>
+                    <div
+                      className={`w-full rounded-sm ${isPos ? 'bg-emerald-500' : 'bg-red-500'}`}
+                      style={{ height: `${Math.max(2, height)}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-slate-600">{MONTH_HE[monthKey] || monthKey}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   profile,
   investments,
@@ -299,15 +389,12 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
 
   const [depositAmount, setDepositAmount] = useState('');
 
-  // Investment tracks
-  const TRACKS = [
-    { value: 'stocks',      label: 'מסלול מניות',           annualReturn: 9.5 },
-    { value: 'index',       label: 'מסלול מחקה מדד (S&P)',  annualReturn: 8.5 },
-    { value: 'balanced',    label: 'מסלול כללי מאוזן',      annualReturn: 7.0 },
-    { value: 'halakha',     label: 'מסלול הלכה',            annualReturn: 6.5 },
-    { value: 'bonds',       label: 'מסלול אגח',             annualReturn: 4.0 },
-    { value: 'conservative',label: 'מסלול שמרני',           annualReturn: 3.0 },
-  ] as const;
+  interface FundResult {
+    id: string; name: string; company: string; type: string; track: string;
+    ytdReturn: number; threeYearAvg: number; fiveYearAvg: number;
+    monthlyReturns: { month: string; returnPct: number }[];
+    source: 'live' | 'static';
+  }
 
   // Editable fund inputs
   const [kerenInput, setKerenInput] = useState(
@@ -318,6 +405,43 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   );
   const [kerenTrack, setKerenTrack] = useState(investments.kerenTrack || '');
   const [pensionTrack, setPensionTrack] = useState(investments.pensionTrack || '');
+
+  // Fund search state
+  const [kerenSearch, setKerenSearch]           = useState('');
+  const [kerenFunds, setKerenFunds]             = useState<FundResult[]>([]);
+  const [kerenSelected, setKerenSelected]       = useState<FundResult | null>(null);
+  const [kerenSearching, setKerenSearching]     = useState(false);
+
+  const [pensionSearch, setPensionSearch]       = useState('');
+  const [pensionFunds, setPensionFunds]         = useState<FundResult[]>([]);
+  const [pensionSelected, setPensionSelected]   = useState<FundResult | null>(null);
+  const [pensionSearching, setPensionSearching] = useState(false);
+
+  async function searchFunds(q: string, type: 'keren' | 'pension', setFunds: (f: FundResult[]) => void, setSearching: (b: boolean) => void) {
+    setSearching(true);
+    try {
+      const url = q.trim() ? `/api/funds/search?q=${encodeURIComponent(q)}&type=${type}` : `/api/funds/all?type=${type}`;
+      const res = await fetch(url);
+      if (res.ok) setFunds(await res.json());
+    } catch {}
+    setSearching(false);
+  }
+
+  useEffect(() => {
+    const t = setTimeout(() => searchFunds(kerenSearch, 'keren', setKerenFunds, setKerenSearching), 300);
+    return () => clearTimeout(t);
+  }, [kerenSearch]);
+
+  useEffect(() => {
+    const t = setTimeout(() => searchFunds(pensionSearch, 'pension', setPensionFunds, setPensionSearching), 300);
+    return () => clearTimeout(t);
+  }, [pensionSearch]);
+
+  // Load initial fund lists on mount
+  useEffect(() => {
+    searchFunds('', 'keren', setKerenFunds, setKerenSearching);
+    searchFunds('', 'pension', setPensionFunds, setPensionSearching);
+  }, []);
 
   // New savings account state
   const [showAddSavings, setShowAddSavings] = useState(false);
@@ -742,16 +866,33 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             </div>
 
-            {/* Track selection */}
+            {/* Fund search */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">מסלול השקעה</label>
-              <select value={kerenTrack} onChange={(e) => setKerenTrack(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none">
-                <option value="">בחר מסלול...</option>
-                {TRACKS.map(t => (
-                  <option key={t.value} value={t.value}>{t.label} — תשואה שנתית ממוצעת {t.annualReturn}%</option>
-                ))}
-              </select>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">חפש קרן השתלמות</label>
+              <input type="text" value={kerenSearch} onChange={e => setKerenSearch(e.target.value)}
+                placeholder="הראל, מנורה, אינפיניטי, כלל..."
+                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none mb-2" />
+
+              {kerenSelected ? (
+                <FundCard fund={kerenSelected} balance={parseFloat(kerenInput) || investments.kerenValue || 0}
+                  onClear={() => setKerenSelected(null)} />
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {kerenSearching && <div className="text-xs text-slate-500 text-center py-2">מחפש...</div>}
+                  {kerenFunds.map(f => (
+                    <button key={f.id} onClick={() => setKerenSelected(f)}
+                      className="w-full text-right bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl px-3 py-2.5 transition-all cursor-pointer">
+                      <div className="text-xs font-bold text-white">{f.name}</div>
+                      <div className="flex justify-between mt-0.5">
+                        <span className="text-[11px] text-slate-500">{f.company} · {f.track}</span>
+                        <span className={`text-[11px] font-bold font-num ${f.ytdReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {f.ytdReturn >= 0 ? '+' : ''}{f.ytdReturn}% (2024)
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Monthly deduction breakdown */}
@@ -770,17 +911,6 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                   <span className="text-slate-300 font-bold">סה"כ חודשי</span>
                   <span className="font-bold text-emerald-400 font-num">{fmtILS(kerenMonthlyEst)}</span>
                 </div>
-                {kerenTrack && (() => {
-                  const track = TRACKS.find(t => t.value === kerenTrack);
-                  const balance = parseFloat(kerenInput) || investments.kerenValue || 0;
-                  const annualGain = balance * (track!.annualReturn / 100);
-                  return track ? (
-                    <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
-                      <span className="text-blue-400 font-bold">רווח שנתי משוער ({track.annualReturn}%)</span>
-                      <span className="font-bold text-blue-400 font-num">+{fmtILS(annualGain)}</span>
-                    </div>
-                  ) : null;
-                })()}
               </div>
             )}
           </div>
@@ -815,16 +945,33 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             </div>
 
-            {/* Track selection */}
+            {/* Fund search */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">מסלול השקעה</label>
-              <select value={pensionTrack} onChange={(e) => setPensionTrack(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-3 text-white text-sm outline-none">
-                <option value="">בחר מסלול...</option>
-                {TRACKS.map(t => (
-                  <option key={t.value} value={t.value}>{t.label} — תשואה שנתית ממוצעת {t.annualReturn}%</option>
-                ))}
-              </select>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">חפש קרן פנסיה</label>
+              <input type="text" value={pensionSearch} onChange={e => setPensionSearch(e.target.value)}
+                placeholder="הראל, מנורה, אינפיניטי, כלל, מגדל..."
+                className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-3 text-white text-sm outline-none mb-2" />
+
+              {pensionSelected ? (
+                <FundCard fund={pensionSelected} balance={parseFloat(pensionInput) || investments.pensionValue || 0}
+                  onClear={() => setPensionSelected(null)} />
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {pensionSearching && <div className="text-xs text-slate-500 text-center py-2">מחפש...</div>}
+                  {pensionFunds.map(f => (
+                    <button key={f.id} onClick={() => setPensionSelected(f)}
+                      className="w-full text-right bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/40 rounded-xl px-3 py-2.5 transition-all cursor-pointer">
+                      <div className="text-xs font-bold text-white">{f.name}</div>
+                      <div className="flex justify-between mt-0.5">
+                        <span className="text-[11px] text-slate-500">{f.company} · {f.track}</span>
+                        <span className={`text-[11px] font-bold font-num ${f.ytdReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {f.ytdReturn >= 0 ? '+' : ''}{f.ytdReturn}% (2024)
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Monthly deduction breakdown */}
@@ -847,17 +994,6 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                   <span className="text-slate-500">הפקדה שנתית</span>
                   <span className="font-bold text-slate-300 font-num">{fmtILS(pensionMonthlyEst * 12)}</span>
                 </div>
-                {pensionTrack && (() => {
-                  const track = TRACKS.find(t => t.value === pensionTrack);
-                  const balance = parseFloat(pensionInput) || investments.pensionValue || 0;
-                  const annualGain = balance * (track!.annualReturn / 100);
-                  return track ? (
-                    <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
-                      <span className="text-blue-400 font-bold">רווח שנתי משוער ({track.annualReturn}%)</span>
-                      <span className="font-bold text-blue-400 font-num">+{fmtILS(annualGain)}</span>
-                    </div>
-                  ) : null;
-                })()}
               </div>
             )}
           </div>

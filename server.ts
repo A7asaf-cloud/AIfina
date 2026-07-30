@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { authRouter } from './server/authRouter';
 import { decodeAccessToken } from './server/authUtils';
+import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
 
 dotenv.config();
 
@@ -188,6 +189,30 @@ async function startServer() {
   // Health check endpoint
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // ── Israeli pension/keren fund search ──────────────────────────────────────
+  app.get('/api/funds/search', async (req, res) => {
+    const q = String(req.query.q || '').trim();
+    const type = req.query.type === 'keren' ? 'keren' : 'pension';
+    if (!q) return res.json(getAllFunds(type).slice(0, 10));
+    try {
+      const results = await searchFunds(q, type);
+      res.json(results.slice(0, 15));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/funds/all', (req, res) => {
+    const type = req.query.type === 'keren' ? 'keren' : 'pension';
+    res.json(getAllFunds(type));
+  });
+
+  app.get('/api/funds/:id', async (req, res) => {
+    const fund = await getFundById(req.params.id);
+    if (!fund) return res.status(404).json({ error: 'Fund not found' });
+    res.json(fund);
   });
 
   // Live Forex Endpoint (USD/ILS, EUR/ILS)
