@@ -37,7 +37,7 @@ var import_crypto2 = __toESM(require("crypto"), 1);
 // server/authUtils.ts
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
-var JWT_SECRET = () => process.env.JWT_SECRET || "";
+var JWT_SECRET = () => process.env.JWT_SECRET || "aifina-default-secret-key-change-in-production";
 var ACCESS_EXPIRE_SEC = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || "15") * 60;
 function hashOtp(email, code) {
   return import_crypto.default.createHash("sha256").update(`${email.toLowerCase().trim()}:${code}`).digest("hex");
