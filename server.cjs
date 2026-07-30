@@ -38,8 +38,10 @@ var import_crypto2 = __toESM(require("crypto"), 1);
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
 var JWT_SECRET = () => process.env.JWT_SECRET || "aifina-default-secret-key-change-in-production";
-var GOOGLE_REDIRECT_URI = () => process.env.GOOGLE_REDIRECT_URI || "https://aifina.ai.studio/auth/google/callback";
+var REFRESH_SECRET = () => process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "aifina-refresh-secret-key-change-in-production";
 var ACCESS_EXPIRE_SEC = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || "15") * 60;
+var REFRESH_EXPIRE_DAYS = () => parseInt(process.env.REFRESH_TOKEN_EXPIRE_DAYS || "30");
+var GOOGLE_REDIRECT_URI = () => process.env.GOOGLE_REDIRECT_URI || "https://aifina.ai.studio/auth/google/callback";
 function hashOtp(email, code) {
   return import_crypto.default.createHash("sha256").update(`${email.toLowerCase().trim()}:${code}`).digest("hex");
 }
@@ -49,26 +51,30 @@ function verifyOtp(email, code, hashed) {
   if (expected.length !== actual.length) return false;
   return import_crypto.default.timingSafeEqual(expected, actual);
 }
-function hashToken(token) {
-  return import_crypto.default.createHash("sha256").update(token).digest("hex");
-}
 function generateOtp() {
   let otp = "";
   for (let i = 0; i < 6; i++) otp += import_crypto.default.randomInt(0, 10).toString();
   return otp;
 }
-function generateRefreshToken() {
-  return import_crypto.default.randomBytes(48).toString("base64url");
-}
 function createAccessToken(userId, email) {
-  const secret = JWT_SECRET();
-  if (!secret) throw new Error("JWT_SECRET is not set");
-  return import_jsonwebtoken.default.sign({ sub: userId, email, type: "access" }, secret, { expiresIn: ACCESS_EXPIRE_SEC() });
+  return import_jsonwebtoken.default.sign(
+    { sub: userId, email, type: "access" },
+    JWT_SECRET(),
+    { expiresIn: ACCESS_EXPIRE_SEC() }
+  );
 }
 function decodeAccessToken(token) {
-  const secret = JWT_SECRET();
-  if (!secret) throw new Error("JWT_SECRET is not set");
-  return import_jsonwebtoken.default.verify(token, secret);
+  return import_jsonwebtoken.default.verify(token, JWT_SECRET());
+}
+function createRefreshToken(userId, email, tokenVersion) {
+  return import_jsonwebtoken.default.sign(
+    { sub: userId, email, type: "refresh", ver: tokenVersion },
+    REFRESH_SECRET(),
+    { expiresIn: `${REFRESH_EXPIRE_DAYS()}d` }
+  );
+}
+function verifyRefreshToken(token) {
+  return import_jsonwebtoken.default.verify(token, REFRESH_SECRET());
 }
 
 // server/authFileStore.ts
@@ -120,12 +126,21 @@ function getOrCreateDemoUser() {
       avatarUrl: "",
       googleId: "",
       isVerified: true,
+      tokenVersion: 0,
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     saveAuthUser(user);
   }
   return user;
+}
+function incrementTokenVersion(userId) {
+  const users = getAllAuthUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx < 0) return 0;
+  users[idx].tokenVersion = (users[idx].tokenVersion || 0) + 1;
+  writeJson(AUTH_USERS_FILE, users);
+  return users[idx].tokenVersion;
 }
 var OTP_FILE = "auth_otp_codes.json";
 function getRecentOtps(email, windowMs) {
@@ -146,30 +161,6 @@ function getUnusedValidOtps(email) {
 function markOtpUsed(id) {
   const otps = readJson(OTP_FILE).map((r) => r.id === id ? { ...r, used: true } : r);
   writeJson(OTP_FILE, otps);
-}
-var RT_FILE = "auth_refresh_tokens.json";
-function saveRefreshToken(record) {
-  const tokens = readJson(RT_FILE);
-  tokens.push(record);
-  writeJson(RT_FILE, tokens);
-}
-function findRefreshToken(hashedToken) {
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  return readJson(RT_FILE).find(
-    (r) => r.token === hashedToken && !r.revoked && r.expiresAt > now
-  );
-}
-function revokeRefreshToken(id) {
-  const tokens = readJson(RT_FILE).map(
-    (r) => r.id === id ? { ...r, revoked: true } : r
-  );
-  writeJson(RT_FILE, tokens);
-}
-function revokeAllRefreshTokensForUser(userId) {
-  const tokens = readJson(RT_FILE).map(
-    (r) => r.userId === userId ? { ...r, revoked: true } : r
-  );
-  writeJson(RT_FILE, tokens);
 }
 
 // server/authEmail.ts
@@ -234,8 +225,8 @@ var COOKIE_NAME = "refresh_token";
 var OTP_EXPIRE_MIN = 10;
 var OTP_RATE_LIMIT = 3;
 var OTP_WINDOW_MIN = 15;
-var REFRESH_DAYS = () => parseInt(process.env.REFRESH_TOKEN_EXPIRE_DAYS || "30");
-function setCookie(res, token, days) {
+function setCookie(res, token) {
+  const days = parseInt(process.env.REFRESH_TOKEN_EXPIRE_DAYS || "30");
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -247,35 +238,34 @@ function setCookie(res, token, days) {
 function clearCookie(res) {
   res.clearCookie(COOKIE_NAME, { path: "/auth" });
 }
-function issueRefreshToken(userId, deviceInfo2, days) {
-  const plain = generateRefreshToken();
-  const now = /* @__PURE__ */ new Date();
-  saveRefreshToken({
-    id: import_crypto2.default.randomUUID(),
-    userId,
-    token: hashToken(plain),
-    deviceInfo: deviceInfo2.slice(0, 256),
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + days * 864e5).toISOString(),
-    revoked: false
-  });
-  return plain;
+function issueSession(res, user) {
+  const refreshToken = createRefreshToken(user.id, user.email, user.tokenVersion || 0);
+  setCookie(res, refreshToken);
+  return createAccessToken(user.id, user.email);
 }
 function formatUser(u) {
   return { id: u.id, email: u.email, name: u.name, avatarUrl: u.avatarUrl, isVerified: u.isVerified };
 }
-function deviceInfo(req) {
-  return req.headers["user-agent"] || "";
+function makeUser(partial) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return {
+    name: "",
+    avatarUrl: "",
+    googleId: "",
+    isVerified: true,
+    tokenVersion: 0,
+    createdAt: now,
+    updatedAt: now,
+    ...partial
+  };
 }
 authRouter.post("/otp/request", async (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
-  if (!email || !email.includes("@") || !email.split("@")[1]?.includes(".")) {
+  if (!email || !email.includes("@") || !email.split("@")[1]?.includes("."))
     return res.status(400).json({ detail: "\u05DB\u05EA\u05D5\u05D1\u05EA \u05D0\u05D9\u05DE\u05D9\u05D9\u05DC \u05DC\u05D0 \u05EA\u05E7\u05D9\u05E0\u05D4" });
-  }
   const recent = getRecentOtps(email, OTP_WINDOW_MIN * 6e4);
-  if (recent.length >= OTP_RATE_LIMIT) {
+  if (recent.length >= OTP_RATE_LIMIT)
     return res.status(429).json({ detail: "\u05D9\u05D5\u05EA\u05E8 \u05DE\u05D3\u05D9 \u05D1\u05E7\u05E9\u05D5\u05EA \u2014 \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D1\u05E2\u05D5\u05D3 15 \u05D3\u05E7\u05D5\u05EA" });
-  }
   const code = generateOtp();
   saveOtp({
     id: import_crypto2.default.randomUUID(),
@@ -288,44 +278,30 @@ authRouter.post("/otp/request", async (req, res) => {
     await sendOtpEmail(email, code);
   } catch (err) {
     console.error("SMTP error:", err);
-    return res.status(502).json({ detail: "\u05E9\u05DC\u05D9\u05D7\u05EA \u05D4\u05D0\u05D9\u05DE\u05D9\u05D9\u05DC \u05E0\u05DB\u05E9\u05DC\u05D4 \u2014 \u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D4\u05D2\u05D3\u05E8\u05D5\u05EA SMTP" });
+    return res.status(502).json({ detail: "\u05E9\u05DC\u05D9\u05D7\u05EA \u05D4\u05D0\u05D9\u05DE\u05D9\u05D9\u05DC \u05E0\u05DB\u05E9\u05DC\u05D4 \u2014 \u05D1\u05D3\u05D5\u05E7 \u05D4\u05D2\u05D3\u05E8\u05D5\u05EA SMTP" });
   }
   return res.json({ message: "\u05E7\u05D5\u05D3 \u05E0\u05E9\u05DC\u05D7" });
 });
 authRouter.post("/otp/verify", async (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
   const code = (req.body.code || "").trim();
-  if (code.length !== 6 || !/^\d+$/.test(code)) {
+  if (code.length !== 6 || !/^\d+$/.test(code))
     return res.status(400).json({ detail: "\u05E7\u05D5\u05D3 \u05D7\u05D9\u05D9\u05D1 \u05DC\u05D4\u05D9\u05D5\u05EA 6 \u05E1\u05E4\u05E8\u05D5\u05EA" });
-  }
   const candidates = getUnusedValidOtps(email);
   const matched = candidates.find((r) => verifyOtp(email, code, r.code));
-  if (!matched) {
+  if (!matched)
     return res.status(401).json({ detail: "\u05E7\u05D5\u05D3 \u05E9\u05D2\u05D5\u05D9 \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
-  }
   markOtpUsed(matched.id);
-  const now = (/* @__PURE__ */ new Date()).toISOString();
   let user = findAuthUserByEmail(email);
   if (!user) {
-    user = {
-      id: import_crypto2.default.randomUUID(),
-      email,
-      name: email.split("@")[0],
-      avatarUrl: "",
-      googleId: "",
-      isVerified: true,
-      createdAt: now,
-      updatedAt: now
-    };
+    user = makeUser({ id: import_crypto2.default.randomUUID(), email, name: "" });
     saveAuthUser(user);
   } else {
-    user = { ...user, isVerified: true, updatedAt: now };
+    user = { ...user, isVerified: true, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     saveAuthUser(user);
   }
-  const days = REFRESH_DAYS();
-  const plain = issueRefreshToken(user.id, deviceInfo(req), days);
-  setCookie(res, plain, days);
-  return res.json({ access_token: createAccessToken(user.id, user.email), user: formatUser(user) });
+  const accessToken = issueSession(res, user);
+  return res.json({ access_token: accessToken, user: formatUser(user) });
 });
 authRouter.get("/google", (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -362,61 +338,51 @@ authRouter.get("/google/callback", async (req, res) => {
     const info = await infoRes.json();
     const email = (info.email || "").toLowerCase().trim();
     if (!email) throw new Error("No email from Google");
-    const now = (/* @__PURE__ */ new Date()).toISOString();
     let user = findAuthUserByEmail(email);
     if (!user) {
-      user = {
+      user = makeUser({
         id: import_crypto2.default.randomUUID(),
         email,
-        name: info.name || email.split("@")[0],
+        name: info.name || "",
         avatarUrl: info.picture || "",
-        googleId: info.sub || "",
-        isVerified: true,
-        createdAt: now,
-        updatedAt: now
-      };
+        googleId: info.sub || ""
+      });
     } else {
-      user = { ...user, googleId: info.sub || user.googleId, name: info.name || user.name, avatarUrl: info.picture || user.avatarUrl, updatedAt: now };
+      user = {
+        ...user,
+        googleId: info.sub || user.googleId,
+        name: info.name || user.name,
+        avatarUrl: info.picture || user.avatarUrl,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
     }
     saveAuthUser(user);
-    const days = REFRESH_DAYS();
-    const plain = issueRefreshToken(user.id, deviceInfo(req), days);
-    const accessToken = createAccessToken(user.id, user.email);
-    res.cookie(COOKIE_NAME, plain, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: days * 864e5,
-      path: "/auth"
-    });
+    const accessToken = issueSession(res, user);
     return res.redirect(`${frontendUrl}/#access_token=${accessToken}`);
   } catch (err) {
     console.error("Google OAuth error:", err);
-    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:3000"}/#auth_error=google_failed`);
+    return res.redirect(`${process.env.FRONTEND_URL || "https://aifina.ai.studio/"}/#auth_error=google_failed`);
   }
 });
 authRouter.post("/refresh", (req, res) => {
-  const plain = req.cookies?.[COOKIE_NAME];
-  if (!plain) return res.status(401).json({ detail: "\u05D0\u05D9\u05DF refresh token" });
-  const record = findRefreshToken(hashToken(plain));
-  if (!record) {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (!token) return res.status(401).json({ detail: "\u05D0\u05D9\u05DF refresh token" });
+  try {
+    const payload = verifyRefreshToken(token);
+    const user = findAuthUserById(payload.sub);
+    if (!user) throw new Error("user not found");
+    if ((payload.ver ?? 0) !== (user.tokenVersion || 0)) {
+      clearCookie(res);
+      return res.status(401).json({ detail: "Token \u05D1\u05D5\u05D8\u05DC \u2014 \u05D9\u05E9 \u05DC\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DE\u05D7\u05D3\u05E9" });
+    }
+    const accessToken = issueSession(res, user);
+    return res.json({ access_token: accessToken });
+  } catch {
     clearCookie(res);
     return res.status(401).json({ detail: "Refresh token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
   }
-  const user = findAuthUserById(record.userId);
-  if (!user) return res.status(401).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
-  revokeRefreshToken(record.id);
-  const days = REFRESH_DAYS();
-  const newPlain = issueRefreshToken(user.id, deviceInfo(req), days);
-  setCookie(res, newPlain, days);
-  return res.json({ access_token: createAccessToken(user.id, user.email) });
 });
 authRouter.post("/logout", (req, res) => {
-  const plain = req.cookies?.[COOKIE_NAME];
-  if (plain) {
-    const record = findRefreshToken(hashToken(plain));
-    if (record) revokeRefreshToken(record.id);
-  }
   clearCookie(res);
   return res.json({ message: "\u05D4\u05EA\u05E0\u05EA\u05E7\u05EA \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4" });
 });
@@ -425,7 +391,7 @@ authRouter.post("/logout-all", (req, res) => {
   if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
   try {
     const { sub: userId } = decodeAccessToken(auth.slice(7));
-    revokeAllRefreshTokensForUser(userId);
+    incrementTokenVersion(userId);
     clearCookie(res);
     return res.json({ message: "\u05D4\u05EA\u05E0\u05EA\u05E7\u05EA \u05DE\u05DB\u05DC \u05D4\u05DE\u05DB\u05E9\u05D9\u05E8\u05D9\u05DD" });
   } catch {
@@ -446,10 +412,8 @@ authRouter.get("/me", (req, res) => {
 });
 authRouter.post("/demo", (req, res) => {
   const user = getOrCreateDemoUser();
-  const days = REFRESH_DAYS();
-  const plain = issueRefreshToken(user.id, deviceInfo(req), days);
-  setCookie(res, plain, days);
-  return res.json({ access_token: createAccessToken(user.id, user.email), user: formatUser(user) });
+  const accessToken = issueSession(res, user);
+  return res.json({ access_token: accessToken, user: formatUser(user) });
 });
 
 // server/fundsApi.ts
