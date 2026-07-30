@@ -33,8 +33,6 @@ var import_fs2 = __toESM(require("fs"), 1);
 // server/authRouter.ts
 var import_express = require("express");
 var import_crypto2 = __toESM(require("crypto"), 1);
-var import_node_fetch = __toESM(require("node-fetch"), 1);
-var import_url = require("url");
 
 // server/authUtils.ts
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
@@ -331,7 +329,7 @@ authRouter.post("/otp/verify", async (req, res) => {
 authRouter.get("/google", (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) return res.status(501).json({ detail: "Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8" });
-  const params = new import_url.URLSearchParams({
+  const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/auth/google/callback",
     response_type: "code",
@@ -349,14 +347,14 @@ authRouter.get("/google/callback", async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   if (!clientId || !clientSecret) return res.status(501).send("Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8");
   try {
-    const tokenRes = await (0, import_node_fetch.default)("https://oauth2.googleapis.com/token", {
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new import_url.URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: "authorization_code" }).toString()
+      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: "authorization_code" }).toString()
     });
     if (!tokenRes.ok) throw new Error("Token exchange failed");
     const tokenData = await tokenRes.json();
-    const infoRes = await (0, import_node_fetch.default)("https://www.googleapis.com/oauth2/v3/userinfo", {
+    const infoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
     if (!infoRes.ok) throw new Error("User info fetch failed");
