@@ -30,6 +30,7 @@ export interface AuthUserRecord {
   isVerified: boolean;
   createdAt: string;
   updatedAt: string;
+  tokenVersion: number;   // incremented on logout-all; old refresh tokens become invalid
 }
 
 const AUTH_USERS_FILE = 'auth_users.json';
@@ -64,12 +65,22 @@ export function getOrCreateDemoUser(): AuthUserRecord {
       avatarUrl: '',
       googleId: '',
       isVerified: true,
+      tokenVersion: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     saveAuthUser(user);
   }
   return user;
+}
+
+export function incrementTokenVersion(userId: string): number {
+  const users = getAllAuthUsers();
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx < 0) return 0;
+  users[idx].tokenVersion = (users[idx].tokenVersion || 0) + 1;
+  writeJson(AUTH_USERS_FILE, users);
+  return users[idx].tokenVersion;
 }
 
 // ── OTP records ───────────────────────────────────────────────────────────────

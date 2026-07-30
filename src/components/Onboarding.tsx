@@ -13,8 +13,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ initialProfile, onDone }
   const [step, setStep] = useState(1);
   const TOTAL_STEPS = 5;
 
+  // Strip email-derived names (contain @ or no spaces and look like usernames)
+  const initialName = initialProfile.name && !initialProfile.name.includes('@') && initialProfile.name.includes(' ')
+    ? initialProfile.name
+    : '';
+
   const [d, setD] = useState({
-    name: initialProfile.name || '',
+    name: initialName,
     netSalary: initialProfile.netSalary ? String(initialProfile.netSalary) : '',
     grossSalary: initialProfile.grossSalary ? String(initialProfile.grossSalary) : '',
     salaryDay: initialProfile.salaryDay || 10,

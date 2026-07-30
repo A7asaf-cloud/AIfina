@@ -4,19 +4,19 @@
 import { CategoryRule, BudgetPlanItem, Transaction } from '../types';
 
 export const CAT_RULES: CategoryRule[] = [
-  { kw: ['שופרסל', 'רמי לוי', 'ויקטורי', 'מגה', 'יינות ביתן', 'אושר עד', 'חצי חינם', 'אמפמ', 'am:pm', 'fresh market', 'קשת טעמים', 'טיב טעם', 'rami levy', 'shufersal', 'סופרמרקט', 'מכולת'], cat: 'סופרמרקט', color: '#22C55E', emoji: '🛒' },
-  { kw: ['וולט', 'wolt', 'מקדונלד', 'mcdonald', 'קפה', 'cafe', 'coffee', 'מסעדה', 'פיצה', 'pizza', 'סושי', 'בורגר', 'תן ביס', '10bis', 'ארומה', 'גולדה', 'ריבר', 'לנדוור', 'ריבר סושי'], cat: 'מסעדות וקפה', color: '#F97316', emoji: '🍽️' },
-  { kw: ['ארנונה', 'עיריית', 'עירייה', 'municipality'], cat: 'ארנונה', color: '#8B5CF6', emoji: '🏛️' },
-  { kw: ['hot', 'הוט', 'netflix', 'נטפליקס', 'spotify', 'ספוטיפיי', 'yes', 'יס', 'disney', 'apple tv', 'youtube', 'steam', 'cinema', 'סינמה', 'קולנוע'], cat: 'בידור', color: '#EC4899', emoji: '🎬' },
-  { kw: ['partner', 'פרטנר', 'cellcom', 'סלקום', 'פלאפון', 'pelephone', 'bezeq', 'בזק', 'golan', 'גולן'], cat: 'תקשורת', color: '#06B6D4', emoji: '📱' },
-  { kw: ['paz', 'פז', 'sonol', 'סונול', 'דלק', 'fuel', 'yellow', 'דור אלון', 'טנגו', 'ten', 'טן'], cat: 'דלק ורכב', color: '#84CC16', emoji: '⛽' },
-  { kw: ['אגד', 'דן', 'רב-קו', 'rav-kav', 'רכבת', 'גט', 'gett', 'taxi', 'חניה', 'parking', 'אחוזות החוף', 'פנגו', 'pango', 'cello', 'סלו'], cat: 'תחבורה', color: '#3B82F6', emoji: '🚌' },
-  { kw: ['חברת החשמל', 'iec', 'מים', 'ועד בית', 'גז', 'אמישראגז', 'סופרגז'], cat: 'חשבונות בית', color: '#EAB308', emoji: '💡' },
-  { kw: ['ביטוח', 'הראל', 'מנורה', 'כלל', 'מגדל', 'איילון', 'פניקס', 'AIG', 'מגדל ביטוח'], cat: 'ביטוח', color: '#6366F1', emoji: '🛡️' },
-  { kw: ['מכבי', 'כללית', 'לאומית', 'מאוחדת', 'סופר-פארם', 'super pharm', 'תרופות', 'BE', 'קופת חולים', 'מרפאה'], cat: 'בריאות', color: '#14B8A6', emoji: '🏥' },
-  { kw: ['amazon', 'אמזון', 'aliexpress', 'ebay', 'זארה', 'zara', 'h&m', 'קסטרו', 'קניון', 'ksp', 'אייבורי', 'איקאה', 'ikea', 'עליאקספרס', 'shein', 'שאין', 'טרמינל'], cat: 'קניות', color: '#F59E0B', emoji: '🛍️' },
-  { kw: ['שכר דירה', 'שכירות', 'mortgage', 'משכנתה', 'משכנתא'], cat: 'דיור', color: '#64748B', emoji: '🏠' },
-  { kw: ['משכורת', 'שכר', 'הכנסה', 'income', 'salary', 'bonus', 'בונוס', 'החזר', 'זיכוי'], cat: 'הכנסה', color: '#10B981', emoji: '💰' },
+  { kw: ['שופרסל', 'רמי לוי', 'ויקטורי', 'מגה', 'יינות ביתן', 'אושר עד', 'חצי חינם', 'אמפמ', 'am:pm', 'fresh market', 'קשת טעמים', 'טיב טעם', 'rami levy', 'shufersal', 'סופרמרקט', 'מכולת', 'aldi', 'carrefour', 'כרפור', 'ספייסר', 'שוק', 'מינימרקט', 'convenience', 'grocery', 'food store', 'superstore'], cat: 'סופרמרקט', color: '#22C55E', emoji: '🛒' },
+  { kw: ['וולט', 'wolt', 'מקדונלד', 'mcdonald', 'קפה', 'cafe', 'coffee', 'מסעדה', 'פיצה', 'pizza', 'סושי', 'בורגר', 'תן ביס', '10bis', 'ארומה', 'גולדה', 'ריבר', 'לנדוור', 'ריבר סושי', 'domino', 'kfc', 'burger king', 'שווארמה', 'פלאפל', 'hummus', 'חומוס', 'bar ', 'pub', 'restaurant', 'אוכל', 'גריל', 'גרגרים', 'אינדיאני', 'יפני', 'טאקו', 'starbucks'], cat: 'מסעדות וקפה', color: '#F97316', emoji: '🍽️' },
+  { kw: ['ארנונה', 'עיריית', 'עירייה', 'municipality', 'אגרה', 'היטל'], cat: 'ארנונה', color: '#8B5CF6', emoji: '🏛️' },
+  { kw: ['hot', 'הוט', 'netflix', 'נטפליקס', 'spotify', 'ספוטיפיי', 'yes', 'יס', 'disney', 'apple tv', 'youtube', 'steam', 'cinema', 'סינמה', 'קולנוע', 'הbo', 'hbo', 'paramount', 'apple music', 'deezer', 'tidal', 'google play', 'app store', 'gaming', 'playstation', 'xbox', 'nintendo', 'twitch', 'כרטיס ראינוע', 'yes planet', 'cinema city'], cat: 'בידור', color: '#EC4899', emoji: '🎬' },
+  { kw: ['partner', 'פרטנר', 'cellcom', 'סלקום', 'פלאפון', 'pelephone', 'bezeq', 'בזק', 'golan', 'גולן', '012', 'רנט', 'rami levi com', 'internet', 'אינטרנט', '019', '017', 'ברנט', 'hot mobile', 'hotmobile', 'xfone', 'ex phone', ' telecom'], cat: 'תקשורת', color: '#06B6D4', emoji: '📱' },
+  { kw: ['paz', 'פז', 'sonol', 'סונול', 'דלק', 'fuel', 'yellow', 'דור אלון', 'טנגו', 'ten ', 'טן ', 'orio', 'אוריו', 'gil', 'גיל דלק', 'petrol', 'gas station', 'תדלוק', 'נסיעה', 'driving', 'car wash', 'שטיפת רכב', 'ביטוח רכב', 'רישוי', 'טסט', 'מוסך', 'spare parts', 'אלדי ים', 'delek', 'gulf', 'pi glilot'], cat: 'דלק ורכב', color: '#84CC16', emoji: '⛽' },
+  { kw: ['אגד', 'דן', 'רב-קו', 'rav-kav', 'ravkav', 'רכבת ישראל', 'israel railways', 'גט', 'gett', 'yango', 'יאנגו', 'bolt', 'taxi', 'מונית', 'חניה', 'parking', 'אחוזות החוף', 'פנגו', 'pango', 'cello', 'סלו', 'אוטובוס', 'bus', 'metro', 'tram', 'uber', 'lyft', 'ride', 'transfer', 'shuttle', 'airport', 'נמל תעופה'], cat: 'תחבורה', color: '#3B82F6', emoji: '🚌' },
+  { kw: ['חברת החשמל', 'iec ', 'חשמל', 'electricity', 'מים', 'water', 'ועד בית', 'house committee', 'גז', 'gas', 'אמישראגז', 'סופרגז', 'שב"א', 'שמש', 'solar', 'בזק ב', 'cable', 'פסגות', 'חום', 'קירור', 'maintenance', 'תחזוקה', 'עמידר', 'שכרות', 'handy'], cat: 'חשבונות בית', color: '#EAB308', emoji: '💡' },
+  { kw: ['ביטוח', 'insurance', 'הראל ביטוח', 'מנורה ביטוח', 'כלל ביטוח', 'מגדל ביטוח', 'איילון', 'פניקס', 'aig', 'הפניקס', 'סיכון', 'risk', 'policy', 'פוליסה', 'premiums'], cat: 'ביטוח', color: '#6366F1', emoji: '🛡️' },
+  { kw: ['מכבי', 'כללית', 'לאומית', 'מאוחדת', 'סופר-פארם', 'super pharm', 'superpharm', 'תרופות', 'pharmacy', 'בית מרקחת', 'קופת חולים', 'מרפאה', 'clinic', 'doctor', 'רופא', 'hospital', 'בית חולים', 'dental', 'שיניים', 'optic', 'משקפיים', 'gym', 'כושר', 'sport', 'ספורט', 'fitness', 'pilates', 'yoga', 'health', 'wellness'], cat: 'בריאות', color: '#14B8A6', emoji: '🏥' },
+  { kw: ['amazon', 'אמזון', 'aliexpress', 'ali express', 'ebay', 'זארה', 'zara', 'h&m', 'hm ', 'קסטרו', 'castro', 'קניון', 'mall', 'ksp', 'אייבורי', 'ivory', 'איקאה', 'ikea', 'עליאקספרס', 'shein', 'שאין', 'טרמינל', 'terminal', 'factory 54', 'fox', 'פוקס', 'renuar', 'רנואר', 'golf', 'גולף', 'adidas', 'nike', 'puma', 'fashion', 'clothing', 'apparel', 'shoes', 'footwear', 'נעליים', 'בגדים', 'walmart', 'target', 'best buy', 'mediamarkt'], cat: 'קניות', color: '#F59E0B', emoji: '🛍️' },
+  { kw: ['שכר דירה', 'שכירות', 'rent', 'mortgage', 'משכנתה', 'משכנתא', 'דמי שכירות', 'housing', 'apartment', 'דירה'], cat: 'דיור', color: '#64748B', emoji: '🏠' },
+  { kw: ['משכורת', 'שכר', 'הכנסה', 'income', 'salary', 'wage', 'bonus', 'בונוס', 'החזר', 'זיכוי', 'credit', 'refund', 'העברה נכנסת', 'transfer in', 'הפקדה', 'deposit received', 'פיצויים', 'מענק'], cat: 'הכנסה', color: '#10B981', emoji: '💰' },
 ];
 
 export const DEF_CAT = { cat: 'אחר', color: '#9CA3AF', emoji: '📦' };
