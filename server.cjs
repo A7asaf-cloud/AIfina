@@ -22,20 +22,446 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // server.ts
-var import_express = __toESM(require("express"), 1);
-var import_path = __toESM(require("path"), 1);
+var import_express2 = __toESM(require("express"), 1);
+var import_cookie_parser = __toESM(require("cookie-parser"), 1);
+var import_path2 = __toESM(require("path"), 1);
 var import_vite = require("vite");
 var import_genai = require("@google/genai");
 var import_dotenv = __toESM(require("dotenv"), 1);
-var import_fs = __toESM(require("fs"), 1);
-import_dotenv.default.config();
-var DATA_DIR = import_path.default.join(process.cwd(), "data");
-if (!import_fs.default.existsSync(DATA_DIR)) {
-  import_fs.default.mkdirSync(DATA_DIR, { recursive: true });
+var import_fs2 = __toESM(require("fs"), 1);
+
+// server/authRouter.ts
+var import_express = require("express");
+var import_crypto2 = __toESM(require("crypto"), 1);
+var import_node_fetch = __toESM(require("node-fetch"), 1);
+var import_url = require("url");
+
+// server/authUtils.ts
+var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
+var JWT_SECRET = () => process.env.JWT_SECRET || "";
+var ACCESS_EXPIRE_SEC = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || "15") * 60;
+function hashOtp(email, code) {
+  return import_crypto.default.createHash("sha256").update(`${email.toLowerCase().trim()}:${code}`).digest("hex");
 }
-var USERS_FILE = import_path.default.join(DATA_DIR, "users.json");
+function verifyOtp(email, code, hashed) {
+  const expected = Buffer.from(hashOtp(email, code), "hex");
+  const actual = Buffer.from(hashed, "hex");
+  if (expected.length !== actual.length) return false;
+  return import_crypto.default.timingSafeEqual(expected, actual);
+}
+function hashToken(token) {
+  return import_crypto.default.createHash("sha256").update(token).digest("hex");
+}
+function generateOtp() {
+  let otp = "";
+  for (let i = 0; i < 6; i++) otp += import_crypto.default.randomInt(0, 10).toString();
+  return otp;
+}
+function generateRefreshToken() {
+  return import_crypto.default.randomBytes(48).toString("base64url");
+}
+function createAccessToken(userId, email) {
+  const secret = JWT_SECRET();
+  if (!secret) throw new Error("JWT_SECRET is not set");
+  return import_jsonwebtoken.default.sign({ sub: userId, email, type: "access" }, secret, { expiresIn: ACCESS_EXPIRE_SEC() });
+}
+function decodeAccessToken(token) {
+  const secret = JWT_SECRET();
+  if (!secret) throw new Error("JWT_SECRET is not set");
+  return import_jsonwebtoken.default.verify(token, secret);
+}
+
+// server/authFileStore.ts
+var import_fs = __toESM(require("fs"), 1);
+var import_path = __toESM(require("path"), 1);
+var DATA_DIR = import_path.default.join(process.cwd(), "data");
+function ensureDataDir() {
+  if (!import_fs.default.existsSync(DATA_DIR)) import_fs.default.mkdirSync(DATA_DIR, { recursive: true });
+}
+function readJson(filename) {
+  ensureDataDir();
+  const filePath = import_path.default.join(DATA_DIR, filename);
+  if (!import_fs.default.existsSync(filePath)) return [];
+  try {
+    return JSON.parse(import_fs.default.readFileSync(filePath, "utf8"));
+  } catch {
+    return [];
+  }
+}
+function writeJson(filename, data) {
+  ensureDataDir();
+  import_fs.default.writeFileSync(import_path.default.join(DATA_DIR, filename), JSON.stringify(data, null, 2), "utf8");
+}
+var AUTH_USERS_FILE = "auth_users.json";
+function getAllAuthUsers() {
+  return readJson(AUTH_USERS_FILE);
+}
+function findAuthUserByEmail(email) {
+  return getAllAuthUsers().find((u) => u.email === email.toLowerCase().trim());
+}
+function findAuthUserById(id) {
+  return getAllAuthUsers().find((u) => u.id === id);
+}
+function saveAuthUser(user) {
+  const users = getAllAuthUsers();
+  const idx = users.findIndex((u) => u.id === user.id);
+  if (idx >= 0) users[idx] = user;
+  else users.push(user);
+  writeJson(AUTH_USERS_FILE, users);
+}
+function getOrCreateDemoUser() {
+  const email = "demo@finance.il";
+  let user = findAuthUserByEmail(email);
+  if (!user) {
+    user = {
+      id: "demo_user_id",
+      email,
+      name: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
+      avatarUrl: "",
+      googleId: "",
+      isVerified: true,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    saveAuthUser(user);
+  }
+  return user;
+}
+var OTP_FILE = "auth_otp_codes.json";
+function getRecentOtps(email, windowMs) {
+  const cutoff = new Date(Date.now() - windowMs).toISOString();
+  return readJson(OTP_FILE).filter(
+    (r) => r.email === email && r.expiresAt > cutoff
+  );
+}
+function saveOtp(record) {
+  const otps = readJson(OTP_FILE);
+  otps.push(record);
+  writeJson(OTP_FILE, otps);
+}
+function getUnusedValidOtps(email) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return readJson(OTP_FILE).filter((r) => r.email === email && !r.used && r.expiresAt > now).sort((a, b) => b.expiresAt.localeCompare(a.expiresAt));
+}
+function markOtpUsed(id) {
+  const otps = readJson(OTP_FILE).map((r) => r.id === id ? { ...r, used: true } : r);
+  writeJson(OTP_FILE, otps);
+}
+var RT_FILE = "auth_refresh_tokens.json";
+function saveRefreshToken(record) {
+  const tokens = readJson(RT_FILE);
+  tokens.push(record);
+  writeJson(RT_FILE, tokens);
+}
+function findRefreshToken(hashedToken) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return readJson(RT_FILE).find(
+    (r) => r.token === hashedToken && !r.revoked && r.expiresAt > now
+  );
+}
+function revokeRefreshToken(id) {
+  const tokens = readJson(RT_FILE).map(
+    (r) => r.id === id ? { ...r, revoked: true } : r
+  );
+  writeJson(RT_FILE, tokens);
+}
+function revokeAllRefreshTokensForUser(userId) {
+  const tokens = readJson(RT_FILE).map(
+    (r) => r.userId === userId ? { ...r, revoked: true } : r
+  );
+  writeJson(RT_FILE, tokens);
+}
+
+// server/authEmail.ts
+var import_nodemailer = __toESM(require("nodemailer"), 1);
+async function sendOtpEmail(toEmail, code) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  if (!host || !user) {
+    console.warn(`[DEV] OTP for ${toEmail}: ${code}  (SMTP \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8 \u2014 \u05DE\u05D5\u05D3\u05E4\u05E1 \u05DC-log)`);
+    return;
+  }
+  const transporter = import_nodemailer.default.createTransport({
+    host,
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: false,
+    auth: { user, pass: process.env.SMTP_PASS || "" }
+  });
+  const from = process.env.FROM_EMAIL || user;
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<body style="margin:0;padding:0;background:#020617;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px">
+    <tr><td align="center">
+      <table width="420" cellpadding="0" cellspacing="0"
+             style="background:#0f172a;border:1px solid #1e293b;border-radius:24px;padding:36px">
+        <tr><td style="text-align:right">
+          <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:20px">
+            <span style="font-size:28px">\u{1F48E}</span>
+            <span style="color:#10b981;font-size:18px;font-weight:800">FinanceIL</span>
+          </div>
+          <div style="color:#cbd5e1;font-size:14px;margin-bottom:20px">\u05E7\u05D5\u05D3 \u05D4\u05D0\u05D9\u05DE\u05D5\u05EA \u05E9\u05DC\u05DA:</div>
+          <div style="background:#020617;border:1px solid #1e293b;border-radius:12px;
+                      padding:20px;text-align:center;margin-bottom:24px;direction:ltr">
+            <span style="font-size:38px;font-weight:700;letter-spacing:14px;color:#fff;font-family:monospace">
+              ${code}
+            </span>
+          </div>
+          <div style="color:#475569;font-size:12px;line-height:1.6">
+            \u05D4\u05E7\u05D5\u05D3 \u05EA\u05E7\u05E3 \u05DC-<strong style="color:#64748b">10 \u05D3\u05E7\u05D5\u05EA</strong>.
+            \u05D0\u05DD \u05DC\u05D0 \u05D1\u05D9\u05E7\u05E9\u05EA \u05DC\u05D4\u05EA\u05D7\u05D1\u05E8, \u05E0\u05D9\u05EA\u05DF \u05DC\u05D4\u05EA\u05E2\u05DC\u05DD \u05DE\u05D4\u05D5\u05D3\u05E2\u05D4 \u05D6\u05D5.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  await transporter.sendMail({
+    from: `"FinanceIL" <${from}>`,
+    to: toEmail,
+    subject: "\u05E7\u05D5\u05D3 \u05D4\u05D0\u05D9\u05DE\u05D5\u05EA \u05E9\u05DC\u05DA - FinanceIL",
+    text: `\u05E7\u05D5\u05D3 \u05D4\u05D0\u05D9\u05DE\u05D5\u05EA \u05E9\u05DC\u05DA \u05DC-FinanceIL \u05D4\u05D5\u05D0: ${code}
+
+\u05D4\u05E7\u05D5\u05D3 \u05EA\u05E7\u05E3 \u05DC-10 \u05D3\u05E7\u05D5\u05EA.`,
+    html
+  });
+}
+
+// server/authRouter.ts
+var authRouter = (0, import_express.Router)();
+var COOKIE_NAME = "refresh_token";
+var OTP_EXPIRE_MIN = 10;
+var OTP_RATE_LIMIT = 3;
+var OTP_WINDOW_MIN = 15;
+var REFRESH_DAYS = () => parseInt(process.env.REFRESH_TOKEN_EXPIRE_DAYS || "30");
+function setCookie(res, token, days) {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: days * 864e5,
+    path: "/auth"
+  });
+}
+function clearCookie(res) {
+  res.clearCookie(COOKIE_NAME, { path: "/auth" });
+}
+function issueRefreshToken(userId, deviceInfo2, days) {
+  const plain = generateRefreshToken();
+  const now = /* @__PURE__ */ new Date();
+  saveRefreshToken({
+    id: import_crypto2.default.randomUUID(),
+    userId,
+    token: hashToken(plain),
+    deviceInfo: deviceInfo2.slice(0, 256),
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + days * 864e5).toISOString(),
+    revoked: false
+  });
+  return plain;
+}
+function formatUser(u) {
+  return { id: u.id, email: u.email, name: u.name, avatarUrl: u.avatarUrl, isVerified: u.isVerified };
+}
+function deviceInfo(req) {
+  return req.headers["user-agent"] || "";
+}
+authRouter.post("/otp/request", async (req, res) => {
+  const email = (req.body.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@") || !email.split("@")[1]?.includes(".")) {
+    return res.status(400).json({ detail: "\u05DB\u05EA\u05D5\u05D1\u05EA \u05D0\u05D9\u05DE\u05D9\u05D9\u05DC \u05DC\u05D0 \u05EA\u05E7\u05D9\u05E0\u05D4" });
+  }
+  const recent = getRecentOtps(email, OTP_WINDOW_MIN * 6e4);
+  if (recent.length >= OTP_RATE_LIMIT) {
+    return res.status(429).json({ detail: "\u05D9\u05D5\u05EA\u05E8 \u05DE\u05D3\u05D9 \u05D1\u05E7\u05E9\u05D5\u05EA \u2014 \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D1\u05E2\u05D5\u05D3 15 \u05D3\u05E7\u05D5\u05EA" });
+  }
+  const code = generateOtp();
+  saveOtp({
+    id: import_crypto2.default.randomUUID(),
+    email,
+    code: hashOtp(email, code),
+    expiresAt: new Date(Date.now() + OTP_EXPIRE_MIN * 6e4).toISOString(),
+    used: false
+  });
+  try {
+    await sendOtpEmail(email, code);
+  } catch (err) {
+    console.error("SMTP error:", err);
+    return res.status(502).json({ detail: "\u05E9\u05DC\u05D9\u05D7\u05EA \u05D4\u05D0\u05D9\u05DE\u05D9\u05D9\u05DC \u05E0\u05DB\u05E9\u05DC\u05D4 \u2014 \u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D4\u05D2\u05D3\u05E8\u05D5\u05EA SMTP" });
+  }
+  return res.json({ message: "\u05E7\u05D5\u05D3 \u05E0\u05E9\u05DC\u05D7" });
+});
+authRouter.post("/otp/verify", async (req, res) => {
+  const email = (req.body.email || "").trim().toLowerCase();
+  const code = (req.body.code || "").trim();
+  if (code.length !== 6 || !/^\d+$/.test(code)) {
+    return res.status(400).json({ detail: "\u05E7\u05D5\u05D3 \u05D7\u05D9\u05D9\u05D1 \u05DC\u05D4\u05D9\u05D5\u05EA 6 \u05E1\u05E4\u05E8\u05D5\u05EA" });
+  }
+  const candidates = getUnusedValidOtps(email);
+  const matched = candidates.find((r) => verifyOtp(email, code, r.code));
+  if (!matched) {
+    return res.status(401).json({ detail: "\u05E7\u05D5\u05D3 \u05E9\u05D2\u05D5\u05D9 \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
+  }
+  markOtpUsed(matched.id);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  let user = findAuthUserByEmail(email);
+  if (!user) {
+    user = {
+      id: import_crypto2.default.randomUUID(),
+      email,
+      name: email.split("@")[0],
+      avatarUrl: "",
+      googleId: "",
+      isVerified: true,
+      createdAt: now,
+      updatedAt: now
+    };
+    saveAuthUser(user);
+  } else {
+    user = { ...user, isVerified: true, updatedAt: now };
+    saveAuthUser(user);
+  }
+  const days = REFRESH_DAYS();
+  const plain = issueRefreshToken(user.id, deviceInfo(req), days);
+  setCookie(res, plain, days);
+  return res.json({ access_token: createAccessToken(user.id, user.email), user: formatUser(user) });
+});
+authRouter.get("/google", (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) return res.status(501).json({ detail: "Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8" });
+  const params = new import_url.URLSearchParams({
+    client_id: clientId,
+    redirect_uri: process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/auth/google/callback",
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "select_account"
+  });
+  return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+authRouter.get("/google/callback", async (req, res) => {
+  const code = req.query.code;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/auth/google/callback";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  if (!clientId || !clientSecret) return res.status(501).send("Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8");
+  try {
+    const tokenRes = await (0, import_node_fetch.default)("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new import_url.URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: "authorization_code" }).toString()
+    });
+    if (!tokenRes.ok) throw new Error("Token exchange failed");
+    const tokenData = await tokenRes.json();
+    const infoRes = await (0, import_node_fetch.default)("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    if (!infoRes.ok) throw new Error("User info fetch failed");
+    const info = await infoRes.json();
+    const email = (info.email || "").toLowerCase().trim();
+    if (!email) throw new Error("No email from Google");
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    let user = findAuthUserByEmail(email);
+    if (!user) {
+      user = {
+        id: import_crypto2.default.randomUUID(),
+        email,
+        name: info.name || email.split("@")[0],
+        avatarUrl: info.picture || "",
+        googleId: info.sub || "",
+        isVerified: true,
+        createdAt: now,
+        updatedAt: now
+      };
+    } else {
+      user = { ...user, googleId: info.sub || user.googleId, name: info.name || user.name, avatarUrl: info.picture || user.avatarUrl, updatedAt: now };
+    }
+    saveAuthUser(user);
+    const days = REFRESH_DAYS();
+    const plain = issueRefreshToken(user.id, deviceInfo(req), days);
+    const accessToken = createAccessToken(user.id, user.email);
+    res.cookie(COOKIE_NAME, plain, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: days * 864e5,
+      path: "/auth"
+    });
+    return res.redirect(`${frontendUrl}/#access_token=${accessToken}`);
+  } catch (err) {
+    console.error("Google OAuth error:", err);
+    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:3000"}/#auth_error=google_failed`);
+  }
+});
+authRouter.post("/refresh", (req, res) => {
+  const plain = req.cookies?.[COOKIE_NAME];
+  if (!plain) return res.status(401).json({ detail: "\u05D0\u05D9\u05DF refresh token" });
+  const record = findRefreshToken(hashToken(plain));
+  if (!record) {
+    clearCookie(res);
+    return res.status(401).json({ detail: "Refresh token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
+  }
+  const user = findAuthUserById(record.userId);
+  if (!user) return res.status(401).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
+  revokeRefreshToken(record.id);
+  const days = REFRESH_DAYS();
+  const newPlain = issueRefreshToken(user.id, deviceInfo(req), days);
+  setCookie(res, newPlain, days);
+  return res.json({ access_token: createAccessToken(user.id, user.email) });
+});
+authRouter.post("/logout", (req, res) => {
+  const plain = req.cookies?.[COOKIE_NAME];
+  if (plain) {
+    const record = findRefreshToken(hashToken(plain));
+    if (record) revokeRefreshToken(record.id);
+  }
+  clearCookie(res);
+  return res.json({ message: "\u05D4\u05EA\u05E0\u05EA\u05E7\u05EA \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4" });
+});
+authRouter.post("/logout-all", (req, res) => {
+  const auth = req.headers.authorization || "";
+  if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
+  try {
+    const { sub: userId } = decodeAccessToken(auth.slice(7));
+    revokeAllRefreshTokensForUser(userId);
+    clearCookie(res);
+    return res.json({ message: "\u05D4\u05EA\u05E0\u05EA\u05E7\u05EA \u05DE\u05DB\u05DC \u05D4\u05DE\u05DB\u05E9\u05D9\u05E8\u05D9\u05DD" });
+  } catch {
+    return res.status(401).json({ detail: "Access token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF" });
+  }
+});
+authRouter.get("/me", (req, res) => {
+  const auth = req.headers.authorization || "";
+  if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
+  try {
+    const { sub: userId } = decodeAccessToken(auth.slice(7));
+    const user = findAuthUserById(userId);
+    if (!user) return res.status(404).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
+    return res.json(formatUser(user));
+  } catch {
+    return res.status(401).json({ detail: "Access token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF" });
+  }
+});
+authRouter.post("/demo", (req, res) => {
+  const user = getOrCreateDemoUser();
+  const days = REFRESH_DAYS();
+  const plain = issueRefreshToken(user.id, deviceInfo(req), days);
+  setCookie(res, plain, days);
+  return res.json({ access_token: createAccessToken(user.id, user.email), user: formatUser(user) });
+});
+
+// server.ts
+import_dotenv.default.config();
+var DATA_DIR2 = import_path2.default.join(process.cwd(), "data");
+if (!import_fs2.default.existsSync(DATA_DIR2)) {
+  import_fs2.default.mkdirSync(DATA_DIR2, { recursive: true });
+}
+var USERS_FILE = import_path2.default.join(DATA_DIR2, "users.json");
 function readUsersOnServer() {
-  if (!import_fs.default.existsSync(USERS_FILE)) {
+  if (!import_fs2.default.existsSync(USERS_FILE)) {
     const demoProfile = {
       name: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
       netSalary: 16500,
@@ -132,38 +558,57 @@ function readUsersOnServer() {
         ]
       }
     };
-    import_fs.default.writeFileSync(USERS_FILE, JSON.stringify([demoAccount], null, 2), "utf8");
-    import_fs.default.writeFileSync(import_path.default.join(DATA_DIR, "user_data_demo_user_id.json"), JSON.stringify(demoData, null, 2), "utf8");
+    import_fs2.default.writeFileSync(USERS_FILE, JSON.stringify([demoAccount], null, 2), "utf8");
+    import_fs2.default.writeFileSync(import_path2.default.join(DATA_DIR2, "user_data_demo_user_id.json"), JSON.stringify(demoData, null, 2), "utf8");
     return [demoAccount];
   }
   try {
-    return JSON.parse(import_fs.default.readFileSync(USERS_FILE, "utf8"));
+    return JSON.parse(import_fs2.default.readFileSync(USERS_FILE, "utf8"));
   } catch (e) {
     return [];
   }
 }
 function writeUsersOnServer(users) {
-  import_fs.default.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+  import_fs2.default.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
 }
 function readUserDataOnServer(userId) {
-  const filePath = import_path.default.join(DATA_DIR, `user_data_${userId}.json`);
-  if (!import_fs.default.existsSync(filePath)) {
+  const filePath = import_path2.default.join(DATA_DIR2, `user_data_${userId}.json`);
+  if (!import_fs2.default.existsSync(filePath)) {
     return null;
   }
   try {
-    return JSON.parse(import_fs.default.readFileSync(filePath, "utf8"));
+    return JSON.parse(import_fs2.default.readFileSync(filePath, "utf8"));
   } catch (e) {
     return null;
   }
 }
 function writeUserDataOnServer(userId, data) {
-  const filePath = import_path.default.join(DATA_DIR, `user_data_${userId}.json`);
-  import_fs.default.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+  const filePath = import_path2.default.join(DATA_DIR2, `user_data_${userId}.json`);
+  import_fs2.default.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
 }
 async function startServer() {
-  const app = (0, import_express.default)();
+  const app = (0, import_express2.default)();
   const PORT = 3e3;
-  app.use(import_express.default.json({ limit: "20mb" }));
+  app.use(import_express2.default.json({ limit: "20mb" }));
+  app.use((0, import_cookie_parser.default)());
+  app.use("/auth", authRouter);
+  app.use((req, res, next) => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return next();
+    if (!req.path.startsWith("/api/")) return next();
+    const pub = ["/api/health", "/api/forex", "/api/market-summary", "/api/stock-quote"];
+    if (pub.some((p) => req.path.startsWith(p))) return next();
+    const auth = req.headers.authorization || "";
+    if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
+    try {
+      const payload = decodeAccessToken(auth.slice(7));
+      req.userId = payload.sub;
+      req.userEmail = payload.email;
+      next();
+    } catch {
+      return res.status(401).json({ detail: "Token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
+    }
+  });
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
@@ -761,10 +1206,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = import_path.default.join(process.cwd(), "dist");
-    app.use(import_express.default.static(distPath));
+    const distPath = import_path2.default.join(process.cwd(), "dist");
+    app.use(import_express2.default.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(import_path.default.join(distPath, "index.html"));
+      res.sendFile(import_path2.default.join(distPath, "index.html"));
     });
   }
   app.listen(PORT, "0.0.0.0", () => {
