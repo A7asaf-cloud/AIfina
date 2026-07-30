@@ -369,8 +369,11 @@ authRouter.post("/refresh", (req, res) => {
   if (!token) return res.status(401).json({ detail: "\u05D0\u05D9\u05DF refresh token" });
   try {
     const payload = verifyRefreshToken(token);
-    const user = findAuthUserById(payload.sub);
-    if (!user) throw new Error("user not found");
+    let user = findAuthUserById(payload.sub);
+    if (!user) {
+      user = makeUser({ id: payload.sub, email: payload.email, tokenVersion: 0 });
+      saveAuthUser(user);
+    }
     if ((payload.ver ?? 0) !== (user.tokenVersion || 0)) {
       clearCookie(res);
       return res.status(401).json({ detail: "Token \u05D1\u05D5\u05D8\u05DC \u2014 \u05D9\u05E9 \u05DC\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DE\u05D7\u05D3\u05E9" });
@@ -1033,7 +1036,7 @@ async function startServer() {
       const ai = new import_genai.GoogleGenAI({ apiKey });
       const prompt = `\u05E1\u05D5\u05D5\u05D2 \u05DB\u05DC \u05EA\u05D9\u05D0\u05D5\u05E8 \u05E2\u05E1\u05E7\u05D4 \u05DC\u05D0\u05D7\u05EA \u05DE\u05D4\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05D4\u05D1\u05D0\u05D5\u05EA \u05D1\u05DC\u05D1\u05D3. \u05D0\u05DC \u05EA\u05DE\u05E6\u05D9\u05D0 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05D7\u05D3\u05E9\u05D5\u05EA.
 
-\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA: \u05E1\u05D5\u05E4\u05E8\u05DE\u05E8\u05E7\u05D8 | \u05DE\u05E1\u05E2\u05D3\u05D5\u05EA \u05D5\u05E7\u05E4\u05D4 | \u05D0\u05E8\u05E0\u05D5\u05E0\u05D4 | \u05D1\u05D9\u05D3\u05D5\u05E8 | \u05EA\u05E7\u05E9\u05D5\u05E8\u05EA | \u05D3\u05DC\u05E7 \u05D5\u05E8\u05DB\u05D1 | \u05EA\u05D7\u05D1\u05D5\u05E8\u05D4 | \u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA \u05D1\u05D9\u05EA | \u05D1\u05D9\u05D8\u05D5\u05D7 | \u05D1\u05E8\u05D9\u05D0\u05D5\u05EA | \u05E7\u05E0\u05D9\u05D5\u05EA | \u05D3\u05D9\u05D5\u05E8 | \u05D4\u05DB\u05E0\u05E1\u05D4 | \u05D0\u05D7\u05E8
+\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA: \u05D4\u05DB\u05E0\u05E1\u05D4 | \u05DE\u05D6\u05D5\u05DF \u05D5\u05E9\u05D5\u05E7 | \u05D3\u05D9\u05D5\u05E8 | \u05EA\u05D7\u05D1\u05D5\u05E8\u05D4 | \u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA | \u05D1\u05E8\u05D9\u05D0\u05D5\u05EA | \u05D1\u05D9\u05D3\u05D5\u05E8 | \u05E7\u05E0\u05D9\u05D5\u05EA | \u05D7\u05D9\u05E1\u05DB\u05D5\u05DF | \u05E9\u05D5\u05E0\u05D5\u05EA
 
 \u05EA\u05D9\u05D0\u05D5\u05E8\u05D9\u05DD:
 ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
@@ -1047,7 +1050,9 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       const first = clean.indexOf("{");
       const last = clean.lastIndexOf("}");
       const json = JSON.parse(clean.substring(first, last + 1));
-      return res.json({ results: json.results || [] });
+      const VALID = ["\u05D4\u05DB\u05E0\u05E1\u05D4", "\u05DE\u05D6\u05D5\u05DF \u05D5\u05E9\u05D5\u05E7", "\u05D3\u05D9\u05D5\u05E8", "\u05EA\u05D7\u05D1\u05D5\u05E8\u05D4", "\u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA", "\u05D1\u05E8\u05D9\u05D0\u05D5\u05EA", "\u05D1\u05D9\u05D3\u05D5\u05E8", "\u05E7\u05E0\u05D9\u05D5\u05EA", "\u05D7\u05D9\u05E1\u05DB\u05D5\u05DF", "\u05E9\u05D5\u05E0\u05D5\u05EA"];
+      const normalized = (json.results || []).map((c) => VALID.includes(c) ? c : "\u05E9\u05D5\u05E0\u05D5\u05EA");
+      return res.json({ results: normalized });
     } catch (e) {
       console.error("Categorize error:", e);
       return res.status(500).json({ error: e.message });
