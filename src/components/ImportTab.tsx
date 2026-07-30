@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Transaction } from '../types';
 import { parseExcelOrCsvFile } from '../utils/bankParsers';
-import { categorize, CAT_RULES, DEF_CAT } from '../utils/categories';
+import { categorize, CAT_RULES } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
@@ -50,9 +50,53 @@ export const ImportTab: React.FC<ImportTabProps> = ({
       const parsed = await parseExcelOrCsvFile(file);
       if (parsed.length === 0) {
         setErrorMsg('לא נמצאו עסקאות בקובץ. אנא ודא שהקובץ תקין ומכיל עמודות תאריך, תיאור וסכום.');
-      } else {
-        setPreviewTxs(parsed);
+        return;
       }
+
+      // Re-categorize transactions that got "אחר" using Gemini
+      const uncategorized = parsed.filter(t => t.cat === 'אחר');
+      if (uncategorized.length > 0) {
+        try {
+          const customKey = localStorage.getItem('fil_gemini_api_key') || '';
+          if (customKey) {
+            const descriptions = uncategorized.map(t => t.description);
+            const prompt = `סווג כל תיאור עסקה לאחת מהקטגוריות הבאות בלבד:
+סופרמרקט | מסעדות וקפה | ארנונה | בידור | תקשורת | דלק ורכב | תחבורה | חשבונות בית | ביטוח | בריאות | קניות | דיור | הכנסה | אחר
+
+תיאורים לסיווג:
+${descriptions.map((d, i) => `${i + 1}. ${d}`).join('\n')}
+
+החזר JSON בלבד ללא markdown:
+{"results": ["קטגוריה1", "קטגוריה2", ...]}
+(בדיוק ${descriptions.length} קטגוריות לפי הסדר)`;
+
+            const text = await generateGeminiContentClient(customKey, [
+              { role: 'user', parts: [{ text: prompt }] }
+            ]);
+            const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const json = JSON.parse(clean.substring(clean.indexOf('{'), clean.lastIndexOf('}') + 1));
+            const cats: string[] = json.results || [];
+
+            if (cats.length === uncategorized.length) {
+              const catMap = new Map<string | number, string>();
+              uncategorized.forEach((t, i) => { if (cats[i] && cats[i] !== 'אחר') catMap.set(t.id, cats[i]); });
+
+              const recategorized = parsed.map(t => {
+                const newCat = catMap.get(t.id);
+                if (!newCat) return t;
+                const rule = CAT_RULES.find(r => r.cat === newCat);
+                return rule ? { ...t, cat: rule.cat, color: rule.color, emoji: rule.emoji } : t;
+              });
+              setPreviewTxs(recategorized);
+              return;
+            }
+          }
+        } catch (aiErr) {
+          console.warn('AI re-categorization failed, using keyword results:', aiErr);
+        }
+      }
+
+      setPreviewTxs(parsed);
     } catch (err: any) {
       setErrorMsg(err.message || 'שגיאה בקריאת קובץ ה-Excel. אנא נסה קובץ אחר.');
     } finally {

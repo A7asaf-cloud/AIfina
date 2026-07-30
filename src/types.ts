@@ -102,8 +102,10 @@ export interface MoneyMarketFund {
 export interface InvestmentState {
   kerenValue: number;
   kerenYTD?: number;
+  kerenTrack?: string;
   pensionValue: number;
   pensionYTD?: number;
+  pensionTrack?: string;
   savings: SavingsAccount[];
   moneyMarket: MoneyMarketFund[];
   portfolioHoldings: StockHolding[];

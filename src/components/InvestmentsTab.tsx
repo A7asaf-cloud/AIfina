@@ -299,6 +299,16 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
 
   const [depositAmount, setDepositAmount] = useState('');
 
+  // Investment tracks
+  const TRACKS = [
+    { value: 'stocks',      label: 'מסלול מניות',           annualReturn: 9.5 },
+    { value: 'index',       label: 'מסלול מחקה מדד (S&P)',  annualReturn: 8.5 },
+    { value: 'balanced',    label: 'מסלול כללי מאוזן',      annualReturn: 7.0 },
+    { value: 'halakha',     label: 'מסלול הלכה',            annualReturn: 6.5 },
+    { value: 'bonds',       label: 'מסלול אגח',             annualReturn: 4.0 },
+    { value: 'conservative',label: 'מסלול שמרני',           annualReturn: 3.0 },
+  ] as const;
+
   // Editable fund inputs
   const [kerenInput, setKerenInput] = useState(
     investments.kerenValue ? String(investments.kerenValue) : ''
@@ -306,6 +316,8 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   const [pensionInput, setPensionInput] = useState(
     investments.pensionValue ? String(investments.pensionValue) : ''
   );
+  const [kerenTrack, setKerenTrack] = useState(investments.kerenTrack || '');
+  const [pensionTrack, setPensionTrack] = useState(investments.pensionTrack || '');
 
   // New savings account state
   const [showAddSavings, setShowAddSavings] = useState(false);
@@ -420,14 +432,14 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   const handleSaveKeren = () => {
     const v = parseFloat(kerenInput);
     if (!isNaN(v) && v >= 0) {
-      onUpdateInvestments({ kerenValue: v });
+      onUpdateInvestments({ kerenValue: v, kerenTrack: kerenTrack || undefined });
     }
   };
 
   const handleSavePension = () => {
     const v = parseFloat(pensionInput);
     if (!isNaN(v) && v >= 0) {
-      onUpdateInvestments({ pensionValue: v });
+      onUpdateInvestments({ pensionValue: v, pensionTrack: pensionTrack || undefined });
     }
   };
 
@@ -642,7 +654,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 אין ניירות ערך בתיק עדיין — לחץ "קנה נייר" להוספת מניה
               </div>
             ) : (
-              <div className="divide-y divide-slate-800/80">
+              <div className="space-y-3">
                 {holdings.map((h) => {
                   const livePrice = h.currentPrice || h.avgCost || 0;
                   const valUSD = h.shares * livePrice;
@@ -651,72 +663,45 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                   const isPositive = gainUSD >= 0;
 
                   return (
-                    <div key={h.id} className="py-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-xs flex-shrink-0"
-                          style={{
-                            backgroundColor: h.color + '20',
-                            color: h.color,
-                          }}
-                        >
-                          {h.symbol.slice(0, 4)}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white font-num truncate">
-                              {h.symbol}
-                            </span>
-                            {h.changePercent !== undefined && (
-                              <span
-                                className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded font-num ${
-                                  h.changePercent >= 0
-                                    ? 'bg-emerald-500/15 text-emerald-400'
-                                    : 'bg-red-500/15 text-red-400'
-                                }`}
-                              >
-                                {h.changePercent >= 0 ? '+' : ''}
-                                {h.changePercent.toFixed(2)}%
-                              </span>
-                            )}
+                    <div key={h.id} className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 space-y-3">
+                      {/* Row 1: symbol + value */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-xs flex-shrink-0"
+                               style={{ backgroundColor: h.color + '20', color: h.color }}>
+                            {h.symbol.slice(0, 4)}
                           </div>
-                          <div className="text-xs text-slate-400 truncate">
-                            {h.shares} יח׳ · ${livePrice.toFixed(2)} למניה
+                          <div>
+                            <div className="text-sm font-bold text-white">{h.symbol}</div>
+                            <div className="text-xs text-slate-400 mt-0.5 leading-snug max-w-[160px]">{h.name}</div>
+                          </div>
+                        </div>
+                        <div className="text-left flex-shrink-0">
+                          <div className="text-base font-bold text-white font-num">{fmtUSD(valUSD)}</div>
+                          <div className={`text-xs font-bold font-num mt-0.5 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {isPositive ? '+' : ''}{fmtUSD(gainUSD)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-left">
-                          <div className="text-sm font-bold text-white font-num">
-                            {fmtUSD(valUSD)}
-                          </div>
-                          <div
-                            className={`text-xs font-bold font-num ${
-                              isPositive ? 'text-emerald-400' : 'text-red-400'
-                            }`}
-                          >
-                            {isPositive ? '+' : ''}
-                            {fmtUSD(gainUSD)} ({gainPct >= 0 ? '+' : ''}
-                            {gainPct.toFixed(1)}%)
-                          </div>
+                      {/* Row 2: details + actions */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[11px] text-slate-500 leading-relaxed">
+                          <span>{h.shares} יח׳ · מחיר: ${livePrice.toFixed(2)} · ממוצע: ${h.avgCost.toFixed(2)}</span>
+                          {h.changePercent !== undefined && (
+                            <span className={`mr-2 font-bold ${h.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              · היום: {h.changePercent >= 0 ? '+' : ''}{h.changePercent.toFixed(2)}%
+                            </span>
+                          )}
                         </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => openSellModal(h)}
-                            className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-lg transition-all cursor-pointer"
-                            title="מכור מניות מהתיק"
-                          >
-                            מכור 🏷️
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button onClick={() => openSellModal(h)}
+                            className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-lg transition-all cursor-pointer">
+                            מכור
                           </button>
-                          <button
-                            onClick={() => handleDeleteStockHolding(h.id, h.symbol)}
-                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all cursor-pointer"
-                            title="מחק החזקה"
-                          >
-                            <Trash2 className="w-4 h-4" />
+                          <button onClick={() => handleDeleteStockHolding(h.id, h.symbol)}
+                            className="p-1.5 text-slate-600 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all cursor-pointer">
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -742,32 +727,60 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-2">
+            {/* Current value */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                שווי נוכחי בקרן (₪)
-              </label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">שווי נוכחי בקרן (₪)</label>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={kerenInput}
-                  onChange={(e) => setKerenInput(e.target.value)}
+                <input type="number" value={kerenInput} onChange={(e) => setKerenInput(e.target.value)}
                   placeholder="85000"
-                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num"
-                />
-                <button
-                  onClick={handleSaveKeren}
-                  className="px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer"
-                >
+                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
+                <button onClick={handleSaveKeren}
+                  className="px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer">
                   עדכן
                 </button>
               </div>
             </div>
 
-            {kerenMonthlyEst > 0 && (
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs flex justify-between items-center">
-                <span className="text-slate-400">הפקדה חודשית משוערת (עובד+מעסיק)</span>
-                <span className="font-bold text-emerald-400 font-num">{fmtILS(kerenMonthlyEst)}</span>
+            {/* Track selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">מסלול השקעה</label>
+              <select value={kerenTrack} onChange={(e) => setKerenTrack(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none">
+                <option value="">בחר מסלול...</option>
+                {TRACKS.map(t => (
+                  <option key={t.value} value={t.value}>{t.label} — תשואה שנתית ממוצעת {t.annualReturn}%</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Monthly deduction breakdown */}
+            {profile.hasKeren && profile.grossSalary > 0 && (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <div className="text-xs font-bold text-slate-300 mb-3">הפרשה חודשית מהמשכורת</div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">עובד ({profile.kerenEmp}%)</span>
+                  <span className="font-bold text-white font-num">{fmtILS(profile.grossSalary * profile.kerenEmp / 100)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">מעסיק ({profile.kerenEr}%)</span>
+                  <span className="font-bold text-white font-num">{fmtILS(profile.grossSalary * profile.kerenEr / 100)}</span>
+                </div>
+                <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
+                  <span className="text-slate-300 font-bold">סה"כ חודשי</span>
+                  <span className="font-bold text-emerald-400 font-num">{fmtILS(kerenMonthlyEst)}</span>
+                </div>
+                {kerenTrack && (() => {
+                  const track = TRACKS.find(t => t.value === kerenTrack);
+                  const balance = parseFloat(kerenInput) || investments.kerenValue || 0;
+                  const annualGain = balance * (track!.annualReturn / 100);
+                  return track ? (
+                    <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
+                      <span className="text-blue-400 font-bold">רווח שנתי משוער ({track.annualReturn}%)</span>
+                      <span className="font-bold text-blue-400 font-num">+{fmtILS(annualGain)}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
           </div>
@@ -787,32 +800,64 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-2">
+            {/* Current value */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                שווי יתרה נזילה בפנסיה (₪)
-              </label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">שווי נוכחי בפנסיה (₪)</label>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={pensionInput}
-                  onChange={(e) => setPensionInput(e.target.value)}
+                <input type="number" value={pensionInput} onChange={(e) => setPensionInput(e.target.value)}
                   placeholder="240000"
-                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num"
-                />
-                <button
-                  onClick={handleSavePension}
-                  className="px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer"
-                >
+                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
+                <button onClick={handleSavePension}
+                  className="px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer">
                   עדכן
                 </button>
               </div>
             </div>
 
-            {pensionMonthlyEst > 0 && (
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs flex justify-between items-center">
-                <span className="text-slate-400">הפרשה חודשית כוללת (תגמולים+פיצויים)</span>
-                <span className="font-bold text-purple-400 font-num">{fmtILS(pensionMonthlyEst)}</span>
+            {/* Track selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">מסלול השקעה</label>
+              <select value={pensionTrack} onChange={(e) => setPensionTrack(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-3 text-white text-sm outline-none">
+                <option value="">בחר מסלול...</option>
+                {TRACKS.map(t => (
+                  <option key={t.value} value={t.value}>{t.label} — תשואה שנתית ממוצעת {t.annualReturn}%</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Monthly deduction breakdown */}
+            {profile.hasPension && profile.grossSalary > 0 && (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <div className="text-xs font-bold text-slate-300 mb-3">הפרשה חודשית מהמשכורת</div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">תגמולי עובד ({profile.pensionEmp}%)</span>
+                  <span className="font-bold text-white font-num">{fmtILS(profile.grossSalary * profile.pensionEmp / 100)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">תגמולי מעסיק ({profile.pensionEr}%)</span>
+                  <span className="font-bold text-white font-num">{fmtILS(profile.grossSalary * profile.pensionEr / 100)}</span>
+                </div>
+                <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
+                  <span className="text-slate-300 font-bold">סה"כ חודשי</span>
+                  <span className="font-bold text-purple-400 font-num">{fmtILS(pensionMonthlyEst)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">הפקדה שנתית</span>
+                  <span className="font-bold text-slate-300 font-num">{fmtILS(pensionMonthlyEst * 12)}</span>
+                </div>
+                {pensionTrack && (() => {
+                  const track = TRACKS.find(t => t.value === pensionTrack);
+                  const balance = parseFloat(pensionInput) || investments.pensionValue || 0;
+                  const annualGain = balance * (track!.annualReturn / 100);
+                  return track ? (
+                    <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
+                      <span className="text-blue-400 font-bold">רווח שנתי משוער ({track.annualReturn}%)</span>
+                      <span className="font-bold text-blue-400 font-num">+{fmtILS(annualGain)}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
           </div>
