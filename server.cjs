@@ -345,7 +345,7 @@ authRouter.get("/google/callback", async (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri = GOOGLE_REDIRECT_URI();
-  const frontendUrl = process.env.FRONTEND_URL || "https://aifina.ai.studio";
+  const frontendUrl = process.env.FRONTEND_URL || "https://aifina.ai.studio/";
   if (!clientId || !clientSecret) return res.status(501).send("Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8");
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
