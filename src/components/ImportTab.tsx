@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Transaction } from '../types';
 import { parseExcelOrCsvFile } from '../utils/bankParsers';
-import { categorize } from '../utils/categories';
+import { categorize, CAT_RULES, DEF_CAT } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
 import {
@@ -117,30 +117,20 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         const customKey = localStorage.getItem('fil_gemini_api_key') || '';
         const cleanBase64 = compressedBase64.includes(',') ? compressedBase64.split(',').pop() : compressedBase64;
         
-        let localPromptText = `אתה אלגוריתם חכם לזיהוי וסיווג עסקאות פיננסיות. חלץ את כל העסקאות מהתמונה וסווג כל אחת לקטגוריה המתאימה.
-החזר אך ורק מערך JSON תקין במבנה הבא ללא טקסט נוסף וללא markdown:
-[{"date":"YYYY-MM-DD","description":"שם בית העסק","amount":number,"cat":"קטגוריה","emoji":"אמוג'י"}]
+        let localPromptText = `אתה אלגוריתם לחילוץ וסיווג עסקאות פיננסיות מתמונות.
+חלץ את כל העסקאות וסווג כל אחת לאחת מהקטגוריות הבאות בלבד — אל תמציא קטגוריות חדשות.
 
-קטגוריות אפשריות (בחר את המתאים ביותר):
-- הכנסה (משכורת, העברה נכנסת) 💰
-- דיור (שכר דירה, ועד בית, ארנונה) 🏠
-- סופרמרקט (שופרסל, רמי לוי, מגה, יינות ביתן) 🛒
-- מסעדות וקפה (אוכל בחוץ, קפה, פיצה, סושי, וולט, טיב טעם) 🍽️
-- דלק ורכב (פז, סונול, דלק, חניה, ביטוח רכב) ⛽
-- תחבורה (אוטובוס, רכבת, מונית) 🚌
-- חשבונות בית (חשמל, מים, גז, אינטרנט) 💡
-- תקשורת (פלאפון, סלולר, HOT, YES) 📱
-- בריאות (רופא, תרופות, ביטוח בריאות, סופר-פארם) 🏥
-- קניות (ביגוד, נעליים, אמזון, אלקטרוניקה) 🛍️
-- בידור (קולנוע, נטפליקס, ספוטיפיי, משחקים) 🎬
-- חיסכון (קרן, פיקדון, השקעה) 💎
-- שונות (כל דבר אחר) 📦
+קטגוריות מותרות בלבד:
+סופרמרקט | מסעדות וקפה | ארנונה | בידור | תקשורת | דלק ורכב | תחבורה | חשבונות בית | ביטוח | בריאות | קניות | דיור | הכנסה | אחר
+
+החזר אך ורק מערך JSON תקין ללא markdown:
+[{"date":"YYYY-MM-DD","description":"שם בית העסק","amount":number,"cat":"אחת מהקטגוריות למעלה"}]
 
 חוקים:
-- סכום שלילי = הוצאה / חיוב.
-- סכום חיובי = הכנסה / זיכוי.
-- אם אין שנה, השתמש בשנה הנוכחית (${new Date().getFullYear()}).
-- חלץ את כל השורות שגלויות בתמונה.`;
+- סכום שלילי = הוצאה. סכום חיובי = הכנסה.
+- אם לא בטוח בקטגוריה — השתמש ב"אחר".
+- אם אין שנה, השתמש ב-${new Date().getFullYear()}.
+- חלץ את כל השורות הגלויות בתמונה.`;
 
         if (ocrDocType === 'stocks') {
           localPromptText = `חלץ את כל ניירות הערך (מניות/תעודות סל) מתמונת תיק ההשקעות.
@@ -240,16 +230,20 @@ export const ImportTab: React.FC<ImportTabProps> = ({
             ]);
           } else if (Array.isArray(data.result)) {
             const txs: Transaction[] = data.result.map((r: any, idx: number) => {
-              // Use AI-returned category first, fall back to local keyword matching
-              const catInfo = categorize(r.cat || r.description || '');
+              // Find the exact category in our system (by name), fall back to keyword matching
+              const aiCat = (r.cat || '').trim();
+              const matchedRule = CAT_RULES.find(rule => rule.cat === aiCat);
+              const catInfo = matchedRule
+                ? { cat: matchedRule.cat, color: matchedRule.color, emoji: matchedRule.emoji }
+                : categorize(r.description || '');
               return {
                 id: Date.now() + idx + Math.random(),
                 description: r.description || 'עסקה שזוהתה',
                 amount: parseFloat(r.amount) || 0,
                 date: r.date || new Date().toISOString().split('T')[0],
-                cat: r.cat || catInfo.cat,
+                cat: catInfo.cat,
                 color: catInfo.color,
-                emoji: r.emoji || catInfo.emoji,
+                emoji: catInfo.emoji,
                 account: 'צילום מסך',
               };
             });
