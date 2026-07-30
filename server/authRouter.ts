@@ -1,7 +1,5 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import fetch from 'node-fetch';
-import { URLSearchParams } from 'url';
 import {
   hashOtp, verifyOtp, hashToken,
   generateOtp, generateRefreshToken,
