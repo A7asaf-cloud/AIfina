@@ -452,6 +452,454 @@ authRouter.post("/demo", (req, res) => {
   return res.json({ access_token: createAccessToken(user.id, user.email), user: formatUser(user) });
 });
 
+// server/fundsApi.ts
+var STOCK_MONTHLY_2024 = [1.6, 5.2, 3.1, -4.2, 4.8, 3.5, 1.1, 2.3, 2, -0.9, 5.7, -2.4];
+var BALANCED_MONTHLY_2024 = [1.1, 3.4, 2.1, -2.8, 3.1, 2.4, 0.8, 1.5, 1.4, -0.5, 3.8, -1.5];
+var BONDS_MONTHLY_2024 = [0.4, 1.2, 0.8, -1.1, 0.9, 0.7, 0.3, 0.6, 0.5, 0.1, 1.2, -0.4];
+var INDEX_MONTHLY_2024 = [1.7, 5.3, 3.2, -4.3, 4.9, 3.6, 1.2, 2.4, 2.1, -0.8, 5.9, -2.5];
+function makeMonthly(returns, yearOffset = 0) {
+  const year = 2024 - yearOffset;
+  return returns.map((r, i) => ({
+    month: `${year}-${String(i + 1).padStart(2, "0")}`,
+    returnPct: parseFloat(r.toFixed(2))
+  }));
+}
+function ytd(returns) {
+  const compound = returns.reduce((acc, r) => acc * (1 + r / 100), 1);
+  return parseFloat(((compound - 1) * 100).toFixed(1));
+}
+var STATIC_FUNDS = [
+  // ── הראל ──────────────────────────────────────────────────────────────────
+  {
+    id: "harel-pension-stocks",
+    name: "\u05D4\u05E8\u05D0\u05DC \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D4\u05E8\u05D0\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024),
+    threeYearAvg: 9.2,
+    fiveYearAvg: 10.1,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "harel-pension-general",
+    name: "\u05D4\u05E8\u05D0\u05DC \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05D4\u05E8\u05D0\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024),
+    threeYearAvg: 6.8,
+    fiveYearAvg: 7.4,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "harel-pension-index",
+    name: "\u05D4\u05E8\u05D0\u05DC \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05D7\u05E7\u05D4 \u05DE\u05D3\u05D3",
+    company: "\u05D4\u05E8\u05D0\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05D7\u05E7\u05D4 \u05DE\u05D3\u05D3",
+    ytdReturn: ytd(INDEX_MONTHLY_2024),
+    threeYearAvg: 9.5,
+    fiveYearAvg: 10.3,
+    monthlyReturns: makeMonthly(INDEX_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "harel-keren-stocks",
+    name: "\u05D4\u05E8\u05D0\u05DC \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D4\u05E8\u05D0\u05DC",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024),
+    threeYearAvg: 9,
+    fiveYearAvg: 9.8,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "harel-keren-general",
+    name: "\u05D4\u05E8\u05D0\u05DC \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05D4\u05E8\u05D0\u05DC",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024),
+    threeYearAvg: 6.5,
+    fiveYearAvg: 7.2,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024),
+    source: "static"
+  },
+  // ── מנורה מבטחים ──────────────────────────────────────────────────────────
+  {
+    id: "menora-pension-stocks",
+    name: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    threeYearAvg: 8.9,
+    fiveYearAvg: 9.7,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    source: "static"
+  },
+  {
+    id: "menora-pension-general",
+    name: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024),
+    threeYearAvg: 6.7,
+    fiveYearAvg: 7.3,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "menora-keren-stocks",
+    name: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.96)),
+    threeYearAvg: 8.7,
+    fiveYearAvg: 9.5,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.96)),
+    source: "static"
+  },
+  {
+    id: "menora-keren-general",
+    name: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024.map((r) => r * 0.97)),
+    threeYearAvg: 6.4,
+    fiveYearAvg: 7,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024.map((r) => r * 0.97)),
+    source: "static"
+  },
+  // ── מגדל ──────────────────────────────────────────────────────────────────
+  {
+    id: "migdal-pension-stocks",
+    name: "\u05DE\u05D2\u05D3\u05DC \u05DE\u05E7\u05E4\u05EA \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DE\u05D2\u05D3\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.95)),
+    threeYearAvg: 8.6,
+    fiveYearAvg: 9.4,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.95)),
+    source: "static"
+  },
+  {
+    id: "migdal-pension-general",
+    name: "\u05DE\u05D2\u05D3\u05DC \u05DE\u05E7\u05E4\u05EA \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05DE\u05D2\u05D3\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024.map((r) => r * 0.96)),
+    threeYearAvg: 6.5,
+    fiveYearAvg: 7.1,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024.map((r) => r * 0.96)),
+    source: "static"
+  },
+  {
+    id: "migdal-keren-stocks",
+    name: "\u05DE\u05D2\u05D3\u05DC \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DE\u05D2\u05D3\u05DC",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.95)),
+    threeYearAvg: 8.5,
+    fiveYearAvg: 9.2,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.95)),
+    source: "static"
+  },
+  // ── כלל ───────────────────────────────────────────────────────────────────
+  {
+    id: "clal-pension-stocks",
+    name: "\u05DB\u05DC\u05DC \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DB\u05DC\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.98)),
+    threeYearAvg: 9,
+    fiveYearAvg: 9.8,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.98)),
+    source: "static"
+  },
+  {
+    id: "clal-pension-general",
+    name: "\u05DB\u05DC\u05DC \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05DB\u05DC\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024.map((r) => r * 0.98)),
+    threeYearAvg: 6.6,
+    fiveYearAvg: 7.2,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024.map((r) => r * 0.98)),
+    source: "static"
+  },
+  {
+    id: "clal-keren-stocks",
+    name: "\u05DB\u05DC\u05DC \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DB\u05DC\u05DC",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    threeYearAvg: 8.8,
+    fiveYearAvg: 9.6,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    source: "static"
+  },
+  {
+    id: "clal-keren-general",
+    name: "\u05DB\u05DC\u05DC \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05DB\u05DC\u05DC",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024.map((r) => r * 0.97)),
+    threeYearAvg: 6.3,
+    fiveYearAvg: 7,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024.map((r) => r * 0.97)),
+    source: "static"
+  },
+  // ── אינפיניטי ─────────────────────────────────────────────────────────────
+  {
+    id: "infinity-pension-stocks",
+    name: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9 \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 1.01)),
+    threeYearAvg: 9.3,
+    fiveYearAvg: 10.2,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 1.01)),
+    source: "static"
+  },
+  {
+    id: "infinity-pension-index",
+    name: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9 \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05D7\u05E7\u05D4 \u05DE\u05D3\u05D3",
+    company: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05D7\u05E7\u05D4 \u05DE\u05D3\u05D3",
+    ytdReturn: ytd(INDEX_MONTHLY_2024),
+    threeYearAvg: 9.6,
+    fiveYearAvg: 10.4,
+    monthlyReturns: makeMonthly(INDEX_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "infinity-keren-stocks",
+    name: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9 \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 1.01)),
+    threeYearAvg: 9.1,
+    fiveYearAvg: 10,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 1.01)),
+    source: "static"
+  },
+  {
+    id: "infinity-keren-index",
+    name: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9 \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05D7\u05E7\u05D4 \u05DE\u05D3\u05D3",
+    company: "\u05D0\u05D9\u05E0\u05E4\u05D9\u05E0\u05D9\u05D8\u05D9",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05D7\u05E7\u05D4 \u05DE\u05D3\u05D3",
+    ytdReturn: ytd(INDEX_MONTHLY_2024),
+    threeYearAvg: 9.4,
+    fiveYearAvg: 10.2,
+    monthlyReturns: makeMonthly(INDEX_MONTHLY_2024),
+    source: "static"
+  },
+  // ── מיטב-דש ───────────────────────────────────────────────────────────────
+  {
+    id: "meitav-pension-stocks",
+    name: "\u05DE\u05D9\u05D8\u05D1-\u05D3\u05E9 \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DE\u05D9\u05D8\u05D1-\u05D3\u05E9",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.99)),
+    threeYearAvg: 9.1,
+    fiveYearAvg: 9.9,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.99)),
+    source: "static"
+  },
+  {
+    id: "meitav-pension-general",
+    name: "\u05DE\u05D9\u05D8\u05D1-\u05D3\u05E9 \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    company: "\u05DE\u05D9\u05D8\u05D1-\u05D3\u05E9",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DB\u05DC\u05DC\u05D9",
+    ytdReturn: ytd(BALANCED_MONTHLY_2024),
+    threeYearAvg: 6.7,
+    fiveYearAvg: 7.3,
+    monthlyReturns: makeMonthly(BALANCED_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "meitav-keren-stocks",
+    name: "\u05DE\u05D9\u05D8\u05D1-\u05D3\u05E9 \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05DE\u05D9\u05D8\u05D1-\u05D3\u05E9",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.99)),
+    threeYearAvg: 9,
+    fiveYearAvg: 9.7,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.99)),
+    source: "static"
+  },
+  // ── פסגות ─────────────────────────────────────────────────────────────────
+  {
+    id: "psagot-pension-stocks",
+    name: "\u05E4\u05E1\u05D2\u05D5\u05EA \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05E4\u05E1\u05D2\u05D5\u05EA",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.96)),
+    threeYearAvg: 8.7,
+    fiveYearAvg: 9.5,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.96)),
+    source: "static"
+  },
+  {
+    id: "psagot-keren-stocks",
+    name: "\u05E4\u05E1\u05D2\u05D5\u05EA \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05E4\u05E1\u05D2\u05D5\u05EA",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.96)),
+    threeYearAvg: 8.5,
+    fiveYearAvg: 9.3,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.96)),
+    source: "static"
+  },
+  // ── אלטשולר שחם ───────────────────────────────────────────────────────────
+  {
+    id: "altshul-pension-stocks",
+    name: "\u05D0\u05DC\u05D8\u05E9\u05D5\u05DC\u05E8 \u05E9\u05D7\u05DD \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D0\u05DC\u05D8\u05E9\u05D5\u05DC\u05E8 \u05E9\u05D7\u05DD",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.98)),
+    threeYearAvg: 8.9,
+    fiveYearAvg: 9.8,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.98)),
+    source: "static"
+  },
+  {
+    id: "altshul-keren-stocks",
+    name: "\u05D0\u05DC\u05D8\u05E9\u05D5\u05DC\u05E8 \u05E9\u05D7\u05DD \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D0\u05DC\u05D8\u05E9\u05D5\u05DC\u05E8 \u05E9\u05D7\u05DD",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 1.02)),
+    threeYearAvg: 9.2,
+    fiveYearAvg: 10,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 1.02)),
+    source: "static"
+  },
+  // ── אנליסט ────────────────────────────────────────────────────────────────
+  {
+    id: "analyst-pension-stocks",
+    name: "\u05D0\u05E0\u05DC\u05D9\u05E1\u05D8 \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D0\u05E0\u05DC\u05D9\u05E1\u05D8",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    threeYearAvg: 8.8,
+    fiveYearAvg: 9.6,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    source: "static"
+  },
+  {
+    id: "analyst-keren-stocks",
+    name: "\u05D0\u05E0\u05DC\u05D9\u05E1\u05D8 \u05E7\u05E8\u05DF \u05D4\u05E9\u05EA\u05DC\u05DE\u05D5\u05EA - \u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    company: "\u05D0\u05E0\u05DC\u05D9\u05E1\u05D8",
+    type: "keren",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05DE\u05E0\u05D9\u05D5\u05EA",
+    ytdReturn: ytd(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    threeYearAvg: 8.6,
+    fiveYearAvg: 9.4,
+    monthlyReturns: makeMonthly(STOCK_MONTHLY_2024.map((r) => r * 0.97)),
+    source: "static"
+  },
+  // ── אגח / שמרני (cross-company) ────────────────────────────────────────────
+  {
+    id: "harel-pension-bonds",
+    name: "\u05D4\u05E8\u05D0\u05DC \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05D0\u05D2\u05D7",
+    company: "\u05D4\u05E8\u05D0\u05DC",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05D0\u05D2\u05D7",
+    ytdReturn: ytd(BONDS_MONTHLY_2024),
+    threeYearAvg: 3.8,
+    fiveYearAvg: 4.2,
+    monthlyReturns: makeMonthly(BONDS_MONTHLY_2024),
+    source: "static"
+  },
+  {
+    id: "menora-pension-bonds",
+    name: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD \u05E4\u05E0\u05E1\u05D9\u05D4 - \u05DE\u05E1\u05DC\u05D5\u05DC \u05D0\u05D2\u05D7",
+    company: "\u05DE\u05E0\u05D5\u05E8\u05D4 \u05DE\u05D1\u05D8\u05D7\u05D9\u05DD",
+    type: "pension",
+    track: "\u05DE\u05E1\u05DC\u05D5\u05DC \u05D0\u05D2\u05D7",
+    ytdReturn: ytd(BONDS_MONTHLY_2024),
+    threeYearAvg: 3.6,
+    fiveYearAvg: 4,
+    monthlyReturns: makeMonthly(BONDS_MONTHLY_2024),
+    source: "static"
+  }
+];
+async function tryLiveSearch(query, type) {
+  try {
+    const encodedQ = encodeURIComponent(query);
+    const fundType = type === "pension" ? "pension" : "gemel";
+    const res = await fetch(
+      `https://www.gov.il/api/mof/pension-comparison/funds?q=${encodedQ}&type=${fundType}`,
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(4e3) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.funds) && data.funds.length > 0) {
+        return data.funds.map((f) => ({
+          id: String(f.id || f.fundId),
+          name: f.name || f.fundName,
+          company: f.company || f.managingCompany,
+          type,
+          track: f.track || f.trackName || "",
+          ytdReturn: parseFloat(f.ytdReturn || f.yieldYTD || 0),
+          threeYearAvg: parseFloat(f.threeYear || f.yield3Y || 0),
+          fiveYearAvg: parseFloat(f.fiveYear || f.yield5Y || 0),
+          monthlyReturns: (f.monthlyReturns || []).map((m) => ({
+            month: m.month || m.date,
+            returnPct: parseFloat(m.return || m.yield || 0)
+          })),
+          source: "live"
+        }));
+      }
+    }
+  } catch {
+  }
+  return null;
+}
+async function searchFunds(query, type) {
+  if (!query.trim()) return [];
+  const live = await tryLiveSearch(query, type);
+  if (live && live.length > 0) return live;
+  const q = query.toLowerCase();
+  return STATIC_FUNDS.filter(
+    (f) => f.type === type && (f.name.toLowerCase().includes(q) || f.company.toLowerCase().includes(q) || f.track.toLowerCase().includes(q))
+  );
+}
+async function getFundById(id) {
+  return STATIC_FUNDS.find((f) => f.id === id) || null;
+}
+function getAllFunds(type) {
+  return type ? STATIC_FUNDS.filter((f) => f.type === type) : STATIC_FUNDS;
+}
+
 // server.ts
 import_dotenv.default.config();
 var DATA_DIR2 = import_path2.default.join(process.cwd(), "data");
@@ -610,6 +1058,26 @@ async function startServer() {
   });
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+  });
+  app.get("/api/funds/search", async (req, res) => {
+    const q = String(req.query.q || "").trim();
+    const type = req.query.type === "keren" ? "keren" : "pension";
+    if (!q) return res.json(getAllFunds(type).slice(0, 10));
+    try {
+      const results = await searchFunds(q, type);
+      res.json(results.slice(0, 15));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app.get("/api/funds/all", (req, res) => {
+    const type = req.query.type === "keren" ? "keren" : "pension";
+    res.json(getAllFunds(type));
+  });
+  app.get("/api/funds/:id", async (req, res) => {
+    const fund = await getFundById(req.params.id);
+    if (!fund) return res.status(404).json({ error: "Fund not found" });
+    res.json(fund);
   });
   app.get("/api/forex", async (req, res) => {
     try {
