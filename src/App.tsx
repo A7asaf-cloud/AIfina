@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState } from './types';
 import { StorageService } from './services/storage';
-import { useAuth } from './auth/AuthContext';
+import { useAuth, getMemToken } from './auth/AuthContext';
 import AuthPage from './auth/AuthPage';
 import { setTokenProvider } from './services/storage';
 import { Onboarding } from './components/Onboarding';
@@ -42,11 +42,18 @@ export default function App() {
     if (!authUser || !accessToken) { setAppData(null); setNeedsOnboarding(false); return; }
     StorageService.setActiveUserId(authUser.id);
 
-    // Load from server first (cross-device sync), fall back to localStorage
-    StorageService.loadFromServer(authUser.id, accessToken).then(serverData => {
-      if (serverData) {
-        // Server is source of truth — update localStorage
+    // Cross-device sync strategy:
+    // 1. Try to load from server (another device may have saved data there)
+    // 2. If server has data → use it (server wins)
+    // 3. If server is empty → use localStorage and push it to server (this device is source of truth)
+    const localToken = getMemToken();
+    StorageService.loadFromServer(authUser.id, localToken || accessToken || '').then(serverData => {
+      if (serverData && serverData.transactions) {
+        // Server has real data — treat as source of truth
         localStorage.setItem(`fil_u_data_${authUser.id}`, JSON.stringify(serverData));
+      } else {
+        // Server is empty (restarted) — push our local data up
+        StorageService.pushToServer(authUser.id);
       }
       const data = StorageService.getUserData(authUser.id);
       setAppData(data);

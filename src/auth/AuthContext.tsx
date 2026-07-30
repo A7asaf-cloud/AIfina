@@ -19,37 +19,42 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-const CACHE_KEY = 'fil_auth_user';
 
-// In-memory token (not persisted — security: not in localStorage)
-let _memToken: string | null = null;
-export function setMemToken(t: string | null) { _memToken = t; }
-export function getMemToken(): string | null   { return _memToken; }
+const TOKEN_KEY    = 'fil_access_token';
+const USER_KEY     = 'fil_auth_user';
+
+// Module-level reference — always current, no closure staleness
+let _memToken: string | null = localStorage.getItem(TOKEN_KEY);
+
+export function getMemToken(): string | null { return _memToken; }
+export function setMemToken(t: string | null) {
+  _memToken = t;
+  if (t) localStorage.setItem(TOKEN_KEY, t);
+  else    localStorage.removeItem(TOKEN_KEY);
+}
 
 function getCachedUser(): AuthUser | null {
-  try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { return null; }
+  try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; }
 }
 function setCachedUser(u: AuthUser | null) {
-  if (u) localStorage.setItem(CACHE_KEY, JSON.stringify(u));
-  else localStorage.removeItem(CACHE_KEY);
+  if (u) localStorage.setItem(USER_KEY, JSON.stringify(u));
+  else    localStorage.removeItem(USER_KEY);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Start with cached user immediately — no loading flash on refresh
   const [user, setUser]               = useState<AuthUser | null>(getCachedUser);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  // isLoading = true only while we're validating the cached session in background
-  const [isLoading, setIsLoading]     = useState(true);
+  const [accessToken, setAccessToken] = useState<string | null>(_memToken);
+  const [isLoading, setIsLoading]     = useState(!_memToken); // skip spinner if token already in LS
 
   const applySession = useCallback((token: string, userData: AuthUser) => {
-    _memToken = token;
+    setMemToken(token);
     setAccessToken(token);
     setUser(userData);
     setCachedUser(userData);
   }, []);
 
   const clearSession = useCallback(() => {
-    _memToken = null;
+    setMemToken(null);
     setAccessToken(null);
     setUser(null);
     setCachedUser(null);
@@ -57,11 +62,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMe = useCallback(async (token: string): Promise<AuthUser> => {
     const res = await fetch('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) throw new Error('me failed');
+    if (!res.ok) {
+      // Only clear session on explicit 401 from backend
+      if (res.status === 401) throw new Error('401');
+      throw new Error('me failed');
+    }
     return res.json();
   }, []);
 
+  // Silently refresh token — never redirect unless backend says 401
   const silentRefresh = useCallback(async (): Promise<boolean> => {
+    // If we have a stored token, validate it first before trying refresh
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    if (storedToken) {
+      try {
+        const userData = await fetchMe(storedToken);
+        applySession(storedToken, userData);
+        return true;
+      } catch (err: any) {
+        if (err?.message !== '401') {
+          // Network error or non-401 — keep existing session, don't log out
+          const cachedUser = getCachedUser();
+          if (cachedUser) {
+            setUser(cachedUser);
+            setAccessToken(storedToken);
+            return true;
+          }
+        }
+        // 401 → try refresh token cookie
+      }
+    }
+
     try {
       const res = await fetch('/auth/refresh', { method: 'POST', credentials: 'include' });
       if (!res.ok) throw new Error('refresh failed');
@@ -70,7 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applySession(access_token, userData);
       return true;
     } catch {
-      // Only clear if we had no cached user — avoid flash-of-logout
+      // Network error — keep cached user so we don't flash login screen
+      const cached = getCachedUser();
+      if (cached) {
+        setUser(cached);
+        // Keep whatever token we have, or null
+        return true;
+      }
+      // No cache + no refresh → must re-login
       clearSession();
       return false;
     }
@@ -82,17 +120,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fragmentToken = params.get('access_token');
 
     if (fragmentToken) {
-      // Google OAuth callback
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       fetchMe(fragmentToken)
         .then(u => applySession(fragmentToken, u))
         .catch(clearSession)
         .finally(() => setIsLoading(false));
     } else {
-      // Silent refresh in background — UI already shows from cache
       silentRefresh().finally(() => setIsLoading(false));
     }
   }, []); // eslint-disable-line
+
+  // Refresh token 2 minutes before expiry (access token is 15 min)
+  useEffect(() => {
+    if (!accessToken) return;
+    const interval = setInterval(() => {
+      silentRefresh();
+    }, 13 * 60 * 1000); // 13 minutes
+    return () => clearInterval(interval);
+  }, [accessToken, silentRefresh]);
 
   const logout = useCallback(async () => {
     try {

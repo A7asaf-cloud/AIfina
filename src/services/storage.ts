@@ -13,6 +13,7 @@ import {
   StockHistoryItem,
   SnapshotItem,
 } from '../types';
+import { getMemToken } from '../auth/AuthContext';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
 
@@ -316,8 +317,8 @@ export class StorageService {
       const updated = { ...current, ...data };
       localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify(updated));
 
-      // Fire-and-forget server sync so data is available on all devices
-      const token = _tokenProvider?.();
+      // Server sync — use in-memory token (always current, never stale closure)
+      const token = getMemToken();
       if (token) {
         fetch('/api/user/save', {
           method: 'POST',
@@ -329,6 +330,19 @@ export class StorageService {
     } catch (e) {
       console.error('Error saving user data:', e);
     }
+  }
+
+  // Push full localStorage data to server (call on login to ensure server has latest)
+  static pushToServer(userId: string): void {
+    const token = getMemToken();
+    if (!token) return;
+    const data = this.getUserData(userId);
+    fetch('/api/user/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      credentials: 'include',
+      body: JSON.stringify({ userId, data }),
+    }).catch(() => {});
   }
 
   static async loadFromServer(userId: string, token: string): Promise<UserAppData | null> {

@@ -172,7 +172,7 @@ async function startServer() {
     const secret = process.env.JWT_SECRET;
     if (!secret) return next();                              // auth disabled
     if (!req.path.startsWith('/api/')) return next();       // only guard /api/*
-    const pub = ['/api/health', '/api/forex', '/api/market-summary', '/api/stock-quote'];
+    const pub = ['/api/health', '/api/forex', '/api/market-summary', '/api/stock-quote', '/api/categorize', '/api/funds'];
     if (pub.some(p => req.path.startsWith(p))) return next(); // public endpoints
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ detail: 'לא מאומת' });
