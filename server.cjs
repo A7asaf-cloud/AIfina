@@ -1023,6 +1023,36 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
+  app.post("/api/categorize", async (req, res) => {
+    try {
+      const apiKey = getGeminiApiKey(req);
+      if (!apiKey) return res.status(400).json({ error: "\u05DE\u05E4\u05EA\u05D7 Gemini \u05D7\u05E1\u05E8" });
+      const { descriptions } = req.body;
+      if (!Array.isArray(descriptions) || descriptions.length === 0)
+        return res.status(400).json({ error: "\u05E8\u05E9\u05D9\u05DE\u05EA \u05EA\u05D9\u05D0\u05D5\u05E8\u05D9\u05DD \u05D7\u05E1\u05E8\u05D4" });
+      const ai = new import_genai.GoogleGenAI({ apiKey });
+      const prompt = `\u05E1\u05D5\u05D5\u05D2 \u05DB\u05DC \u05EA\u05D9\u05D0\u05D5\u05E8 \u05E2\u05E1\u05E7\u05D4 \u05DC\u05D0\u05D7\u05EA \u05DE\u05D4\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05D4\u05D1\u05D0\u05D5\u05EA \u05D1\u05DC\u05D1\u05D3. \u05D0\u05DC \u05EA\u05DE\u05E6\u05D9\u05D0 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05D7\u05D3\u05E9\u05D5\u05EA.
+
+\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA: \u05E1\u05D5\u05E4\u05E8\u05DE\u05E8\u05E7\u05D8 | \u05DE\u05E1\u05E2\u05D3\u05D5\u05EA \u05D5\u05E7\u05E4\u05D4 | \u05D0\u05E8\u05E0\u05D5\u05E0\u05D4 | \u05D1\u05D9\u05D3\u05D5\u05E8 | \u05EA\u05E7\u05E9\u05D5\u05E8\u05EA | \u05D3\u05DC\u05E7 \u05D5\u05E8\u05DB\u05D1 | \u05EA\u05D7\u05D1\u05D5\u05E8\u05D4 | \u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA \u05D1\u05D9\u05EA | \u05D1\u05D9\u05D8\u05D5\u05D7 | \u05D1\u05E8\u05D9\u05D0\u05D5\u05EA | \u05E7\u05E0\u05D9\u05D5\u05EA | \u05D3\u05D9\u05D5\u05E8 | \u05D4\u05DB\u05E0\u05E1\u05D4 | \u05D0\u05D7\u05E8
+
+\u05EA\u05D9\u05D0\u05D5\u05E8\u05D9\u05DD:
+${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
+
+\u05D4\u05D7\u05D6\u05E8 JSON \u05D1\u05DC\u05D1\u05D3 (\u05DC\u05DC\u05D0 markdown):
+{"results":["\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4 \u05DC\u05EA\u05D9\u05D0\u05D5\u05E8 1","\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4 \u05DC\u05EA\u05D9\u05D0\u05D5\u05E8 2",...]}
+\u05D7\u05D9\u05D9\u05D1 \u05DC\u05D4\u05D9\u05D5\u05EA \u05D1\u05D3\u05D9\u05D5\u05E7 ${descriptions.length} \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D4\u05E1\u05D3\u05E8.`;
+      const response = await generateGeminiContent(ai, { contents: prompt });
+      const text = response.text || "";
+      const clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const first = clean.indexOf("{");
+      const last = clean.lastIndexOf("}");
+      const json = JSON.parse(clean.substring(first, last + 1));
+      return res.json({ results: json.results || [] });
+    } catch (e) {
+      console.error("Categorize error:", e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
   app.get("/api/funds/search", async (req, res) => {
     const q = String(req.query.q || "").trim();
     const type = req.query.type === "keren" ? "keren" : "pension";
