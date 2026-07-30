@@ -50,7 +50,10 @@ export default function App() {
       }
       const data = StorageService.getUserData(authUser.id);
       setAppData(data);
-      if (!data.profile || !data.profile.onboardingDone) setNeedsOnboarding(true);
+      // Check onboardingDone from data OR from a local browser flag (survives server restarts)
+      const localDone = localStorage.getItem(`fil_onboarded_${authUser.id}`) === '1';
+      const hasRealData = data.profile && (data.profile.netSalary > 0 || (data.transactions && data.transactions.length > 0));
+      if (!data.profile?.onboardingDone && !localDone && !hasRealData) setNeedsOnboarding(true);
       const autoSalaryTx = StorageService.checkAutoSalary(authUser.id);
       if (autoSalaryTx) {
         setSalaryToast(autoSalaryTx.amount);
@@ -66,6 +69,8 @@ export default function App() {
     const updated = { ...appData!, profile: doneProfile };
     setAppData(updated);
     StorageService.saveUserData(activeUser.id, { profile: doneProfile });
+    // Persist onboarding completion in browser — survives server restarts
+    localStorage.setItem(`fil_onboarded_${activeUser.id}`, '1');
     setNeedsOnboarding(false);
   };
 

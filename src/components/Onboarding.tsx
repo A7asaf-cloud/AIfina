@@ -15,13 +15,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ initialProfile, onDone }
 
   const [d, setD] = useState({
     name: initialProfile.name || '',
-    netSalary: initialProfile.netSalary ? String(initialProfile.netSalary) : '0',
-    grossSalary: initialProfile.grossSalary ? String(initialProfile.grossSalary) : '0',
+    netSalary: initialProfile.netSalary ? String(initialProfile.netSalary) : '',
+    grossSalary: initialProfile.grossSalary ? String(initialProfile.grossSalary) : '',
     salaryDay: initialProfile.salaryDay || 10,
     creditDay: initialProfile.creditDay || 1,
-    bankBalance: initialProfile.bankBalance ? String(initialProfile.bankBalance) : '0',
-    creditDebt: initialProfile.creditDebt ? String(initialProfile.creditDebt) : '0',
-    rent: initialProfile.rent ? String(initialProfile.rent) : '0',
+    bankBalance: initialProfile.bankBalance ? String(initialProfile.bankBalance) : '',
+    creditDebt: initialProfile.creditDebt ? String(initialProfile.creditDebt) : '',
+    rent: initialProfile.rent ? String(initialProfile.rent) : '',
     rentDay: initialProfile.rentDay || 1,
     hasKeren: initialProfile.hasKeren ?? false,
     hasPension: initialProfile.hasPension ?? false,
