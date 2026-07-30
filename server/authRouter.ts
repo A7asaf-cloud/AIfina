@@ -4,6 +4,7 @@ import {
   hashOtp, verifyOtp, hashToken,
   generateOtp, generateRefreshToken,
   createAccessToken, decodeAccessToken,
+  GOOGLE_REDIRECT_URI,
 } from './authUtils';
 import {
   findAuthUserByEmail, findAuthUserById, saveAuthUser, getOrCreateDemoUser,
@@ -141,7 +142,7 @@ authRouter.get('/google', (req: Request, res: Response) => {
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback',
+    redirect_uri: GOOGLE_REDIRECT_URI(),
     response_type: 'code',
     scope: 'openid email profile',
     access_type: 'offline',
@@ -156,8 +157,8 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
   const code = req.query.code as string;
   const clientId     = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri  = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback';
-  const frontendUrl  = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const redirectUri  = GOOGLE_REDIRECT_URI();
+  const frontendUrl  = process.env.FRONTEND_URL || 'https://aifina.ai.studio';
 
   if (!clientId || !clientSecret) return res.status(501).send('Google OAuth לא מוגדר');
 

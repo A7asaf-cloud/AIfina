@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 const JWT_SECRET = () => process.env.JWT_SECRET || 'aifina-default-secret-key-change-in-production';
+export const GOOGLE_REDIRECT_URI = () =>
+  process.env.GOOGLE_REDIRECT_URI || 'https://aifina.ai.studio/auth/google/callback';
 const ACCESS_EXPIRE_SEC = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || '15') * 60;
 
 export function hashOtp(email: string, code: string): string {
