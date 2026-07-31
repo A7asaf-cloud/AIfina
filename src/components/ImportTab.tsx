@@ -38,7 +38,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle Excel/CSV file upload — Gemini parses and categorizes in one call
+  // Handle Excel/CSV file upload — Gemini parses and categorizes directly from browser
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -47,24 +47,67 @@ export const ImportTab: React.FC<ImportTabProps> = ({
     setErrorMsg(null);
 
     try {
-      const content = await readFileAsText(file);
-      const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (customKey) headers['x-gemini-api-key'] = customKey;
-
-      const res = await fetch('/api/parse-statement', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ content }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || 'שגיאה בניתוח הקובץ על ידי Gemini AI');
+      const geminiKey = localStorage.getItem('fil_gemini_api_key') || '';
+      if (!geminiKey) {
+        setErrorMsg('נדרש מפתח Gemini API. הגדר אותו בהגדרות האפליקציה.');
         return;
       }
 
-      const txs: Transaction[] = data.transactions || [];
+      const content = await readFileAsText(file);
+
+      const VALID_CATS = ['הכנסה','מזון ושוק','דיור','תחבורה','חשבונות','בריאות','בידור','קניות','חיסכון','שונות'];
+      const prompt = `אתה מומחה בניתוח דפי חשבון בנק וכרטיסי אשראי ישראליים.
+
+להלן תוכן קובץ CSV/Excel של דף חשבון:
+---
+${content.slice(0, 9000)}
+---
+
+משימה: חלץ את כל שורות העסקאות בלבד. התעלם מכותרות, סיכומים ומידע כללי.
+לכל עסקה:
+- date: תאריך בפורמט YYYY-MM-DD (שנה 2 ספרות → הנח 20XX)
+- description: שם בית העסק / תיאור הפעולה (לא תאריך, לא מספר בלבד)
+- amount: הסכום כמספר חיובי בלבד
+- type: "expense" = חיוב/הוצאה | "income" = זיכוי/הכנסה
+- cat: קטגוריה אחת מהרשימה: ${VALID_CATS.join(' | ')}
+
+כללים:
+- אם יש שתי עמודות תאריך (עסקה + חיוב) — קח תאריך עסקה
+- סכום שלילי בקובץ = expense
+- עמודת זכות עם ערך = income
+- קובץ אשראי (Max/Cal) — כל העסקאות הן expense
+
+החזר אך ורק JSON תקין ללא markdown:
+[{"date":"YYYY-MM-DD","description":"שם","amount":number,"type":"expense","cat":"מזון ושוק"}]`;
+
+      const raw = await generateGeminiContentClient(geminiKey, [
+        { role: 'user', parts: [{ text: prompt }] }
+      ]);
+
+      const clean = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const first = clean.indexOf('[');
+      const last  = clean.lastIndexOf(']');
+      if (first === -1 || last === -1) throw new Error('Gemini לא החזיר JSON תקין');
+
+      const parsed: any[] = JSON.parse(clean.substring(first, last + 1));
+      const txs: Transaction[] = parsed
+        .filter(t => t.description && t.amount > 0 && t.date)
+        .map((t, i) => {
+          const aiCat = VALID_CATS.includes(t.cat) ? t.cat : 'שונות';
+          const rule = CAT_RULES.find(r => r.cat === aiCat) || CAT_RULES[CAT_RULES.length - 1];
+          const absAmt = Math.abs(parseFloat(t.amount) || 0);
+          return {
+            id: Date.now() + i + Math.random(),
+            description: String(t.description).trim(),
+            amount: t.type === 'income' ? absAmt : -absAmt,
+            date: String(t.date).slice(0, 10),
+            cat: rule.cat,
+            color: rule.color,
+            emoji: rule.emoji,
+            account: 'ייבוא',
+          };
+        });
+
       if (txs.length === 0) {
         setErrorMsg('Gemini לא זיהה עסקאות בקובץ זה. ודא שמדובר בקובץ תנועות תקין.');
         return;
@@ -72,7 +115,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
       setPreviewTxs(txs);
     } catch (err: any) {
-      setErrorMsg(err.message || 'שגיאה בחיבור לשרת. ודא שמפתח Gemini מוגדר.');
+      setErrorMsg(err.message || 'שגיאה בניתוח הקובץ. ודא שמפתח Gemini תקין ומוגדר בהגדרות.');
     } finally {
       setFileLoading(false);
     }
