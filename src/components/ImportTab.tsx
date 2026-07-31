@@ -53,42 +53,37 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         return;
       }
 
-      // Re-categorize ALL transactions using server-side Gemini
-      // (catches both keyword misses and improves accuracy overall)
+      // Re-categorize ALL transactions using server-side Gemini.
+      // Server falls back to its own GEMINI_API_KEY env if no custom key is provided.
       const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-      if (customKey && parsed.length > 0) {
-        try {
-          const descriptions = parsed.map(t => t.description);
-          const res2 = await fetch('/api/categorize', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-gemini-api-key': customKey,
-            },
-            body: JSON.stringify({ descriptions }),
-          });
+      try {
+        const descriptions = parsed.map(t => t.description);
+        const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (customKey) reqHeaders['x-gemini-api-key'] = customKey;
 
-          if (res2.ok) {
-            const data = await res2.json();
-            const cats: string[] = data.results || [];
+        const res2 = await fetch('/api/categorize', {
+          method: 'POST',
+          headers: reqHeaders,
+          body: JSON.stringify({ descriptions }),
+        });
 
-            if (cats.length === parsed.length) {
-              const recategorized = parsed.map((t, i) => {
-                const aiCat = (cats[i] || '').trim();
-                if (!aiCat || aiCat === 'אחר') return t;
-                // Exact match first
-                let rule = CAT_RULES.find(r => r.cat === aiCat);
-                // Partial match fallback
-                if (!rule) rule = CAT_RULES.find(r => aiCat.includes(r.cat) || r.cat.includes(aiCat));
-                return rule ? { ...t, cat: rule.cat, color: rule.color, emoji: rule.emoji } : t;
-              });
-              setPreviewTxs(recategorized);
-              return;
-            }
+        if (res2.ok) {
+          const data = await res2.json();
+          const cats: string[] = data.results || [];
+
+          if (cats.length === parsed.length) {
+            const recategorized = parsed.map((t, i) => {
+              const aiCat = (cats[i] || '').trim();
+              if (!aiCat || aiCat === 'שונות') return t;
+              const rule = CAT_RULES.find(r => r.cat === aiCat);
+              return rule ? { ...t, cat: rule.cat, color: rule.color, emoji: rule.emoji } : t;
+            });
+            setPreviewTxs(recategorized);
+            return;
           }
-        } catch (aiErr) {
-          console.warn('AI categorization failed, using keyword results:', aiErr);
         }
+      } catch (aiErr) {
+        console.warn('AI categorization failed, using keyword results:', aiErr);
       }
 
       setPreviewTxs(parsed);
@@ -160,14 +155,14 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 חלץ את כל העסקאות וסווג כל אחת לאחת מהקטגוריות הבאות בלבד — אל תמציא קטגוריות חדשות.
 
 קטגוריות מותרות בלבד:
-סופרמרקט | מסעדות וקפה | ארנונה | בידור | תקשורת | דלק ורכב | תחבורה | חשבונות בית | ביטוח | בריאות | קניות | דיור | הכנסה | אחר
+הכנסה | מזון ושוק | דיור | תחבורה | חשבונות | בריאות | בידור | קניות | חיסכון | שונות
 
 החזר אך ורק מערך JSON תקין ללא markdown:
 [{"date":"YYYY-MM-DD","description":"שם בית העסק","amount":number,"cat":"אחת מהקטגוריות למעלה"}]
 
 חוקים:
 - סכום שלילי = הוצאה. סכום חיובי = הכנסה.
-- אם לא בטוח בקטגוריה — השתמש ב"אחר".
+- אם לא בטוח בקטגוריה — השתמש ב"שונות".
 - אם אין שנה, השתמש ב-${new Date().getFullYear()}.
 - חלץ את כל השורות הגלויות בתמונה.`;
 

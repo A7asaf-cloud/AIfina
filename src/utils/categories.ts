@@ -29,7 +29,7 @@ export type CategoryKey = keyof typeof CATEGORIES;
 const RULES: [string[], CategoryKey][] = [
   // ── הכנסה ────────────────────────────────────────────────────────────────
   [[
-    'משכורת', 'שכר', 'salary', 'wage', 'income', 'הכנסה',
+    'משכורת', 'salary', 'wage', 'income', 'הכנסה',
     'bonus', 'בונוס', 'החזר', 'refund', 'זיכוי', 'credit',
     'העברה נכנסת', 'transfer in', 'הפקדה נכנסת', 'deposit received',
     'פיצויים', 'מענק', 'דמי הבראה', 'דמי חופשה',
@@ -41,7 +41,7 @@ const RULES: [string[], CategoryKey][] = [
     'מגה', 'mega', 'יינות ביתן', 'אושר עד', 'חצי חינם', 'am:pm', 'אמפמ',
     'טיב טעם', 'fresh market', 'קשת טעמים', 'סופרמרקט', 'supermarket',
     'מכולת', 'grocery', 'food store', 'minimarket', 'ספייסר', 'spiser',
-    'super', 'שוק', 'market', 'aldi', 'carrefour',
+    'שוק', 'market', 'aldi', 'carrefour',
     // מסעדות וקפה — חלק ממזון
     'וולט', 'wolt', 'מקדונלד', 'mcdonald', 'קפה', 'cafe', 'coffee',
     'מסעדה', 'restaurant', 'פיצה', 'pizza', 'סושי', 'sushi', 'בורגר', 'burger',
@@ -53,7 +53,7 @@ const RULES: [string[], CategoryKey][] = [
 
   // ── דיור ─────────────────────────────────────────────────────────────────
   [[
-    'שכר דירה', 'שכירות', 'rent', 'mortgage', 'משכנתה', 'משכנתא',
+    'שכר דירה', 'שכירות', 'שכר', 'rent', 'mortgage', 'משכנתה', 'משכנתא',
     'דמי שכירות', 'housing', 'דירה', 'apartment', 'ועד בית', 'house committee',
     'ארנונה', 'arnona', 'עיריית', 'עירייה', 'municipality',
     'אגרה', 'היטל', 'property tax', 'ביטוח דירה', 'home insurance',
