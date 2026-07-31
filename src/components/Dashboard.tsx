@@ -280,12 +280,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
 
           <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-lg">🤖</span>
             <h3 className="text-sm font-bold text-white truncate">תובנות פיננסיות</h3>
             <span className="text-indigo-400 text-[10px] px-1.5 py-0.5 bg-indigo-500/20 rounded-full border border-indigo-500/30 shrink-0">
               Gemini AI
             </span>
-            </h3>
-            <span className="text-lg">🤖</span>
           </div>
         </div>
 
