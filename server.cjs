@@ -1026,6 +1026,77 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
+  app.post("/api/parse-statement", async (req, res) => {
+    try {
+      const apiKey = getGeminiApiKey(req);
+      if (!apiKey) return res.status(400).json({ error: "\u05DE\u05E4\u05EA\u05D7 Gemini \u05D7\u05E1\u05E8" });
+      const { content } = req.body;
+      if (!content || typeof content !== "string")
+        return res.status(400).json({ error: "\u05EA\u05D5\u05DB\u05DF \u05E7\u05D5\u05D1\u05E5 \u05D7\u05E1\u05E8" });
+      const ai = new import_genai.GoogleGenAI({ apiKey });
+      const CAT_META = {
+        "\u05D4\u05DB\u05E0\u05E1\u05D4": { color: "#10B981", emoji: "\u{1F4B0}" },
+        "\u05DE\u05D6\u05D5\u05DF \u05D5\u05E9\u05D5\u05E7": { color: "#22C55E", emoji: "\u{1F6D2}" },
+        "\u05D3\u05D9\u05D5\u05E8": { color: "#64748B", emoji: "\u{1F3E0}" },
+        "\u05EA\u05D7\u05D1\u05D5\u05E8\u05D4": { color: "#3B82F6", emoji: "\u{1F68C}" },
+        "\u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA": { color: "#EAB308", emoji: "\u{1F4A1}" },
+        "\u05D1\u05E8\u05D9\u05D0\u05D5\u05EA": { color: "#14B8A6", emoji: "\u{1F3E5}" },
+        "\u05D1\u05D9\u05D3\u05D5\u05E8": { color: "#EC4899", emoji: "\u{1F3AC}" },
+        "\u05E7\u05E0\u05D9\u05D5\u05EA": { color: "#F59E0B", emoji: "\u{1F6CD}\uFE0F" },
+        "\u05D7\u05D9\u05E1\u05DB\u05D5\u05DF": { color: "#8B5CF6", emoji: "\u{1F48E}" },
+        "\u05E9\u05D5\u05E0\u05D5\u05EA": { color: "#9CA3AF", emoji: "\u{1F4E6}" }
+      };
+      const VALID_CATS = Object.keys(CAT_META);
+      const prompt = `\u05D0\u05EA\u05D4 \u05DE\u05D5\u05DE\u05D7\u05D4 \u05D1\u05E0\u05D9\u05EA\u05D5\u05D7 \u05D3\u05E4\u05D9 \u05D7\u05E9\u05D1\u05D5\u05DF \u05D1\u05E0\u05E7 \u05D5\u05DB\u05E8\u05D8\u05D9\u05E1\u05D9 \u05D0\u05E9\u05E8\u05D0\u05D9 \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9\u05D9\u05DD.
+
+\u05DC\u05D4\u05DC\u05DF \u05EA\u05D5\u05DB\u05DF \u05E7\u05D5\u05D1\u05E5 CSV/Excel \u05E9\u05DC \u05D3\u05E3 \u05D7\u05E9\u05D1\u05D5\u05DF:
+---
+${content.slice(0, 9e3)}
+---
+
+\u05DE\u05E9\u05D9\u05DE\u05D4: \u05D7\u05DC\u05E5 \u05D0\u05EA \u05DB\u05DC \u05E9\u05D5\u05E8\u05D5\u05EA \u05D4\u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05D1\u05DC\u05D1\u05D3. \u05D4\u05EA\u05E2\u05DC\u05DD \u05DE\u05DB\u05D5\u05EA\u05E8\u05D5\u05EA, \u05E1\u05D9\u05DB\u05D5\u05DE\u05D9\u05DD \u05D5\u05DE\u05D9\u05D3\u05E2 \u05DB\u05DC\u05DC\u05D9.
+\u05DC\u05DB\u05DC \u05E2\u05E1\u05E7\u05D4 \u05D4\u05D7\u05D6\u05E8:
+- date: \u05EA\u05D0\u05E8\u05D9\u05DA \u05D1\u05E4\u05D5\u05E8\u05DE\u05D8 YYYY-MM-DD (\u05E9\u05E0\u05D4 2 \u05E1\u05E4\u05E8\u05D5\u05EA \u2192 \u05D4\u05E0\u05D7 20XX)
+- description: \u05E9\u05DD \u05D1\u05D9\u05EA \u05D4\u05E2\u05E1\u05E7 / \u05EA\u05D9\u05D0\u05D5\u05E8 \u05D4\u05E4\u05E2\u05D5\u05DC\u05D4 (\u05DC\u05D0 \u05EA\u05D0\u05E8\u05D9\u05DA, \u05DC\u05D0 \u05DE\u05E1\u05E4\u05E8)
+- amount: \u05D4\u05E1\u05DB\u05D5\u05DD \u05DB\u05DE\u05E1\u05E4\u05E8 \u05D7\u05D9\u05D5\u05D1\u05D9
+- type: "expense" \u05E2\u05D1\u05D5\u05E8 \u05D7\u05D9\u05D5\u05D1/\u05D4\u05D5\u05E6\u05D0\u05D4, "income" \u05E2\u05D1\u05D5\u05E8 \u05D6\u05D9\u05DB\u05D5\u05D9/\u05D4\u05DB\u05E0\u05E1\u05D4
+- cat: \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4 \u05D0\u05D7\u05EA \u05D1\u05DC\u05D1\u05D3 \u05DE\u05D4\u05E8\u05E9\u05D9\u05DE\u05D4: ${VALID_CATS.join(" | ")}
+
+\u05DB\u05DC\u05DC\u05D9\u05DD:
+- \u05D0\u05DD \u05D9\u05E9 \u05E9\u05EA\u05D9 \u05E2\u05DE\u05D5\u05D3\u05D5\u05EA \u05EA\u05D0\u05E8\u05D9\u05DA (\u05E2\u05E1\u05E7\u05D4 + \u05D7\u05D9\u05D5\u05D1) \u2014 \u05E7\u05D7 \u05D0\u05EA \u05EA\u05D0\u05E8\u05D9\u05DA \u05D4\u05E2\u05E1\u05E7\u05D4
+- \u05D0\u05DD \u05D4\u05E1\u05DB\u05D5\u05DD \u05E9\u05DC\u05D9\u05DC\u05D9 \u05D1\u05E7\u05D5\u05D1\u05E5 \u2192 type="expense"
+- \u05D0\u05DD \u05D4\u05E1\u05DB\u05D5\u05DD \u05D7\u05D9\u05D5\u05D1\u05D9 \u05D1\u05E2\u05DE\u05D5\u05D3\u05EA "\u05D6\u05DB\u05D5\u05EA" \u2192 type="income"
+- \u05D1\u05E7\u05D5\u05D1\u05E5 \u05D0\u05E9\u05E8\u05D0\u05D9 (Max/Cal) \u05DB\u05DC \u05D4\u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05D4\u05DF expense
+
+\u05D4\u05D7\u05D6\u05E8 \u05D0\u05DA \u05D5\u05E8\u05E7 JSON \u05EA\u05E7\u05D9\u05DF \u05DC\u05DC\u05D0 markdown:
+[{"date":"YYYY-MM-DD","description":"\u05E9\u05DD","amount":number,"type":"expense","cat":"\u05DE\u05D6\u05D5\u05DF \u05D5\u05E9\u05D5\u05E7"}]`;
+      const response = await generateGeminiContent(ai, { contents: prompt });
+      const raw = (response.text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+      const first = raw.indexOf("[");
+      const last = raw.lastIndexOf("]");
+      if (first === -1 || last === -1) throw new Error("Gemini \u05DC\u05D0 \u05D4\u05D7\u05D6\u05D9\u05E8 JSON \u05EA\u05E7\u05D9\u05DF");
+      const parsed = JSON.parse(raw.substring(first, last + 1));
+      const transactions = parsed.map((t, i) => {
+        const cat = VALID_CATS.includes(t.cat) ? t.cat : "\u05E9\u05D5\u05E0\u05D5\u05EA";
+        const meta = CAT_META[cat];
+        const absAmt = Math.abs(parseFloat(t.amount) || 0);
+        return {
+          id: Date.now() + i + Math.random(),
+          description: String(t.description || "").trim(),
+          amount: t.type === "income" ? absAmt : -absAmt,
+          date: String(t.date || "").slice(0, 10),
+          cat,
+          color: meta.color,
+          emoji: meta.emoji,
+          account: "\u05D9\u05D9\u05D1\u05D5\u05D0"
+        };
+      }).filter((t) => t.description && t.amount !== 0 && t.date);
+      return res.json({ transactions });
+    } catch (e) {
+      console.error("parse-statement error:", e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
   app.post("/api/categorize", async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
