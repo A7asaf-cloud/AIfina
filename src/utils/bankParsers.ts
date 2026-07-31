@@ -42,9 +42,35 @@ function parseExcelDate(val: any): string {
   return '';
 }
 
+// Returns true if a column value looks like a pure number / reference code
+function isNumericCell(val: any): boolean {
+  if (val === null || val === undefined || val === '') return true;
+  const s = String(val).trim().replace(/[,.\s]/g, '');
+  return /^\d+$/.test(s);
+}
+
+// Given data rows, pick the column index that has the most non-numeric text content
+// (used as a fallback when header names don't match)
+function inferDescriptionColumn(rows: any[][], excludeIdxs: number[]): number {
+  const scores: Record<number, number> = {};
+  for (const row of rows.slice(0, 20)) {
+    if (!row) continue;
+    row.forEach((cell, i) => {
+      if (excludeIdxs.includes(i)) return;
+      const s = String(cell || '').trim();
+      if (s && !isNumericCell(cell) && s.length > 1) {
+        scores[i] = (scores[i] || 0) + s.length;
+      }
+    });
+  }
+  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+  return best ? parseInt(best[0]) : -1;
+}
+
 export function parseBankRows(rows: any[][]): ParsedRow[] {
   if (!rows || !rows.length) return [];
 
+  // ── Find the header row ──────────────────────────────────────────────────
   let headerRow = -1;
   for (let i = 0; i < Math.min(15, rows.length); i++) {
     const r = (rows[i] || []).map((c) =>
@@ -55,8 +81,13 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
         (c) =>
           c.includes('תאריך') ||
           c.includes('שם בית') ||
+          c.includes('שם עסק') ||
           c.includes('פירוט') ||
-          c.includes('date')
+          c.includes('תיאור') ||
+          c.includes('מוטב') ||
+          c.includes('פרטים') ||
+          c.includes('date') ||
+          c.includes('description')
       )
     ) {
       headerRow = i;
@@ -69,18 +100,27 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
     String(c || '').replace(/\n/g, ' ').toLowerCase().trim()
   );
 
-  const dateIdx = headers.findIndex(
-    (h) => h.includes('תאריך') || h.includes('date')
-  );
-  let descIdx = headers.findIndex((h) => h.includes('שם בית'));
-  if (descIdx < 0) descIdx = headers.findIndex((h) => h.includes('פירוט'));
-  if (descIdx < 0)
-    descIdx = headers.findIndex((h) => h.includes('תיאור') && !h.includes('תאריך'));
-  if (descIdx < 0 || descIdx === dateIdx)
-    descIdx = dateIdx >= 0 ? (dateIdx === 0 ? 1 : 0) : 1;
+  console.debug('[bankParser] headers:', headers);
 
+  // ── Detect date column ───────────────────────────────────────────────────
+  const dateIdx = headers.findIndex(
+    (h) => h.includes('תאריך') || h === 'date'
+  );
+
+  // ── Detect description column ────────────────────────────────────────────
+  let descIdx = -1;
+  const descPatterns = [
+    'שם בית עסק', 'שם בית', 'שם עסק', 'פירוט', 'תיאור פעולה',
+    'תיאור', 'מוטב', 'פרטים', 'שם הפעולה', 'description', 'details',
+  ];
+  for (const pat of descPatterns) {
+    descIdx = headers.findIndex((h) => h.includes(pat));
+    if (descIdx >= 0 && descIdx !== dateIdx) break;
+  }
+
+  // ── Detect amount columns ────────────────────────────────────────────────
   const amtIdx = headers.findIndex(
-    (h) => (h.includes('סכום') || h.includes('amount')) && !h.includes('מט')
+    (h) => (h.includes('סכום') || h.includes('amount')) && !h.includes('מט') && !h.includes('מקורי')
   );
   const debitIdx = headers.findIndex(
     (h) => h.includes('חובה') || h.includes('debit') || h.includes('חיוב')
@@ -89,6 +129,22 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
     (h) => h.includes('זכות') || h.includes('credit') || h.includes('זיכוי')
   );
 
+  // ── Smart fallback: infer description column from data content ───────────
+  if (descIdx < 0 || descIdx === dateIdx) {
+    const dataRows = rows.slice(headerRow + 1);
+    const exclude = [dateIdx, amtIdx, debitIdx, creditIdx].filter(i => i >= 0);
+    descIdx = inferDescriptionColumn(dataRows, exclude);
+    console.debug('[bankParser] inferred descIdx from content:', descIdx);
+  }
+
+  // Last resort
+  if (descIdx < 0) {
+    descIdx = dateIdx >= 0 ? (dateIdx === 0 ? 1 : 0) : 1;
+  }
+
+  console.debug('[bankParser] dateIdx:', dateIdx, '| descIdx:', descIdx, '| amtIdx:', amtIdx, '| debitIdx:', debitIdx, '| creditIdx:', creditIdx);
+
+  // ── Parse data rows ──────────────────────────────────────────────────────
   const result: ParsedRow[] = [];
 
   for (let i = headerRow + 1; i < rows.length; i++) {
@@ -100,9 +156,12 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
     if (!dateStr) continue;
 
     const desc = String(
-      descIdx >= 0 ? row[descIdx] || '' : row[1] || ''
+      descIdx >= 0 ? row[descIdx] ?? '' : row[1] ?? ''
     ).trim();
     if (!desc || desc.includes('סה"כ') || desc.includes('סהכ')) continue;
+
+    // Skip if description is just a number (picked wrong column)
+    if (isNumericCell(desc)) continue;
 
     let amount = 0;
     let type: 'income' | 'expense' = 'expense';
@@ -129,14 +188,10 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
 
     if (amount <= 0) continue;
 
-    result.push({
-      date: dateStr,
-      desc,
-      amount,
-      type,
-    });
+    result.push({ date: dateStr, desc, amount, type });
   }
 
+  console.debug('[bankParser] parsed', result.length, 'rows. First 3:', result.slice(0, 3));
   return result;
 }
 
