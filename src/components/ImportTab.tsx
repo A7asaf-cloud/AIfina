@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Transaction } from '../types';
-import { parseExcelOrCsvFile } from '../utils/bankParsers';
+import { readFileAsText } from '../utils/bankParsers';
 import { categorize, CAT_RULES } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
@@ -38,7 +38,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle Excel/CSV file upload
+  // Handle Excel/CSV file upload — Gemini parses and categorizes in one call
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -47,48 +47,32 @@ export const ImportTab: React.FC<ImportTabProps> = ({
     setErrorMsg(null);
 
     try {
-      const parsed = await parseExcelOrCsvFile(file);
-      if (parsed.length === 0) {
-        setErrorMsg('לא נמצאו עסקאות בקובץ. אנא ודא שהקובץ תקין ומכיל עמודות תאריך, תיאור וסכום.');
+      const content = await readFileAsText(file);
+      const customKey = localStorage.getItem('fil_gemini_api_key') || '';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (customKey) headers['x-gemini-api-key'] = customKey;
+
+      const res = await fetch('/api/parse-statement', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ content }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || 'שגיאה בניתוח הקובץ על ידי Gemini AI');
         return;
       }
 
-      // Re-categorize ALL transactions using server-side Gemini.
-      // Server falls back to its own GEMINI_API_KEY env if no custom key is provided.
-      const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-      try {
-        const descriptions = parsed.map(t => t.description);
-        const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (customKey) reqHeaders['x-gemini-api-key'] = customKey;
-
-        const res2 = await fetch('/api/categorize', {
-          method: 'POST',
-          headers: reqHeaders,
-          body: JSON.stringify({ descriptions }),
-        });
-
-        if (res2.ok) {
-          const data = await res2.json();
-          const cats: string[] = data.results || [];
-
-          if (cats.length === parsed.length) {
-            const recategorized = parsed.map((t, i) => {
-              const aiCat = (cats[i] || '').trim();
-              if (!aiCat || aiCat === 'שונות') return t;
-              const rule = CAT_RULES.find(r => r.cat === aiCat);
-              return rule ? { ...t, cat: rule.cat, color: rule.color, emoji: rule.emoji } : t;
-            });
-            setPreviewTxs(recategorized);
-            return;
-          }
-        }
-      } catch (aiErr) {
-        console.warn('AI categorization failed, using keyword results:', aiErr);
+      const txs: Transaction[] = data.transactions || [];
+      if (txs.length === 0) {
+        setErrorMsg('Gemini לא זיהה עסקאות בקובץ זה. ודא שמדובר בקובץ תנועות תקין.');
+        return;
       }
 
-      setPreviewTxs(parsed);
+      setPreviewTxs(txs);
     } catch (err: any) {
-      setErrorMsg(err.message || 'שגיאה בקריאת קובץ ה-Excel. אנא נסה קובץ אחר.');
+      setErrorMsg(err.message || 'שגיאה בחיבור לשרת. ודא שמפתח Gemini מוגדר.');
     } finally {
       setFileLoading(false);
     }

@@ -191,6 +191,86 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // ── Gemini-powered statement parser (CSV / Excel content as text) ──────────
+  app.post('/api/parse-statement', async (req, res) => {
+    try {
+      const apiKey = getGeminiApiKey(req);
+      if (!apiKey) return res.status(400).json({ error: 'מפתח Gemini חסר' });
+
+      const { content } = req.body;
+      if (!content || typeof content !== 'string')
+        return res.status(400).json({ error: 'תוכן קובץ חסר' });
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      const CAT_META: Record<string, { color: string; emoji: string }> = {
+        'הכנסה':    { color: '#10B981', emoji: '💰' },
+        'מזון ושוק':{ color: '#22C55E', emoji: '🛒' },
+        'דיור':     { color: '#64748B', emoji: '🏠' },
+        'תחבורה':  { color: '#3B82F6', emoji: '🚌' },
+        'חשבונות': { color: '#EAB308', emoji: '💡' },
+        'בריאות':  { color: '#14B8A6', emoji: '🏥' },
+        'בידור':   { color: '#EC4899', emoji: '🎬' },
+        'קניות':   { color: '#F59E0B', emoji: '🛍️' },
+        'חיסכון':  { color: '#8B5CF6', emoji: '💎' },
+        'שונות':   { color: '#9CA3AF', emoji: '📦' },
+      };
+      const VALID_CATS = Object.keys(CAT_META);
+
+      const prompt = `אתה מומחה בניתוח דפי חשבון בנק וכרטיסי אשראי ישראליים.
+
+להלן תוכן קובץ CSV/Excel של דף חשבון:
+---
+${content.slice(0, 9000)}
+---
+
+משימה: חלץ את כל שורות העסקאות בלבד. התעלם מכותרות, סיכומים ומידע כללי.
+לכל עסקה החזר:
+- date: תאריך בפורמט YYYY-MM-DD (שנה 2 ספרות → הנח 20XX)
+- description: שם בית העסק / תיאור הפעולה (לא תאריך, לא מספר)
+- amount: הסכום כמספר חיובי
+- type: "expense" עבור חיוב/הוצאה, "income" עבור זיכוי/הכנסה
+- cat: קטגוריה אחת בלבד מהרשימה: ${VALID_CATS.join(' | ')}
+
+כללים:
+- אם יש שתי עמודות תאריך (עסקה + חיוב) — קח את תאריך העסקה
+- אם הסכום שלילי בקובץ → type="expense"
+- אם הסכום חיובי בעמודת "זכות" → type="income"
+- בקובץ אשראי (Max/Cal) כל העסקאות הן expense
+
+החזר אך ורק JSON תקין ללא markdown:
+[{"date":"YYYY-MM-DD","description":"שם","amount":number,"type":"expense","cat":"מזון ושוק"}]`;
+
+      const response = await generateGeminiContent(ai, { contents: prompt });
+      const raw = (response.text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+      const first = raw.indexOf('[');
+      const last  = raw.lastIndexOf(']');
+      if (first === -1 || last === -1) throw new Error('Gemini לא החזיר JSON תקין');
+
+      const parsed = JSON.parse(raw.substring(first, last + 1));
+      const transactions = (parsed as any[]).map((t: any, i: number) => {
+        const cat = VALID_CATS.includes(t.cat) ? t.cat : 'שונות';
+        const meta = CAT_META[cat];
+        const absAmt = Math.abs(parseFloat(t.amount) || 0);
+        return {
+          id: Date.now() + i + Math.random(),
+          description: String(t.description || '').trim(),
+          amount: t.type === 'income' ? absAmt : -absAmt,
+          date: String(t.date || '').slice(0, 10),
+          cat,
+          color: meta.color,
+          emoji: meta.emoji,
+          account: 'ייבוא',
+        };
+      }).filter((t: any) => t.description && t.amount !== 0 && t.date);
+
+      return res.json({ transactions });
+    } catch (e: any) {
+      console.error('parse-statement error:', e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── AI transaction categorization for CSV imports ──────────────────────────
   app.post('/api/categorize', async (req, res) => {
     try {
