@@ -17,60 +17,76 @@ function parseExcelDate(val: any): string {
   if (typeof val === 'number' && val > 30000 && val < 60000) {
     const d = new Date(Math.round((val - 25569) * 86400 * 1000));
     return (
-      d.getUTCFullYear() +
-      '-' +
-      String(d.getUTCMonth() + 1).padStart(2, '0') +
-      '-' +
+      d.getUTCFullYear() + '-' +
+      String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
       String(d.getUTCDate()).padStart(2, '0')
     );
   }
   if (val instanceof Date) {
     return (
-      val.getFullYear() +
-      '-' +
-      String(val.getMonth() + 1).padStart(2, '0') +
-      '-' +
+      val.getFullYear() + '-' +
+      String(val.getMonth() + 1).padStart(2, '0') + '-' +
       String(val.getDate()).padStart(2, '0')
     );
   }
   const s = String(val).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
   const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
   if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-  // YYYY/MM/DD
   const m2 = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
   if (m2) return m2[1] + '-' + m2[2].padStart(2, '0') + '-' + m2[3].padStart(2, '0');
   return '';
 }
 
-function isNumericCell(val: any): boolean {
-  if (val === null || val === undefined || val === '') return true;
-  const s = String(val).trim().replace(/[,.\s\-]/g, '');
-  return /^\d+$/.test(s);
+function looksLikeDate(val: any): boolean {
+  if (val instanceof Date) return true;
+  if (typeof val === 'number' && val > 30000 && val < 60000) return true;
+  const s = String(val || '').trim();
+  return (
+    /^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}$/.test(s) ||
+    /^\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}$/.test(s) ||
+    /^\d{4}-\d{2}-\d{2}$/.test(s)
+  );
 }
 
+function looksLikeAmount(val: any): boolean {
+  if (val === null || val === undefined || val === '') return false;
+  if (typeof val === 'number') return true;
+  const s = String(val).trim().replace(/[,\s₪$€]/g, '');
+  return /^-?\d+(\.\d{1,2})?$/.test(s) && s.length > 0;
+}
+
+// Among data rows, find the column with most non-numeric, non-date text
 function inferDescriptionColumn(rows: any[][], excludeIdxs: number[]): number {
-  const scores: Record<number, number> = {};
-  for (const row of rows.slice(0, 20)) {
+  const colScores: Record<number, number> = {};
+  const colDateCount: Record<number, number> = {};
+
+  for (const row of rows.slice(0, 30)) {
     if (!row) continue;
     row.forEach((cell, i) => {
       if (excludeIdxs.includes(i)) return;
-      const s = String(cell || '').trim();
-      if (s && !isNumericCell(cell) && s.length > 1) {
-        scores[i] = (scores[i] || 0) + s.length;
-      }
+      const s = String(cell ?? '').trim();
+      if (!s || s.length <= 1) return;
+      if (looksLikeDate(cell)) { colDateCount[i] = (colDateCount[i] || 0) + 1; return; }
+      if (looksLikeAmount(cell)) return;
+      // Text content score (longer = better)
+      colScores[i] = (colScores[i] || 0) + s.length;
     });
   }
-  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+
+  // Exclude columns that are mostly dates
+  for (const i of Object.keys(colDateCount).map(Number)) {
+    delete colScores[i];
+  }
+
+  const best = Object.entries(colScores).sort((a, b) => b[1] - a[1])[0];
   return best ? parseInt(best[0]) : -1;
 }
 
 function parseAmount(val: any): number {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return val;
-  const s = String(val).trim().replace(/[,\s]/g, '');
-  return parseFloat(s) || 0;
+  return parseFloat(String(val).trim().replace(/[,\s₪$€]/g, '')) || 0;
 }
 
 export function parseBankRows(rows: any[][]): ParsedRow[] {
@@ -79,55 +95,47 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
   console.debug('[bankParser] total rows:', rows.length);
   console.debug('[bankParser] first 5 rows raw:', JSON.stringify(rows.slice(0, 5)));
 
-  // ── Find the header row (scan up to row 20) ──────────────────────────────
+  // ── Find header row (up to row 20) ──────────────────────────────────────
   let headerRow = -1;
   for (let i = 0; i < Math.min(20, rows.length); i++) {
-    const r = (rows[i] || []).map((c) =>
-      String(c || '').replace(/\n/g, ' ').toLowerCase()
-    );
-    if (
-      r.some((c) =>
-        c.includes('תאריך') ||
-        c.includes('שם בית') ||
-        c.includes('שם עסק') ||
-        c.includes('פירוט') ||
-        c.includes('תיאור') ||
-        c.includes('מוטב') ||
-        c.includes('פרטים') ||
-        c.includes('ביצוע') ||
-        c.includes('date') ||
-        c.includes('description') ||
-        c.includes('סכום') ||
-        c.includes('חובה') ||
-        c.includes('זכות') ||
-        c.includes('amount')
-      )
-    ) {
+    const r = (rows[i] || []).map((c) => String(c || '').replace(/\n/g, ' ').toLowerCase());
+    if (r.some((c) =>
+      c.includes('תאריך') || c.includes('שם בית') || c.includes('שם עסק') ||
+      c.includes('פירוט') || c.includes('תיאור') || c.includes('מוטב') ||
+      c.includes('date') || c.includes('description') ||
+      c.includes('חובה') || c.includes('זכות') || c.includes('amount')
+    )) {
       headerRow = i;
       break;
     }
   }
-  if (headerRow === -1) {
-    console.warn('[bankParser] header row not found, defaulting to row 0');
-    headerRow = 0;
-  }
-  console.debug('[bankParser] headerRow index:', headerRow);
+  if (headerRow === -1) headerRow = 0;
 
   const headers = (rows[headerRow] || []).map((c) =>
     String(c || '').replace(/\n/g, ' ').toLowerCase().trim()
   );
-  console.debug('[bankParser] headers:', headers);
+  console.debug('[bankParser] headerRow:', headerRow, '| headers:', headers);
 
-  // ── Detect date column ───────────────────────────────────────────────────
-  let dateIdx = headers.findIndex((h) =>
-    h.includes('תאריך') || h === 'date'
-  );
-  // Prefer the first date column (not "תאריך ערך" or "תאריך חיוב")
-  if (dateIdx < 0) {
-    dateIdx = headers.findIndex((h) => h.includes('date'));
+  // ── ALL date columns (there can be more than one: תאריך עסקה + תאריך חיוב) ──
+  const allDateIdxs = headers.reduce<number[]>((acc, h, i) => {
+    if (h.includes('תאריך') || h === 'date') acc.push(i);
+    return acc;
+  }, []);
+  const dateIdx = allDateIdxs[0] ?? -1;
+
+  // ── Amount columns ───────────────────────────────────────────────────────
+  const debitIdx  = headers.findIndex((h) => h.includes('חובה') || h.includes('debit') || h.includes('חיוב'));
+  const creditIdx = headers.findIndex((h) => h.includes('זכות') || h.includes('credit') || h.includes('זיכוי'));
+  // Prefer "סכום חיוב" / "סכום לחיוב" over "סכום עסקה" (Max/Cal format)
+  let amtIdx = headers.findIndex((h) => h.includes('סכום חיוב') || h.includes('סכום לחיוב'));
+  if (amtIdx < 0) {
+    amtIdx = headers.findIndex((h) =>
+      (h.includes('סכום') || h.includes('amount')) && !h.includes('מט') && !h.includes('מקורי')
+    );
   }
 
-  // ── Detect description column ────────────────────────────────────────────
+  // ── Description column — exclude ALL date columns + amount columns ───────
+  const nonDescIdxs = [...new Set([...allDateIdxs, amtIdx, debitIdx, creditIdx].filter(i => i >= 0))];
   let descIdx = -1;
   const descPatterns = [
     'שם בית עסק', 'שם בית', 'שם עסק', 'פירוט', 'תיאור פעולה',
@@ -135,41 +143,27 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
   ];
   for (const pat of descPatterns) {
     const idx = headers.findIndex((h) => h.includes(pat));
-    if (idx >= 0 && idx !== dateIdx) { descIdx = idx; break; }
+    if (idx >= 0 && !nonDescIdxs.includes(idx)) { descIdx = idx; break; }
   }
 
-  // ── Detect amount columns ────────────────────────────────────────────────
-  const debitIdx = headers.findIndex((h) =>
-    h.includes('חובה') || h.includes('debit') || h.includes('חיוב')
-  );
-  const creditIdx = headers.findIndex((h) =>
-    h.includes('זכות') || h.includes('credit') || h.includes('זיכוי')
-  );
-  // prefer סכום חיוב over סכום עסקה (Max/Cal)
-  let amtIdx = headers.findIndex((h) =>
-    h.includes('סכום חיוב') || h.includes('סכום לחיוב')
-  );
-  if (amtIdx < 0) {
-    amtIdx = headers.findIndex((h) =>
-      (h.includes('סכום') || h.includes('amount')) &&
-      !h.includes('מט') && !h.includes('מקורי')
-    );
+  // Fallback: infer from data content (exclude date & amount columns)
+  if (descIdx < 0) {
+    descIdx = inferDescriptionColumn(rows.slice(headerRow + 1), nonDescIdxs);
+    console.debug('[bankParser] inferred descIdx from data content:', descIdx);
   }
 
-  // ── Smart fallback for description ──────────────────────────────────────
+  // Last resort
   if (descIdx < 0) {
-    const dataRows = rows.slice(headerRow + 1);
-    const exclude = [dateIdx, amtIdx, debitIdx, creditIdx].filter((i) => i >= 0);
-    descIdx = inferDescriptionColumn(dataRows, exclude);
-    console.debug('[bankParser] inferred descIdx from content:', descIdx);
-  }
-  if (descIdx < 0) {
-    descIdx = dateIdx >= 0 ? (dateIdx === 0 ? 1 : 0) : 1;
+    // Pick the first column that is not a date/amount column
+    for (let i = 0; i < headers.length; i++) {
+      if (!nonDescIdxs.includes(i)) { descIdx = i; break; }
+    }
     console.warn('[bankParser] last-resort descIdx:', descIdx);
   }
 
   console.debug('[bankParser] dateIdx:', dateIdx, '| descIdx:', descIdx,
-    '| amtIdx:', amtIdx, '| debitIdx:', debitIdx, '| creditIdx:', creditIdx);
+    '| amtIdx:', amtIdx, '| debitIdx:', debitIdx, '| creditIdx:', creditIdx,
+    '| allDateIdxs:', allDateIdxs);
 
   // ── Parse data rows ──────────────────────────────────────────────────────
   const result: ParsedRow[] = [];
@@ -177,21 +171,19 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
 
   for (let i = headerRow + 1; i < rows.length; i++) {
     const row = rows[i];
-    if (!row || row.every((c) => c === null || c === undefined || c === ''))
-      continue;
+    if (!row || row.every((c) => c === null || c === undefined || c === '')) continue;
 
     const rawDate = dateIdx >= 0 ? row[dateIdx] : row[0];
     const dateStr = parseExcelDate(rawDate);
     if (!dateStr) { skippedDate++; continue; }
 
-    const desc = String(
-      descIdx >= 0 ? (row[descIdx] ?? '') : (row[1] ?? '')
-    ).trim();
-
+    const desc = String(row[descIdx] ?? '').trim();
     if (!desc || desc.includes('סה"כ') || desc.includes('סהכ') || desc.includes('יתרה')) {
       skippedDesc++; continue;
     }
-    if (isNumericCell(desc)) { skippedDesc++; continue; }
+    // Skip if it's a date or pure number (wrong column)
+    if (looksLikeDate(desc)) { skippedDesc++; continue; }
+    if (looksLikeAmount(desc) && desc.length < 6) { skippedDesc++; continue; }
 
     let amount = 0;
     let type: 'income' | 'expense' = 'expense';
@@ -199,16 +191,16 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
     if (debitIdx >= 0 && creditIdx >= 0) {
       const deb = Math.abs(parseAmount(row[debitIdx]));
       const cre = Math.abs(parseAmount(row[creditIdx]));
-      if (cre > 0) { amount = cre; type = 'income'; }
+      if (cre > 0)      { amount = cre; type = 'income'; }
       else if (deb > 0) { amount = deb; type = 'expense'; }
     } else if (amtIdx >= 0) {
       const num = parseAmount(row[amtIdx]);
       amount = Math.abs(num);
       type = num < 0 ? 'income' : 'expense';
     } else {
-      // No amount column detected — scan all numeric columns in this row
+      // Scan all numeric columns in the row
       for (let ci = 0; ci < row.length; ci++) {
-        if (ci === dateIdx || ci === descIdx) continue;
+        if (allDateIdxs.includes(ci) || ci === descIdx) continue;
         const n = parseAmount(row[ci]);
         if (Math.abs(n) > 0) { amount = Math.abs(n); type = n < 0 ? 'income' : 'expense'; break; }
       }
@@ -220,9 +212,9 @@ export function parseBankRows(rows: any[][]): ParsedRow[] {
   }
 
   console.debug(
-    `[bankParser] parsed ${result.length} rows. Skipped: date=${skippedDate}, desc=${skippedDesc}, amount=${skippedAmount}`
+    `[bankParser] parsed ${result.length} rows | skipped: date=${skippedDate} desc=${skippedDesc} amount=${skippedAmount}`
   );
-  console.debug('[bankParser] first 3 results:', JSON.stringify(result.slice(0, 3)));
+  if (result.length > 0) console.debug('[bankParser] sample:', JSON.stringify(result.slice(0, 3)));
 
   return result;
 }
@@ -234,33 +226,23 @@ export async function parseExcelOrCsvFile(file: File): Promise<Transaction[]> {
   let rawData: any[][];
 
   if (isCSV) {
-    // Try UTF-8 first; fallback to latin1 which preserves byte values for Windows-1255
-    let text = '';
-    try {
-      text = await file.text();
-      // If Hebrew chars look garbled (replacement chars), retry with latin1
-      if (text.includes('�')) {
-        const buf = await file.arrayBuffer();
-        text = new TextDecoder('windows-1255').decode(buf);
-      }
-    } catch {
-      text = await file.text();
+    let text = await file.text();
+    // Windows-1255 fallback for Hebrew CSVs
+    if (text.includes('�')) {
+      const buf = await file.arrayBuffer();
+      text = new TextDecoder('windows-1255').decode(buf);
     }
     const workbook = XLSX.read(text, { type: 'string', raw: false });
     const sheetName = workbook.SheetNames[0];
     rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-      header: 1,
-      defval: '',
-      raw: false,
+      header: 1, defval: '', raw: false,
     });
   } else {
     const buf = await file.arrayBuffer();
     const workbook = XLSX.read(buf, { type: 'array', raw: true, cellDates: true });
     const sheetName = workbook.SheetNames[0];
     rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-      header: 1,
-      defval: '',
-      raw: true,
+      header: 1, defval: '', raw: true,
     });
   }
 
@@ -270,10 +252,9 @@ export async function parseExcelOrCsvFile(file: File): Promise<Transaction[]> {
     return {
       id: Date.now() + i + Math.random(),
       description: r.desc,
-      amount:
-        r.type === 'income'
-          ? Math.round(r.amount * 100) / 100
-          : -Math.round(r.amount * 100) / 100,
+      amount: r.type === 'income'
+        ? Math.round(r.amount * 100) / 100
+        : -Math.round(r.amount * 100) / 100,
       date: r.date,
       cat: catInfo.cat,
       color: catInfo.color,
