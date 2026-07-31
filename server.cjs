@@ -1010,7 +1010,7 @@ async function startServer() {
     const secret = process.env.JWT_SECRET;
     if (!secret) return next();
     if (!req.path.startsWith("/api/")) return next();
-    const pub = ["/api/health", "/api/forex", "/api/market-summary", "/api/stock-quote"];
+    const pub = ["/api/health", "/api/forex", "/api/market-summary", "/api/stock-quote", "/api/categorize", "/api/funds"];
     if (pub.some((p) => req.path.startsWith(p))) return next();
     const auth = req.headers.authorization || "";
     if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
