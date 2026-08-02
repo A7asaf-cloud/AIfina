@@ -6,6 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { authRouter } from './server/authRouter';
+import { scraperProxy } from './server/scraperProxy';
 import { decodeAccessToken } from './server/authUtils';
 import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
 
@@ -166,6 +167,9 @@ async function startServer() {
 
   // ── Auth routes ──────────────────────────────────────────────────────────────
   app.use('/auth', authRouter);
+
+  // ── Finance-scraper proxy (forwards /api/scraper/* → localhost:3001/api/*) ──
+  app.use('/api/scraper', scraperProxy);
 
   // ── JWT middleware (enabled when JWT_SECRET is set) ───────────────────────────
   app.use((req, res, next) => {

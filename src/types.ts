@@ -126,3 +126,43 @@ export interface UserAppData {
   snapshots: Record<string, SnapshotItem[]>;
 }
 
+// Finance-scraper microservice types
+export interface ScraperInstitution {
+  id: string;
+  company_id: string;
+  display_name: string;
+  is_active: 0 | 1;
+  last_scraped_at: string | null;
+  created_at: string;
+}
+
+export interface ScraperLog {
+  id: string;
+  institution_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'running' | 'success' | 'error';
+  transactions_found: number;
+  transactions_new: number;
+  error_message: string | null;
+}
+
+export interface PensionProfile {
+  id: string;
+  display_name: string;
+  gross_salary: number;
+  salary_effective_date: string;
+  kh_employer_pct: number;
+  kh_employee_pct: number;
+  kh_ceiling: number;
+  kh_start_date: string;
+  kh_current_balance: number;
+  pension_employer_pct: number;
+  pension_employee_pct: number;
+  pension_employer_compensation_pct: number;
+  pension_ceiling: number;
+  pension_start_date: string;
+  pension_current_balance: number;
+  disability_pct: number;
+}
+

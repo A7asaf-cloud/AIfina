@@ -4,6 +4,7 @@ import { readFileAsText } from '../utils/bankParsers';
 import { categorize, CAT_RULES } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
+import { BankScraper } from './BankScraper';
 import {
   FileSpreadsheet,
   Camera,
@@ -14,6 +15,7 @@ import {
   ArrowRight,
   Plus,
   Trash2,
+  Building2,
 } from 'lucide-react';
 
 interface ImportTabProps {
@@ -25,7 +27,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
   onImportTransactions,
   onUpdateInvestment,
 }) => {
-  const [method, setMethod] = useState<'choose' | 'excel' | 'ocr' | 'info'>('choose');
+  const [method, setMethod] = useState<'choose' | 'excel' | 'ocr' | 'info' | 'scraper'>('choose');
   const [fileLoading, setFileLoading] = useState(false);
   const [previewTxs, setPreviewTxs] = useState<Transaction[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -336,6 +338,17 @@ ${content.slice(0, 9000)}
 
   return (
     <div className="space-y-4 pb-24 text-right animate-fade-in">
+      {/* Bank scraper view */}
+      {method === 'scraper' && (
+        <BankScraper
+          onImportTransactions={(txs) => {
+            onImportTransactions(txs);
+            setMethod('choose');
+          }}
+          onBack={() => setMethod('choose')}
+        />
+      )}
+
       {/* Method Selection view */}
       {method === 'choose' && (
         <div className="space-y-4">
@@ -344,6 +357,27 @@ ${content.slice(0, 9000)}
             <p className="text-slate-400 text-xs">בחר את הדרך הנוחה ביותר להזנת הנתונים שלך:</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+              {/* Direct bank scraper — top card, full width */}
+              <button
+                onClick={() => setMethod('scraper')}
+                className="sm:col-span-2 bg-slate-950 border border-violet-500/30 hover:border-violet-500/60 hover:bg-violet-500/5 p-5 rounded-2xl text-right transition-all group cursor-pointer"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 text-violet-400 flex items-center justify-center shrink-0">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base group-hover:text-violet-400 transition-colors flex items-center gap-2">
+                      ייבוא ישיר מהבנק
+                      <span className="text-[10px] font-bold bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">חדש</span>
+                    </h3>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                      התחבר ישירות לבנק הפועלים, לאומי, דיסקונט, מזרחי, Max, Cal ועוד 11 מוסדות — משיכת עסקאות אוטומטית.
+                    </p>
+                  </div>
+                </div>
+              </button>
+
               <button
                 onClick={() => setMethod('excel')}
                 className="bg-slate-950 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl text-right transition-all group cursor-pointer"
@@ -383,10 +417,11 @@ ${content.slice(0, 9000)}
                 <HelpCircle className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm">איך עובד סנכרון ישיר מול הבנק?</h4>
+                <h4 className="font-bold text-white text-sm">איך עובד ייבוא ישיר מהבנק?</h4>
                 <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-                  חיבור ישיר לממשקי הבנקים (Open Banking) בישראל דורש רישיון ספק מידע פיננסי מבנק ישראל.
-                  המערכת שלנו מאפשרת ייבוא מהיר, בטוח וחינמי 100% דרך קבצי Excel או צילומי מסך בפרטיות מלאה!
+                  השירות משתמש בספריית israeli-bank-scrapers — מתחבר לאתר הבנק שלך בדפדפן מוסתר ומושך עסקאות.
+                  גישה לקריאה בלבד. הפרטים מוצפנים AES-256 ונשמרים רק בשרת המקומי שלך.
+                  דרוש: <code className="bg-slate-800 px-1 rounded">cd finance-scraper && npm run dev</code> בטרמינל נפרד.
                 </p>
               </div>
             </div>
