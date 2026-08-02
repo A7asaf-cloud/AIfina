@@ -145,6 +145,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const totalDeductions = kerenDeduction + pensionDeduction + bituahDeduction + masDeduction;
   const impliedNet = gross > 0 ? gross - totalDeductions : 0;
 
+
+  const handleToggleKeren = (checked: boolean) => {
+    if (checked && (p.kerenEmp === 0 || !p.kerenEmp)) {
+      setP({ ...p, hasKeren: true, kerenEmp: 2.5, kerenEr: 7.5 });
+    } else {
+      setP({ ...p, hasKeren: checked });
+    }
+  };
+  const handleTogglePension = (checked: boolean) => {
+    if (checked && (p.pensionEmp === 0 || !p.pensionEmp)) {
+      setP({ ...p, hasPension: true, pensionEmp: 6, pensionEr: 14.83 });
+    } else {
+      setP({ ...p, hasPension: checked });
+    }
+  };
+
   const openAddForm = () => { setEditingId(null); setSoForm(emptyOrder()); };
   const openEditForm = (so: StandingOrder) => {
     setEditingId(so.id);
@@ -253,6 +269,53 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <input type="number" min="0" value={p.masHachnasa ?? ''} onChange={(e) => setP({ ...p, masHachnasa: parseFloat(e.target.value) || 0 })} placeholder="0" className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none font-num text-right" />
               </div>
             </div>
+          </div>
+
+
+          {/* Keren Hishtalmut */}
+          <div className="border-t border-slate-800 pt-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={p.hasKeren} onChange={(e) => handleToggleKeren(e.target.checked)} className="accent-emerald-500 w-4 h-4" />
+                <span className="text-xs text-slate-300">יש לי קרן השתלמות</span>
+              </label>
+              <p className="text-xs font-bold text-amber-400">קרן השתלמות 💎</p>
+            </div>
+            {p.hasKeren && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">עובד (%) — חוק: 2.5%</label>
+                  <input type="number" min="0" max="10" step="0.1" value={p.kerenEmp} onChange={(e) => setP({ ...p, kerenEmp: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-white text-sm outline-none font-num text-right" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">מעסיק (%) — חוק: 7.5%</label>
+                  <input type="number" min="0" max="15" step="0.1" value={p.kerenEr} onChange={(e) => setP({ ...p, kerenEr: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-white text-sm outline-none font-num text-right" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pension */}
+          <div className="border-t border-slate-800 pt-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={p.hasPension} onChange={(e) => handleTogglePension(e.target.checked)} className="accent-emerald-500 w-4 h-4" />
+                <span className="text-xs text-slate-300">יש לי פנסיה</span>
+              </label>
+              <p className="text-xs font-bold text-purple-400">פנסיה 🏦</p>
+            </div>
+            {p.hasPension && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">עובד (%) — חוק: 6%</label>
+                  <input type="number" min="0" max="15" step="0.1" value={p.pensionEmp} onChange={(e) => setP({ ...p, pensionEmp: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-white text-sm outline-none font-num text-right" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">מעסיק (%) — חוק: 14.83%</label>
+                  <input type="number" min="0" max="20" step="0.01" value={p.pensionEr} onChange={(e) => setP({ ...p, pensionEr: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-white text-sm outline-none font-num text-right" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Gross Breakdown */}
