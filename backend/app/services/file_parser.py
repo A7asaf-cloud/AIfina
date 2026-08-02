@@ -76,16 +76,22 @@ def parse_file(content: bytes, filename: str) -> list[dict]:
         if not date_val:
             continue
 
-        # Merge debit (negative) + credit (positive) into a single amount
+        # Merge debit/credit into a single signed amount.
+        # If only one amount column exists, preserve its original sign.
+        # If both debit+credit columns exist, debit=negative, credit=positive.
         amount = 0.0
-        if debit_col:
-            v = _to_float(row.get(debit_col))
-            if v != 0.0:
-                amount -= abs(v)
-        if credit_col:
-            v = _to_float(row.get(credit_col))
-            if v != 0.0:
-                amount += abs(v)
+        if debit_col and not credit_col:
+            # Single column — keep original sign (positive = income, negative = expense)
+            amount = _to_float(row.get(debit_col))
+        else:
+            if debit_col:
+                v = _to_float(row.get(debit_col))
+                if v != 0.0:
+                    amount -= abs(v)
+            if credit_col:
+                v = _to_float(row.get(credit_col))
+                if v != 0.0:
+                    amount += abs(v)
 
         desc = str(row.get(desc_col, "")).strip() if desc_col else ""
         if not desc or desc in ("nan", "None", ""):
