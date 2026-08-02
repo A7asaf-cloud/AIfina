@@ -1,5 +1,7 @@
 import json
+import asyncio
 from datetime import datetime
+from functools import partial
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
@@ -10,6 +12,12 @@ from ..database import get_db
 from ..models import Transaction, UploadBatch, AiAnalysis
 from ..services.file_parser import parse_file
 from ..services import gemini_service as gemini
+
+
+async def _run(fn, *args):
+    """Run a blocking Gemini call in a thread pool to avoid blocking the event loop."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, partial(fn, *args))
 
 router = APIRouter(prefix="/api/finance", tags=["finance"])
 
@@ -103,59 +111,63 @@ async def analyze_batch(batch_id: int, db: AsyncSession = Depends(get_db)):
     batch.status = "analyzing"
     await db.commit()
 
-    # Fetch transactions for this batch
-    result = await db.execute(select(Transaction).where(Transaction.upload_batch_id == batch_id))
-    txs = result.scalars().all()
-    tx_dicts = [_tx_dict(t) for t in txs]
+    try:
+        # Fetch transactions for this batch
+        result = await db.execute(select(Transaction).where(Transaction.upload_batch_id == batch_id))
+        txs = result.scalars().all()
+        tx_dicts = [_tx_dict(t) for t in txs]
 
-    now = datetime.utcnow()
+        now = datetime.utcnow()
 
-    # 1. Categorize
-    categories = gemini.categorize_transactions(tx_dicts)
-    cat_map = {item["id"]: item.get("category", "אחר") for item in categories if isinstance(item, dict)}
-    for tx in txs:
-        tx.ai_category = cat_map.get(tx.id, "אחר")
-    await db.commit()
+        # 1. Categorize (run blocking Gemini call in thread pool)
+        categories = await _run(gemini.categorize_transactions, tx_dicts)
+        cat_map = {item["id"]: item.get("category", "אחר") for item in categories if isinstance(item, dict)}
+        for tx in txs:
+            tx.ai_category = cat_map.get(tx.id, "אחר")
+        await db.commit()
 
-    # 2. Detect recurring
-    all_txs_result = await db.execute(select(Transaction).order_by(Transaction.date.desc()).limit(500))
-    all_txs = [_tx_dict(t) for t in all_txs_result.scalars().all()]
-    recurring = gemini.detect_recurring(all_txs)
-    _save_analysis(db, batch_id, "recurring", recurring, now)
+        # 2. Detect recurring
+        all_txs_result = await db.execute(select(Transaction).order_by(Transaction.date.desc()).limit(500))
+        all_txs = [_tx_dict(t) for t in all_txs_result.scalars().all()]
+        recurring = await _run(gemini.detect_recurring, all_txs)
+        _save_analysis(db, batch_id, "recurring", recurring, now)
 
-    # Mark recurring transactions
-    recurring_descs = {r["description"].lower() for r in recurring if isinstance(r, dict) and "description" in r}
-    for tx in txs:
-        if tx.description.lower() in recurring_descs:
-            tx.is_recurring = True
-    await db.flush()
+        recurring_descs = {r["description"].lower() for r in recurring if isinstance(r, dict) and "description" in r}
+        for tx in txs:
+            if tx.description.lower() in recurring_descs:
+                tx.is_recurring = True
+        await db.flush()
 
-    # 3. Monthly summary (for each month in batch)
-    months = sorted({t["date"][:7] for t in tx_dicts})
-    summaries = {}
-    for m in months:
-        s = gemini.monthly_summary(all_txs, m)
-        summaries[m] = s
-    _save_analysis(db, batch_id, "monthly_summary", summaries, now)
+        # 3. Monthly summary (one Gemini call per month in the batch)
+        months = sorted({t["date"][:7] for t in tx_dicts})
+        summaries = {}
+        for m in months:
+            summaries[m] = await _run(gemini.monthly_summary, all_txs, m)
+        _save_analysis(db, batch_id, "monthly_summary", summaries, now)
 
-    # 4. Anomalies
-    anomalies = gemini.detect_anomalies(all_txs)
-    _save_analysis(db, batch_id, "anomalies", anomalies, now)
-    anomaly_map = {a["transaction_id"]: a.get("severity", "low") for a in anomalies if isinstance(a, dict)}
-    severity_score = {"low": 0.3, "medium": 0.6, "high": 1.0}
-    for tx in txs:
-        sev = anomaly_map.get(tx.id)
-        if sev:
-            tx.anomaly_score = severity_score.get(sev, 0.0)
-    await db.flush()
+        # 4. Anomalies
+        anomalies = await _run(gemini.detect_anomalies, all_txs)
+        _save_analysis(db, batch_id, "anomalies", anomalies, now)
+        severity_score = {"low": 0.3, "medium": 0.6, "high": 1.0}
+        anomaly_map = {a["transaction_id"]: a.get("severity", "low") for a in anomalies if isinstance(a, dict)}
+        for tx in txs:
+            sev = anomaly_map.get(tx.id)
+            if sev:
+                tx.anomaly_score = severity_score.get(sev, 0.0)
+        await db.flush()
 
-    # 5. Recommendations (using first month summary)
-    summary_for_rec = next(iter(summaries.values()), {}) if summaries else {}
-    recs = gemini.savings_recommendations(summary_for_rec, recurring)
-    _save_analysis(db, batch_id, "recommendations", recs, now)
+        # 5. Recommendations
+        summary_for_rec = next(iter(summaries.values()), {}) if summaries else {}
+        recs = await _run(gemini.savings_recommendations, summary_for_rec, recurring)
+        _save_analysis(db, batch_id, "recommendations", recs, now)
 
-    batch.status = "done"
-    await db.commit()
+        batch.status = "done"
+        await db.commit()
+
+    except Exception as exc:
+        batch.status = "error"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"ניתוח נכשל: {exc}")
 
     return {"batch_id": batch_id, "status": "done", "months_analyzed": months}
 

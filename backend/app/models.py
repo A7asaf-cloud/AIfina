@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import String, Integer, Boolean, DateTime, Float, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -25,7 +26,7 @@ class Transaction(Base):
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     anomaly_score: Mapped[float] = mapped_column(Float, default=0.0)
     source_file: Mapped[str] = mapped_column(String, default="")
-    upload_batch_id: Mapped[int] = mapped_column(Integer, ForeignKey("upload_batches.id"), nullable=True)
+    upload_batch_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("upload_batches.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
