@@ -193,15 +193,16 @@ export function calcBudget(netSalary: number, plan: BudgetPlanItem[]): BudgetPla
   return p.map(b => ({ ...b, amount: Math.round((netSalary * b.pct) / 100) }));
 }
 
-export function spentPerBudget(txs: Transaction[], budget: BudgetPlanItem[]): Record<string, number> {
+export function spentPerBudget(txs: Transaction[], budget: BudgetPlanItem[], billingStart?: Date): Record<string, number> {
   const map: Record<string, number> = {};
   budget.forEach(b => { map[b.key] = 0; });
   const now = new Date();
+  const cutoff = billingStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
   txs
     .filter(t => t.amount < 0)
     .forEach(t => {
       const d = new Date(t.date);
-      if (!isNaN(d.getTime()) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+      if (!isNaN(d.getTime()) && d >= cutoff) {
         const bk = CAT_TO_BUDGET[t.cat] || 'שונות';
         if (map[bk] !== undefined) map[bk] += Math.abs(t.amount);
         else if (map['שונות'] !== undefined) map['שונות'] += Math.abs(t.amount);

@@ -103,9 +103,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const net = profile.netSalary || 0;
   const budget = useMemo(() => calcBudget(net, budgetPlan), [net, budgetPlan]);
-  const spent = useMemo(() => spentPerBudget(transactions, budget), [transactions, budget]);
 
   const now = new Date();
+
+  // Billing period: from creditDay last month (or this month if today >= creditDay)
+  const creditDay = profile.creditDay || 1;
+  const today = now.getDate();
+  const billingStart =
+    today >= creditDay
+      ? new Date(now.getFullYear(), now.getMonth(), creditDay)
+      : new Date(now.getFullYear(), now.getMonth() - 1, creditDay);
+
+  const spent = useMemo(() => spentPerBudget(transactions, budget, billingStart), [transactions, budget]); // eslint-disable-line
+
+  // Income: calendar month (salary-based)
   const currentMonthTxs = transactions.filter((t) => {
     const d = new Date(t.date);
     return (
@@ -119,9 +130,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .filter((t) => t.amount > 0)
     .reduce((s, t) => s + t.amount, 0);
 
+  // Expenses: billing period (matches credit card accumulation)
+  const billingPeriodExpenses = transactions.filter((t) => {
+    const d = new Date(t.date);
+    return !isNaN(d.getTime()) && d >= billingStart && t.amount < 0;
+  });
+
   const monthExpense = Math.abs(
-    currentMonthTxs.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0)
+    billingPeriodExpenses.reduce((s, t) => s + t.amount, 0)
   );
+
+  const creditCardAccumulated = monthExpense;
 
   const safeToSpend = Math.max(0, net - monthExpense);
   const spendRatio = net > 0 ? safeToSpend / net : 1;
@@ -138,20 +157,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const daysToSalary = daysUntil(profile.salaryDay || 10);
   const daysToCredit = daysUntil(profile.creditDay || 1);
-
-  // Credit card approximate accumulation this billing period
-  const creditDay = profile.creditDay || 1;
-  const today = now.getDate();
-  const billingStart =
-    today >= creditDay
-      ? new Date(now.getFullYear(), now.getMonth(), creditDay)
-      : new Date(now.getFullYear(), now.getMonth() - 1, creditDay);
-
-  const creditCardAccumulated = Math.abs(
-    transactions
-      .filter((t) => t.amount < 0 && new Date(t.date) >= billingStart)
-      .reduce((s, t) => s + t.amount, 0)
-  );
 
   const stockPortfolioVal = holdings.reduce(
     (s, h) => s + h.shares * (h.avgCost || 0),
