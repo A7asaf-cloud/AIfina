@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Wallet,
 } from 'lucide-react';
+import { ModalShell } from './ModalShell';
 
 interface InvestmentsTabProps {
   profile: UserProfile;
@@ -45,11 +46,11 @@ function FundCard({ fund, balance, onClear }: {
 
   return (
     <div className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
-      <div className="flex justify-between items-start">
-        <button onClick={onClear} className="text-xs text-slate-500 hover:text-slate-300 transition">✕ שנה קרן</button>
-        <div className="text-right">
-          <div className="text-sm font-bold text-white">{fund.name}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{fund.company} · {fund.track}</div>
+      <div className="flex justify-between items-start gap-3">
+        <button onClick={onClear} className="shrink-0 text-xs text-slate-500 hover:text-slate-300 transition">✕ שנה קרן</button>
+        <div className="min-w-0 text-right">
+          <div className="text-sm font-bold text-white break-words">{fund.name}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5 break-words">{fund.company} · {fund.track}</div>
           {fund.source === 'static' && (
             <div className="text-[10px] text-amber-400 mt-0.5">* נתוני 2024 — מקור: דוחות ציבוריים</div>
           )}
@@ -57,7 +58,7 @@ function FundCard({ fund, balance, onClear }: {
       </div>
 
       {/* Returns summary */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="bg-slate-900 rounded-xl p-2.5 text-center">
           <div className="text-[10px] text-slate-500">תשואה 2024</div>
           <div className={`text-sm font-black font-num ${fund.ytdReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -636,12 +637,12 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
       {/* Live Market Overview Ticker Bar */}
       {marketSummary && marketSummary.length > 0 && (
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-inner space-y-1.5">
-          <div className="flex justify-between items-center text-[11px] text-slate-400 font-semibold px-1">
-            <span className="flex items-center gap-1.5 text-slate-300">
+          <div className="flex flex-wrap justify-between items-center gap-1 text-[11px] text-slate-400 font-semibold px-1">
+            <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               מדדי שוק, מט״ח וקריפטו בלייב (API)
             </span>
-            <span className="text-[10px] text-slate-500">לחץ לציטוט מהיר</span>
+            <span className="shrink-0 text-[10px] text-slate-500">לחץ לציטוט מהיר</span>
           </div>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
             {marketSummary.map((m) => {
@@ -775,19 +776,19 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                     <div key={h.id} className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 space-y-3">
                       {/* Row 1: symbol + value */}
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-xs flex-shrink-0"
                                style={{ backgroundColor: h.color + '20', color: h.color }}>
                             {h.symbol.slice(0, 4)}
                           </div>
-                          <div>
-                            <div className="text-sm font-bold text-white">{h.symbol}</div>
-                            <div className="text-xs text-slate-400 mt-0.5 leading-snug max-w-[160px]">{h.name}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-bold text-white truncate">{h.symbol}</div>
+                            <div className="text-xs text-slate-400 mt-0.5 leading-snug line-clamp-2 break-words">{h.name}</div>
                           </div>
                         </div>
-                        <div className="text-left flex-shrink-0">
+                        <div className="max-w-[48%] text-left flex-shrink-0">
                           <div className="text-base font-bold text-white font-num">{fmtUSD(valUSD)}</div>
-                          <div className={`text-xs font-bold font-num mt-0.5 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <div className={`text-xs font-bold font-num mt-0.5 break-words ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                             {isPositive ? '+' : ''}{fmtUSD(gainUSD)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
                           </div>
                         </div>
@@ -988,14 +989,14 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
       {/* ── BANK SAVINGS ── */}
       {activeSubTab === 'savings' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-3">
             <button
               onClick={() => setShowAddSavings(!showAddSavings)}
               className="text-xs text-emerald-400 font-bold hover:underline"
             >
               {showAddSavings ? 'סגור' : '+ הוסף חיסכון'}
             </button>
-            <h3 className="text-lg font-bold text-white">חסכונות בנקאיים (פק"מ)</h3>
+            <h3 className="min-w-0 truncate text-lg font-bold text-white">חסכונות בנקאיים (פק"מ)</h3>
           </div>
 
           {showAddSavings && (
@@ -1007,7 +1008,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 placeholder="שם החיסכון (כגון: פק''מ בריבית קבועה)"
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs outline-none"
               />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   type="number"
                   value={savVal}
@@ -1038,12 +1039,12 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               <div className="text-center py-6 text-slate-500 text-xs">אין חסכונות עדיין</div>
             ) : (
               (investments.savings || []).map((s) => (
-                <div key={s.id} className="py-3 flex justify-between items-center text-xs">
-                  <div>
-                    <div className="font-bold text-white">{s.name}</div>
-                    <div className="text-slate-500">{s.bank} · {s.rate}% ריבית</div>
+                <div key={s.id} className="py-3 flex justify-between items-center gap-3 text-xs">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-white truncate">{s.name}</div>
+                    <div className="text-slate-500 truncate">{s.bank} · {s.rate}% ריבית</div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     <span className="font-bold text-emerald-400 font-num">{fmtILS(s.value)}</span>
                     <button
                       onClick={() => handleDeleteSavings(s.id)}
@@ -1062,14 +1063,14 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
       {/* ── MONEY MARKET ── */}
       {activeSubTab === 'mm' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-3">
             <button
               onClick={() => setShowAddMM(!showAddMM)}
               className="text-xs text-emerald-400 font-bold hover:underline"
             >
               {showAddMM ? 'סגור' : '+ הוסף קרן'}
             </button>
-            <h3 className="text-lg font-bold text-white">קרנות כספיות</h3>
+            <h3 className="min-w-0 truncate text-lg font-bold text-white">קרנות כספיות</h3>
           </div>
 
           {showAddMM && (
@@ -1081,7 +1082,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 placeholder="שם הקרן (כגון: מגדל שקלים כספית)"
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs outline-none"
               />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   type="number"
                   value={mmVal}
@@ -1112,12 +1113,12 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               <div className="text-center py-6 text-slate-500 text-xs">אין קרנות כספיות עדיין</div>
             ) : (
               (investments.moneyMarket || []).map((f) => (
-                <div key={f.id} className="py-3 flex justify-between items-center text-xs">
-                  <div>
-                    <div className="font-bold text-white">{f.name}</div>
+                <div key={f.id} className="py-3 flex justify-between items-center gap-3 text-xs">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-white truncate">{f.name}</div>
                     <div className="text-slate-500">תשואה: {f.yield}% שנתי</div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     <span className="font-bold text-emerald-400 font-num">{fmtILS(f.value)}</span>
                     <button
                       onClick={() => handleDeleteMM(f.id)}
@@ -1135,11 +1136,18 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
 
       {/* Buy Stock Modal */}
       {showBuyModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4">
-            <h3 className="text-base font-bold text-white flex justify-between items-center">
-              <span>רכישת נייר ערך (USD)</span>
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-sans">
+        <ModalShell
+          onClose={() => {
+            setShowBuyModal(false);
+            setQuoteMessage(null);
+          }}
+          ariaLabel="רכישת נייר ערך"
+          maxWidthClass="sm:max-w-sm"
+          panelClassName="space-y-4"
+        >
+            <h3 className="text-base font-bold text-white flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="min-w-0">רכישת נייר ערך (USD)</span>
+              <span className="shrink-0 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-sans">
                 מחובר ל-Live Quote API
               </span>
             </h3>
@@ -1147,7 +1155,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
             {/* Symbol Input + Live Lookup */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-400">סימול מניה / נייר ערך</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   type="text"
                   value={buySymbol}
@@ -1166,13 +1174,13 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                     }
                   }}
                   placeholder="סימול או שם מניה (NVDA, TSLA, טסלה, אנבידיה)"
-                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-white text-sm outline-none font-num"
+                  className="w-full min-w-0 flex-1 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-white text-sm outline-none font-num"
                 />
                 <button
                   type="button"
                   onClick={() => fetchQuoteForSymbol(buySymbol)}
                   disabled={isFetchingQuote || !buySymbol.trim()}
-                  className="px-3 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-xs rounded-xl flex items-center gap-1 transition-all cursor-pointer disabled:opacity-40"
+                  className="shrink-0 px-3 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer disabled:opacity-40"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isFetchingQuote ? 'animate-spin' : ''}`} />
                   <span>{isFetchingQuote ? 'טוען...' : 'משוך מחיר'}</span>
@@ -1232,7 +1240,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm outline-none"
             />
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-semibold block">כמות מניות</label>
                 <input
@@ -1257,7 +1265,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row">
               <button
                 onClick={() => {
                   setShowBuyModal(false);
@@ -1274,14 +1282,17 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 אשר רכישה ✓
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Deposit Cash Modal */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4">
+        <ModalShell
+          onClose={() => setShowDepositModal(false)}
+          ariaLabel="הפקדת מזומן פנוי"
+          maxWidthClass="sm:max-w-sm"
+          panelClassName="space-y-4"
+        >
             <h3 className="text-base font-bold text-white">הפקדת מזומן פנוי ($)</h3>
 
             <input
@@ -1306,29 +1317,35 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 הפקד ✓
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Sell Stock Modal */}
       {showSellModal && selectedHoldingForSell && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
+        <ModalShell
+          onClose={() => {
+            setShowSellModal(false);
+            setSelectedHoldingForSell(null);
+          }}
+          ariaLabel="מכירת נייר ערך"
+          maxWidthClass="sm:max-w-sm"
+          panelClassName="space-y-4"
+        >
+            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-base font-bold text-white flex min-w-0 items-center gap-2">
                 <span>מכירת נייר ערך</span>
                 <span className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full font-num">
                   {selectedHoldingForSell.symbol}
                 </span>
               </h3>
-              <span className="text-xs text-slate-400 font-num">
+              <span className="text-xs text-slate-400 font-num shrink-0">
                 זמין למכירה: {selectedHoldingForSell.shares} יח׳
               </span>
             </div>
 
             <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800/80 space-y-1">
               <div className="text-[11px] text-slate-400">מחיר שוק מעודכן בלייב</div>
-              <div className="text-sm font-black text-emerald-400 font-num flex justify-between items-center">
+              <div className="text-sm font-black text-emerald-400 font-num flex flex-wrap justify-between items-center gap-2">
                 <span>${(selectedHoldingForSell.currentPrice || selectedHoldingForSell.avgCost || 0).toFixed(2)} למניה</span>
                 <button
                   type="button"
@@ -1340,7 +1357,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-semibold block">כמות מניות למכירה</label>
                 <input
@@ -1368,7 +1385,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
 
             {/* Estimated Proceeds Calculation */}
             {parseFloat(sellShares) > 0 && parseFloat(sellPrice) > 0 && (
-              <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-2xl text-xs flex justify-between items-center">
+              <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-2xl text-xs flex flex-wrap justify-between items-center gap-2">
                 <span className="text-rose-200 font-medium">תקבול ממכירה למזומן:</span>
                 <div className="text-right">
                   <div className="font-black text-rose-300 font-num text-sm">
@@ -1381,7 +1398,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             )}
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row">
               <button
                 type="button"
                 onClick={() => {
@@ -1397,11 +1414,10 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 onClick={handleSellStock}
                 className="flex-1 py-2.5 px-4 bg-rose-500 hover:bg-rose-400 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all"
               >
-                אשר מכירה וקבל מזומן ✓
+                אשר מכירה ✓
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

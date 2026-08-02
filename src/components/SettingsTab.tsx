@@ -259,7 +259,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row">
           <button
             type="button"
             onClick={handleTestGeminiKey}
@@ -272,7 +272,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             type="submit"
             className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all"
           >
-            שמור מפתח Gemini API ✓
+            שמור מפתח ✓
           </button>
         </div>
       </form>
@@ -299,7 +299,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">שכר נטו (₪)</label>
               <input
@@ -320,7 +320,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-emerald-400 mb-1">יום כניסת משכורת</label>
               <input
@@ -356,7 +356,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       {/* Budget Sliders Section */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-2">
           <span
             className={`text-xs font-bold font-num px-2.5 py-1 rounded-lg ${
               isBudgetValid
@@ -366,9 +366,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           >
             סה"כ: {totalPct}% {isBudgetValid ? '✓' : '(חייב להיות 100%)'}
           </span>
-          <h3 className="font-bold text-white text-base flex items-center gap-2">
-            <span>חלוקת אחוזי תקציב</span>
-            <PieChart className="w-4 h-4 text-emerald-400" />
+          <h3 className="min-w-0 font-bold text-white text-base flex items-center gap-2">
+            <span className="truncate">חלוקת אחוזי תקציב</span>
+            <PieChart className="w-4 h-4 shrink-0 text-emerald-400" />
           </h3>
         </div>
 
@@ -408,7 +408,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-3">
         <h3 className="font-bold text-white text-base">גיבוי ושחזור נתונים</h3>
 
-        <div className="grid grid-cols-2 gap-3 pt-1">
+        <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
           <button
             onClick={exportBackupJSON}
             className="flex items-center justify-center gap-2 py-3 px-4 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-bold rounded-xl cursor-pointer transition-all"

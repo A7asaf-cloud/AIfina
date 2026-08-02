@@ -96,10 +96,10 @@ export default function OTPScreen({ email, onBack }: Props) {
   const ss = String(timeLeft%60).padStart(2,'0');
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden" dir="rtl">
+    <div className="min-h-dvh bg-slate-950 flex flex-col items-center p-4 py-8 relative overflow-x-clip overflow-y-auto" dir="rtl">
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md z-10">
+      <div className="w-full max-w-md z-10 my-auto">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-500/20 mb-4">
             <span className="text-3xl">📧</span>
@@ -113,7 +113,7 @@ export default function OTPScreen({ email, onBack }: Props) {
 
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           {/* Digit inputs — LTR direction so 1st box is leftmost */}
-          <div className="flex gap-2 justify-center mb-5 dir-ltr" dir="ltr" onPaste={onPaste}>
+          <div className="flex gap-1.5 sm:gap-2 justify-center mb-5" dir="ltr" onPaste={onPaste}>
             {digits.map((d, i) => (
               <input key={i}
                 ref={el => (refs.current[i] = el)}
@@ -121,7 +121,7 @@ export default function OTPScreen({ email, onBack }: Props) {
                 onChange={e => onChange(i, e.target.value)}
                 onKeyDown={e => onKeyDown(i, e)}
                 autoFocus={i === 0}
-                className={`w-12 h-14 text-center text-xl font-bold rounded-2xl border bg-slate-950 text-white transition outline-none
+                className={`min-w-0 flex-1 max-w-12 h-12 sm:h-14 text-center text-lg sm:text-xl font-bold rounded-xl sm:rounded-2xl border bg-slate-950 text-white transition outline-none
                   ${d ? 'border-emerald-500/60 text-emerald-400' : 'border-slate-700'}
                   ${error ? 'border-red-500/60' : ''}
                   focus:border-emerald-500`}

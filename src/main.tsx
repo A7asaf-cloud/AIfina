@@ -36,7 +36,7 @@ class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 dir-rtl text-right">
+        <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-right" dir="rtl">
           <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4">
             <div className="text-4xl">💎</div>
             <h1 className="text-xl font-bold text-white">FinanceIL - שגיאה במערכת</h1>
@@ -44,7 +44,7 @@ class ErrorBoundary extends Component<Props, State> {
               התרחשה שגיאה בלתי צפויה. ניתן לאפס את נתוני האפליקציה המקומיים כדי להמשיך.
             </p>
             {this.state.error && (
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-red-400 font-mono text-[11px] overflow-auto max-h-32 text-left dir-ltr">
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-red-400 font-mono text-[11px] overflow-auto max-h-32 text-left" dir="ltr">
                 {this.state.error.toString()}
               </div>
             )}

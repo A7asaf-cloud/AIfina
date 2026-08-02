@@ -421,7 +421,7 @@ ${content.slice(0, 9000)}
                 <p className="text-slate-400 text-xs mt-1 leading-relaxed">
                   השירות משתמש בספריית israeli-bank-scrapers — מתחבר לאתר הבנק שלך בדפדפן מוסתר ומושך עסקאות.
                   גישה לקריאה בלבד. הפרטים מוצפנים AES-256 ונשמרים רק בשרת המקומי שלך.
-                  דרוש: <code className="bg-slate-800 px-1 rounded">cd finance-scraper && npm run dev</code> בטרמינל נפרד.
+                  דרוש: <code className="bg-slate-800 px-1 rounded break-all">cd finance-scraper && npm run dev</code> בטרמינל נפרד.
                 </p>
               </div>
             </div>
@@ -432,19 +432,19 @@ ${content.slice(0, 9000)}
       {/* Excel Upload Method */}
       {method === 'excel' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800">
             <button
               onClick={() => {
                 setMethod('choose');
                 setPreviewTxs([]);
                 setErrorMsg(null);
               }}
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-bold"
+              className="shrink-0 text-xs text-slate-400 hover:text-white flex items-center gap-1 font-bold"
             >
               <ArrowRight className="w-4 h-4 rotate-180" />
               <span>חזור לבחירה</span>
             </button>
-            <h3 className="font-bold text-white text-base">ייבוא מקובץ Excel או CSV</h3>
+            <h3 className="min-w-0 truncate font-bold text-white text-base">ייבוא מקובץ Excel או CSV</h3>
           </div>
 
           <input
@@ -486,16 +486,16 @@ ${content.slice(0, 9000)}
                 <CheckCircle2 className="w-5 h-5" />
               </div>
 
-              <div className="max-h-64 overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+              <div className="max-h-64 overflow-x-hidden overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-3 rounded-2xl border border-slate-800">
                 {previewTxs.slice(0, 30).map((tx, idx) => (
-                  <div key={idx} className="py-2 flex justify-between items-center text-xs">
-                    <div className="flex items-center gap-2">
-                      <span>{tx.emoji}</span>
-                      <span className="text-white font-medium">{tx.description}</span>
-                      <span className="text-slate-500">({tx.cat})</span>
+                  <div key={idx} className="py-2 flex justify-between items-center gap-3 text-xs">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="shrink-0">{tx.emoji}</span>
+                      <span className="min-w-0 flex-1 truncate text-white font-medium">{tx.description}</span>
+                      <span className="hidden max-w-20 truncate text-slate-500 sm:inline">({tx.cat})</span>
                     </div>
                     <span
-                      className={`font-num font-bold ${
+                      className={`shrink-0 font-num font-bold ${
                         tx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'
                       }`}
                     >
@@ -505,7 +505,7 @@ ${content.slice(0, 9000)}
                 ))}
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
                 <button
                   onClick={() => setPreviewTxs([])}
                   className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm rounded-xl transition-all cursor-pointer"
@@ -527,7 +527,7 @@ ${content.slice(0, 9000)}
       {/* Gemini Vision OCR Method */}
       {method === 'ocr' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800">
             <button
               onClick={() => {
                 setMethod('choose');
@@ -535,12 +535,12 @@ ${content.slice(0, 9000)}
                 setOcrImage(null);
                 setErrorMsg(null);
               }}
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-bold"
+              className="shrink-0 text-xs text-slate-400 hover:text-white flex items-center gap-1 font-bold"
             >
               <ArrowRight className="w-4 h-4 rotate-180" />
               <span>חזור לבחירה</span>
             </button>
-            <h3 className="font-bold text-white text-base">סריקת תמונה / צילום מסך</h3>
+            <h3 className="min-w-0 truncate font-bold text-white text-base">סריקת תמונה / צילום מסך</h3>
           </div>
 
           <input
@@ -552,7 +552,7 @@ ${content.slice(0, 9000)}
           />
 
           <div className="space-y-4">
-            <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
+            <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 sm:grid-cols-4">
               {(
                 [
                   ['bank', 'דף תנועות בנק'],
@@ -565,7 +565,7 @@ ${content.slice(0, 9000)}
                   key={typeKey}
                   type="button"
                   onClick={() => setOcrDocType(typeKey)}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`min-w-0 py-2 px-1 text-xs font-bold rounded-xl transition-all ${
                     ocrDocType === typeKey
                       ? 'bg-slate-800 text-white shadow-sm'
                       : 'text-slate-400'
@@ -598,19 +598,19 @@ ${content.slice(0, 9000)}
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
 
-                <div className="max-h-64 overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <div className="max-h-64 overflow-x-hidden overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-3 rounded-2xl border border-slate-800">
                   {previewTxs.map((tx, idx) => (
-                    <div key={idx} className="py-2 flex justify-between items-center text-xs">
-                      <div className="flex items-center gap-2">
-                        <span>{tx.emoji}</span>
-                        <span className="text-white font-medium">{tx.description}</span>
+                    <div key={idx} className="py-2 flex justify-between items-center gap-3 text-xs">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="shrink-0">{tx.emoji}</span>
+                        <span className="min-w-0 flex-1 truncate text-white font-medium">{tx.description}</span>
                       </div>
-                      <span className="font-num font-bold text-slate-200">{fmtILS(tx.amount)}</span>
+                      <span className="shrink-0 font-num font-bold text-slate-200">{fmtILS(tx.amount)}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col-reverse gap-3 sm:flex-row">
                   <button
                     onClick={() => {
                       setPreviewTxs([]);

@@ -47,11 +47,11 @@ export default function AuthPage() {
   if (stage === 'otp') return <OTPScreen email={email} onBack={() => setStage('entry')} />;
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden" dir="rtl">
+    <div className="min-h-dvh bg-slate-950 flex flex-col items-center p-4 py-8 relative overflow-x-clip overflow-y-auto" dir="rtl">
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md z-10">
+      <div className="w-full max-w-md z-10 my-auto">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-500/20 mb-4">
@@ -64,7 +64,7 @@ export default function AuthPage() {
         {/* Demo card */}
         <div className="mb-5 bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-xl">
           <div className="flex items-start gap-3">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-sm">
                 <Sparkles className="w-4 h-4" />
                 <span>כניסה מיידית ללא התעסקות!</span>

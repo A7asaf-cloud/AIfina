@@ -422,12 +422,12 @@ export const BankScraper: React.FC<BankScraperProps> = ({ onImportTransactions, 
 
         <div className="max-h-72 overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-3 rounded-2xl border border-slate-800">
           {previewTxs.slice(0, 100).map((tx, idx) => (
-            <div key={idx} className="py-2 flex justify-between items-center text-xs">
-              <div className="flex items-center gap-2 min-w-0">
-                <span>{tx.emoji}</span>
-                <div className="min-w-0">
-                  <p className="text-white font-medium truncate max-w-[160px]">{tx.description}</p>
-                  <p className="text-slate-500">{fmtDate(tx.date)} · {tx.cat}</p>
+            <div key={idx} className="py-2 flex justify-between items-center gap-3 text-xs">
+              <div className="flex flex-1 items-center gap-2 min-w-0">
+                <span className="shrink-0">{tx.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-white font-medium truncate">{tx.description}</p>
+                  <p className="text-slate-500 truncate">{fmtDate(tx.date)} · {tx.cat}</p>
                 </div>
               </div>
               <span className={`font-bold shrink-0 mr-2 ${tx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'}`}>
@@ -440,7 +440,7 @@ export const BankScraper: React.FC<BankScraperProps> = ({ onImportTransactions, 
           )}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row">
           <button
             onClick={() => setView('list')}
             className="py-3 px-4 bg-slate-800 text-slate-300 font-bold text-sm rounded-xl cursor-pointer"
@@ -488,14 +488,14 @@ export const BankScraper: React.FC<BankScraperProps> = ({ onImportTransactions, 
             onClick={() => setShowCompanyDropdown(v => !v)}
             className="w-full bg-slate-950 border border-slate-700 text-right px-4 py-3 rounded-xl flex items-center justify-between text-sm cursor-pointer"
           >
-            <span className={selectedCompany ? 'text-white' : 'text-slate-500'}>
+            <span className={`min-w-0 truncate ${selectedCompany ? 'text-white' : 'text-slate-500'}`}>
               {selectedCompany?.name ?? 'בחר בנק / כרטיס אשראי...'}
             </span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           </button>
 
           {showCompanyDropdown && (
-            <div className="absolute top-full mt-1 right-0 left-0 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden z-20 shadow-xl max-h-56 overflow-y-auto">
+            <div className="absolute top-full mt-1 right-0 left-0 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden z-40 shadow-xl max-h-56 overflow-y-auto">
               {COMPANIES.map(c => (
                 <button
                   key={c.id}

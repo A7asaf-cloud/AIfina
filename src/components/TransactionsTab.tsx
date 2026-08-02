@@ -79,7 +79,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-24 text-right animate-fade-in">
+    <div className="space-y-4 pb-32 text-right animate-fade-in">
       {/* Header & Controls */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3">
         {/* Search Input */}
@@ -127,12 +127,12 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </div>
 
         {/* Count & Category Select */}
-        <div className="flex justify-between items-center text-xs text-slate-400 pt-1 border-t border-slate-800/60">
-          <span>{filtered.length} עסקאות שנמצאו</span>
+        <div className="flex justify-between items-center gap-3 text-xs text-slate-400 pt-1 border-t border-slate-800/60">
+          <span className="min-w-0 truncate">{filtered.length} עסקאות שנמצאו</span>
           <select
             value={selectedCat}
             onChange={(e) => setSelectedCat(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs outline-none text-right cursor-pointer"
+            className="min-w-0 max-w-[55%] bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs outline-none text-right cursor-pointer"
           >
             <option value="all">כל הקטגוריות</option>
             {ALL_CATS.map((c) => (
@@ -158,7 +158,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
               return (
                 <div key={tx.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex flex-1 items-center gap-3 min-w-0">
                     <div
                       className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg flex-shrink-0"
                       style={{ backgroundColor: tx.color + '20' }}
@@ -166,13 +166,13 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                       {tx.emoji}
                     </div>
 
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-white truncate">
                         {tx.description}
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                        <span>{fmtDate(tx.date)}</span>
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-slate-400 mt-0.5">
+                        <span className="shrink-0">{fmtDate(tx.date)}</span>
 
                         {isEditing ? (
                           <select
@@ -195,7 +195,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                           <button
                             onClick={() => setEditingCatId(tx.id)}
                             title="לחץ לשינוי קטגוריה"
-                            className="px-1.5 py-0.5 rounded text-[10px] font-bold transition-opacity hover:opacity-80 cursor-pointer"
+                            className="min-w-0 max-w-28 truncate px-1.5 py-0.5 rounded text-[10px] font-bold transition-opacity hover:opacity-80 cursor-pointer"
                             style={{
                               backgroundColor: tx.color + '20',
                               color: tx.color,
@@ -236,7 +236,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
       {/* Floating Add Button */}
       <button
         onClick={() => setShowAddModal(true)}
-        className="fixed bottom-20 left-5 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/30 flex items-center justify-center font-black text-2xl z-40 transition-transform active:scale-95 cursor-pointer"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-5 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/30 flex items-center justify-center font-black text-2xl z-40 transition-transform active:scale-95 cursor-pointer"
       >
         <Plus className="w-7 h-7" />
       </button>

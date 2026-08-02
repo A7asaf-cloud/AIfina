@@ -3,7 +3,7 @@
  * Hardcoded keyword matching. No AI required.
  * Categories match budget plan keys exactly.
  */
-import { CategoryRule, BudgetPlanItem, Transaction } from '../types';
+import { BudgetPlanItem, Transaction } from '../types';
 
 // ─── Category definitions ────────────────────────────────────────────────────
 

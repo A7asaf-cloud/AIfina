@@ -61,8 +61,8 @@ export const Onboarding: React.FC<OnboardingProps> = ({ initialProfile, onDone }
   const budgetAllocation = calcBudget(netNum, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative">
-      <div className="w-full max-w-lg">
+    <div className="min-h-dvh bg-slate-950 flex flex-col items-center p-4 py-8 relative overflow-x-clip overflow-y-auto">
+      <div className="w-full max-w-lg my-auto">
         {/* Step Progress */}
         <div className="mb-6">
           <div className="flex justify-between items-center text-xs text-slate-400 mb-2 font-medium">
@@ -121,7 +121,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ initialProfile, onDone }
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-semibold text-emerald-400 mb-1 text-right">יום כניסת משכורת</label>
                     <input
@@ -228,13 +228,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ initialProfile, onDone }
                 {budgetAllocation.map((b) => (
                   <div
                     key={b.key}
-                    className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl text-xs border border-slate-800"
+                    className="flex justify-between items-center gap-3 bg-slate-950 p-2.5 rounded-xl text-xs border border-slate-800"
                   >
-                    <div className="flex items-center gap-2">
-                      <span>{b.emoji}</span>
-                      <span className="text-slate-300 font-medium">{b.key}</span>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="shrink-0">{b.emoji}</span>
+                      <span className="text-slate-300 font-medium truncate">{b.key}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className="font-bold text-white font-num">{fmtILS(b.amount)}</span>
                       <span className="text-slate-500">({b.pct}%)</span>
                     </div>

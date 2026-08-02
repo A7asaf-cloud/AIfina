@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Transaction } from '../types';
 import { categorize, ALL_CATS } from '../utils/categories';
-import { X, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { X, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ModalShell } from './ModalShell';
 
 interface AddTransactionModalProps {
   onClose: () => void;
@@ -44,20 +45,16 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClos
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-slate-900 border border-slate-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-5 text-right">
+    <ModalShell onClose={onClose} ariaLabel="הוספת עסקה חדשה" panelClassName="space-y-5 text-right">
         {/* Header */}
-        <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+        <div className="flex justify-between items-center gap-3 pb-2 border-b border-slate-800">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 shrink-0 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
-          <h3 className="text-lg font-bold text-white">הוספת עסקה חדשה</h3>
+          <h3 className="min-w-0 truncate text-lg font-bold text-white">הוספת עסקה חדשה</h3>
         </div>
 
         {/* Expense vs Income Toggle */}
@@ -105,10 +102,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClos
               className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none text-right"
             />
             {activeCat && (
-              <div className="mt-1.5 flex items-center gap-2 text-xs">
-                <span className="text-slate-400">קטגוריה שזוהתה:</span>
+              <div className="mt-1.5 flex min-w-0 items-center gap-2 text-xs">
+                <span className="shrink-0 text-slate-400">קטגוריה שזוהתה:</span>
                 <span
-                  className="px-2 py-0.5 rounded-lg text-xs font-bold"
+                  className="min-w-0 truncate px-2 py-0.5 rounded-lg text-xs font-bold"
                   style={{ backgroundColor: activeCat.color + '25', color: activeCat.color }}
                 >
                   {activeCat.emoji} {activeCat.cat}
@@ -166,7 +163,6 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClos
             הוסף עסקה ✓
           </button>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

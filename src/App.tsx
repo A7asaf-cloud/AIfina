@@ -201,7 +201,16 @@ export default function App() {
     );
   }
   if (!authUser) return <AuthPage />;
-  if (!appData) return null;
+  if (!appData) {
+    return (
+      <div className="min-h-dvh bg-slate-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-500">טוען...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Render Onboarding if required
   if (needsOnboarding) {
@@ -219,9 +228,9 @@ export default function App() {
   }).format(new Date());
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-x-hidden">
+    <div className="min-h-dvh bg-slate-950 text-slate-100 font-sans relative overflow-x-clip">
       {/* Top Fixed Header */}
-      <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 px-4 py-4">
+      <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto flex items-center justify-between gap-3">
           {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
@@ -236,11 +245,11 @@ export default function App() {
 
           {/* User info */}
           <div className="flex items-center gap-3 min-w-0">
-            <div className="text-right min-w-0">
-              <span className="block text-xs font-semibold text-slate-200 truncate max-w-[110px]">
+            <div className="text-right min-w-0 max-w-[130px]">
+              <span className="block text-xs font-semibold text-slate-200 truncate">
                 {appData.profile.name}
               </span>
-              <span className="block text-[11px] text-emerald-400 font-bold">
+              <span className="block text-[11px] text-emerald-400 font-bold truncate">
                 {fmtILS(appData.profile.netSalary)} / חודש
               </span>
             </div>
@@ -253,14 +262,14 @@ export default function App() {
 
       {/* Toast Alert for Auto-Salary Insertion */}
       {salaryToast && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 text-xs animate-fade-in max-w-sm text-center">
+        <div className="fixed top-[calc(4rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[45] bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 text-xs animate-fade-in w-[calc(100%-2rem)] max-w-sm text-center">
           <span>💰</span>
           <span>משכורת חודשית בסך {fmtILS(salaryToast)} התווספה אוטומטית!</span>
         </div>
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto px-4 pt-5 pb-28">
+      <main className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto px-4 pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         {activeTab === 'dashboard' && (
           <Dashboard
             profile={appData.profile}

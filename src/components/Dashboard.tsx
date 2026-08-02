@@ -168,7 +168,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .slice(0, 6);
 
   return (
-    <div className="space-y-4 text-right animate-fade-in">
+    <div className="space-y-4 pb-32 text-right animate-fade-in">
       {/* Hero Card: Safe To Spend */}
       <div
         className={`bg-gradient-to-br ${cardBgGradient} border border-slate-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden`}
@@ -180,7 +180,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               שלום {profile.name} 👋
             </p>
             <p className="text-xs text-slate-500 mb-3">יתרה פנויה לתקציב החודש</p>
-            <h2 className={`text-3xl sm:text-4xl font-black ${spendColorClass} font-num tracking-tight leading-none`}>
+            <h2 className={`max-w-full overflow-hidden text-ellipsis text-2xl sm:text-4xl font-black ${spendColorClass} font-num tracking-tight leading-none`}>
               {fmtILS(safeToSpend)}
             </h2>
           </div>
@@ -190,13 +190,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Income vs Expense */}
-        <div className="grid grid-cols-2 gap-2.5 mt-5 pt-4 border-t border-slate-800/80">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 mt-5 pt-4 border-t border-slate-800/80">
           <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>הכנסות</span>
             </div>
-            <div className="text-sm font-bold text-white font-num">
+            <div className="max-w-full overflow-hidden text-ellipsis text-sm font-bold text-white font-num">
               {fmtILS(monthIncome || net)}
             </div>
           </div>
@@ -206,7 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <TrendingDown className="w-3.5 h-3.5 text-red-400 shrink-0" />
               <span>הוצאות</span>
             </div>
-            <div className="text-sm font-bold text-white font-num">
+            <div className="max-w-full overflow-hidden text-ellipsis text-sm font-bold text-white font-num">
               {fmtILS(monthExpense)}
             </div>
           </div>
@@ -214,7 +214,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Countdown Timers Strip */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3">
         <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -238,7 +238,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="text-sm font-extrabold text-white leading-snug">
             {daysToCredit === 0 ? 'חיוב היום! ⚠️' : `בעוד ${daysToCredit} ימים`}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">צבור: {fmtILS(creditCardAccumulated)}</div>
+          <div className="text-[11px] text-slate-500 mt-1 truncate">צבור: {fmtILS(creditCardAccumulated)}</div>
         </div>
       </div>
 
@@ -248,18 +248,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onClick={() => onNavigateToTab('investments')}
           className="bg-gradient-to-r from-slate-900 to-indigo-950/60 border border-indigo-500/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-indigo-500/50 transition-all"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold shrink-0">
               📈
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs text-indigo-300 font-semibold">תיק מניות והשקעות</div>
-              <div className="text-sm font-black text-white font-num">
+              <div className="max-w-full overflow-hidden text-ellipsis text-sm font-black text-white font-num">
                 {fmtUSD(stockPortfolioVal + portfolioCash)}
               </div>
             </div>
           </div>
-          <ChevronLeft className="w-5 h-5 text-indigo-400" />
+          <ChevronLeft className="w-5 h-5 text-indigo-400 shrink-0" />
         </div>
       )}
 
@@ -322,16 +322,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Budget Allocation Breakdown */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3">
           <button
             onClick={() => onNavigateToTab('settings')}
             className="text-xs text-emerald-400 hover:underline font-bold"
           >
             ערוך תקציב
           </button>
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <span>תקציב חודשי לפי קטגוריות</span>
-            <PieChart className="w-4 h-4 text-emerald-400" />
+          <h3 className="min-w-0 text-base font-bold text-white flex items-center gap-2">
+            <span className="truncate">תקציב חודשי לפי קטגוריות</span>
+            <PieChart className="w-4 h-4 shrink-0 text-emerald-400" />
           </h3>
         </div>
 
@@ -344,7 +344,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             return (
               <div key={b.key} className="space-y-1.5">
                 <div className="flex justify-between items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-300 shrink-0">
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-300">
                     {b.emoji} {b.key}
                   </span>
                   <div className="flex items-center gap-1.5 min-w-0">
@@ -372,14 +372,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Recent Transactions */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3">
           <button
             onClick={() => onNavigateToTab('transactions')}
             className="text-xs text-emerald-400 hover:underline font-bold"
           >
             לכל העסקאות ({transactions.length})
           </button>
-          <h3 className="text-base font-bold text-white">עסקאות אחרונות</h3>
+          <h3 className="min-w-0 truncate text-base font-bold text-white">עסקאות אחרונות</h3>
         </div>
 
         {recentTxs.length === 0 ? (
@@ -428,7 +428,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Floating Plus Button */}
       <button
         onClick={() => setShowAddModal(true)}
-        className="fixed bottom-20 left-5 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/30 flex items-center justify-center font-black text-2xl z-40 transition-transform active:scale-95 cursor-pointer"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-5 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/30 flex items-center justify-center font-black text-2xl z-40 transition-transform active:scale-95 cursor-pointer"
       >
         <Plus className="w-7 h-7" />
       </button>
