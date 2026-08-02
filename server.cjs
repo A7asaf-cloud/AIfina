@@ -22,7 +22,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // server.ts
-var import_express2 = __toESM(require("express"), 1);
+var import_express3 = __toESM(require("express"), 1);
 var import_cookie_parser = __toESM(require("cookie-parser"), 1);
 var import_path2 = __toESM(require("path"), 1);
 var import_vite = require("vite");
@@ -417,6 +417,40 @@ authRouter.post("/demo", (req, res) => {
   const user = getOrCreateDemoUser();
   const accessToken = issueSession(res, user);
   return res.json({ access_token: accessToken, user: formatUser(user) });
+});
+
+// server/scraperProxy.ts
+var import_express2 = require("express");
+var router = (0, import_express2.Router)();
+var SCRAPER_URL = process.env.SCRAPER_URL ?? "http://localhost:3001";
+var SCRAPER_INTERNAL_KEY = process.env.SCRAPER_INTERNAL_KEY ?? "";
+router.all("*", async (req, res) => {
+  const qs = Object.keys(req.query).length ? "?" + new URLSearchParams(req.query).toString() : "";
+  const targetUrl = `${SCRAPER_URL}/api${req.path}${qs}`;
+  try {
+    const options = {
+      method: req.method,
+      headers: {
+        "X-Internal-Key": SCRAPER_INTERNAL_KEY,
+        "Content-Type": "application/json"
+      }
+    };
+    if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
+      options.body = JSON.stringify(req.body);
+    }
+    const upstream = await fetch(targetUrl, options);
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    const isDown = err?.cause?.code === "ECONNREFUSED";
+    res.status(503).json({
+      success: false,
+      error: {
+        code: "SCRAPER_UNAVAILABLE",
+        message: isDown ? "\u05E9\u05D9\u05E8\u05D5\u05EA \u05D9\u05D9\u05D1\u05D5\u05D0 \u05D4\u05D1\u05E0\u05E7 \u05D0\u05D9\u05E0\u05D5 \u05D6\u05DE\u05D9\u05DF. \u05D4\u05E4\u05E2\u05DC \u05D0\u05D5\u05EA\u05D5 \u05E2\u05DD: cd finance-scraper && npm run dev" : String(err)
+      }
+    });
+  }
 });
 
 // server/fundsApi.ts
@@ -1001,11 +1035,12 @@ function writeUserDataOnServer(userId, data) {
   import_fs2.default.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
 }
 async function startServer() {
-  const app = (0, import_express2.default)();
+  const app = (0, import_express3.default)();
   const PORT = 3e3;
-  app.use(import_express2.default.json({ limit: "20mb" }));
+  app.use(import_express3.default.json({ limit: "20mb" }));
   app.use((0, import_cookie_parser.default)());
   app.use("/auth", authRouter);
+  app.use("/api/scraper", router);
   app.use((req, res, next) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) return next();
@@ -1744,7 +1779,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     app.use(vite.middlewares);
   } else {
     const distPath = import_path2.default.join(process.cwd(), "dist");
-    app.use(import_express2.default.static(distPath));
+    app.use(import_express3.default.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(import_path2.default.join(distPath, "index.html"));
     });
