@@ -7,11 +7,9 @@ import {
   Transaction,
   BudgetPlanItem,
   InvestmentState,
-  StockHolding,
-  SavingsAccount,
-  MoneyMarketFund,
-  StockHistoryItem,
   SnapshotItem,
+  StandingOrder,
+  UserAppData,
 } from '../types';
 import { getMemToken } from '../auth/AuthContext';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
@@ -26,13 +24,13 @@ const KEYS = {
   DATA_PREFIX: 'fil_u_data_',
 };
 
-// Token provider — set from AuthContext so StorageService can call authenticated server endpoints
+// Token provider â€” set from AuthContext so StorageService can call authenticated server endpoints
 let _tokenProvider: (() => string | null) | null = null;
 export function setTokenProvider(fn: () => string | null) { _tokenProvider = fn; }
 
 // Seed sample demo data
 const DEMO_PROFILE: UserProfile = {
-  name: 'ישראל ישראלי',
+  name: '×™×©×¨××œ ×™×©×¨××œ×™',
   netSalary: 16500,
   grossSalary: 22000,
   salaryDay: 10,
@@ -52,16 +50,16 @@ const DEMO_PROFILE: UserProfile = {
 };
 
 const DEMO_TRANSACTIONS: Transaction[] = [
-  { id: 101, description: 'משכורת חודשית', amount: 16500, date: '2026-07-10', cat: 'הכנסה', color: '#10B981', emoji: '💰', account: 'בנק הפועלים', auto: true },
-  { id: 102, description: 'שכר דירה - יולי', amount: -4800, date: '2026-07-01', cat: 'דיור', color: '#64748B', emoji: '🏠', account: 'הוראת קבע' },
-  { id: 103, description: 'שופרסל דיל רעננה', amount: -680, date: '2026-07-24', cat: 'סופרמרקט', color: '#22C55E', emoji: '🛒', account: 'Max' },
-  { id: 104, description: 'וולט - ג\'ירף סושי', amount: -185, date: '2026-07-26', cat: 'מסעדות וקפה', color: '#F97316', emoji: '🍽️', account: 'Max' },
-  { id: 105, description: 'חברת החשמל', amount: -340, date: '2026-07-15', cat: 'חשבונות בית', color: '#EAB308', emoji: '💡', account: 'בנק הפועלים' },
-  { id: 106, description: 'פז - דלק מתחם שפיים', amount: -290, date: '2026-07-20', cat: 'דלק ורכב', color: '#84CC16', emoji: '⛽', account: 'Max' },
-  { id: 107, description: 'סופר-פארם קניון רננים', amount: -145, date: '2026-07-22', cat: 'בריאות', color: '#14B8A6', emoji: '🏥', account: 'Max' },
-  { id: 108, description: 'פרטנר תקשורת', amount: -120, date: '2026-07-05', cat: 'תקשורת', color: '#06B6D4', emoji: '📱', account: 'הוראת קבע' },
-  { id: 109, description: 'נטפליקס חודשי', amount: -65, date: '2026-07-03', cat: 'בידור', color: '#EC4899', emoji: '🎬', account: 'Max' },
-  { id: 110, description: 'זארה קניון עזריאלי', amount: -390, date: '2026-07-18', cat: 'קניות', color: '#F59E0B', emoji: '🛍️', account: 'Max' },
+  { id: 101, description: '×ž×©×›×•×¨×ª ×—×•×“×©×™×ª', amount: 16500, date: '2026-07-10', cat: '×”×›× ×¡×”', color: '#10B981', emoji: 'ðŸ’°', account: '×‘× ×§ ×”×¤×•×¢×œ×™×', auto: true },
+  { id: 102, description: '×©×›×¨ ×“×™×¨×” - ×™×•×œ×™', amount: -4800, date: '2026-07-01', cat: '×“×™×•×¨', color: '#64748B', emoji: 'ðŸ ', account: '×”×•×¨××ª ×§×‘×¢' },
+  { id: 103, description: '×©×•×¤×¨×¡×œ ×“×™×œ ×¨×¢× × ×”', amount: -680, date: '2026-07-24', cat: '×¡×•×¤×¨×ž×¨×§×˜', color: '#22C55E', emoji: 'ðŸ›’', account: 'Max' },
+  { id: 104, description: '×•×•×œ×˜ - ×’\'×™×¨×£ ×¡×•×©×™', amount: -185, date: '2026-07-26', cat: '×ž×¡×¢×“×•×ª ×•×§×¤×”', color: '#F97316', emoji: 'ðŸ½ï¸', account: 'Max' },
+  { id: 105, description: '×—×‘×¨×ª ×”×—×©×ž×œ', amount: -340, date: '2026-07-15', cat: '×—×©×‘×•× ×•×ª ×‘×™×ª', color: '#EAB308', emoji: 'ðŸ’¡', account: '×‘× ×§ ×”×¤×•×¢×œ×™×' },
+  { id: 106, description: '×¤×– - ×“×œ×§ ×ž×ª×—× ×©×¤×™×™×', amount: -290, date: '2026-07-20', cat: '×“×œ×§ ×•×¨×›×‘', color: '#84CC16', emoji: 'â›½', account: 'Max' },
+  { id: 107, description: '×¡×•×¤×¨-×¤××¨× ×§× ×™×•×Ÿ ×¨× × ×™×', amount: -145, date: '2026-07-22', cat: '×‘×¨×™××•×ª', color: '#14B8A6', emoji: 'ðŸ¥', account: 'Max' },
+  { id: 108, description: '×¤×¨×˜× ×¨ ×ª×§×©×•×¨×ª', amount: -120, date: '2026-07-05', cat: '×ª×§×©×•×¨×ª', color: '#06B6D4', emoji: 'ðŸ“±', account: '×”×•×¨××ª ×§×‘×¢' },
+  { id: 109, description: '× ×˜×¤×œ×™×§×¡ ×—×•×“×©×™', amount: -65, date: '2026-07-03', cat: '×‘×™×“×•×¨', color: '#EC4899', emoji: 'ðŸŽ¬', account: 'Max' },
+  { id: 110, description: '×–××¨×” ×§× ×™×•×Ÿ ×¢×–×¨×™××œ×™', amount: -390, date: '2026-07-18', cat: '×§× ×™×•×ª', color: '#F59E0B', emoji: 'ðŸ›ï¸', account: 'Max' },
 ];
 
 const DEMO_INVESTMENTS: InvestmentState = {
@@ -70,10 +68,10 @@ const DEMO_INVESTMENTS: InvestmentState = {
   pensionValue: 240000,
   pensionYTD: 8.2,
   savings: [
-    { id: 1, name: 'פק"מ חודשי מתחדש', bank: 'בנק הפועלים', value: 35000, rate: 4.2 },
+    { id: 1, name: '×¤×§"×ž ×—×•×“×©×™ ×ž×ª×—×“×©', bank: '×‘× ×§ ×”×¤×•×¢×œ×™×', value: 35000, rate: 4.2 },
   ],
   moneyMarket: [
-    { id: 101, name: 'מגדל שקלים כספית', value: 50000, yield: 4.6 },
+    { id: 101, name: '×ž×’×“×œ ×©×§×œ×™× ×›×¡×¤×™×ª', value: 50000, yield: 4.6 },
   ],
   portfolioHoldings: [
     { id: 201, symbol: 'NVDA', name: 'NVIDIA Corporation', shares: 25, avgCost: 110, color: '#22C55E' },
@@ -87,13 +85,6 @@ const DEMO_INVESTMENTS: InvestmentState = {
   ],
 };
 
-export interface UserAppData {
-  profile: UserProfile;
-  transactions: Transaction[];
-  budgetPlan: BudgetPlanItem[];
-  investments: InvestmentState;
-  snapshots: Record<string, SnapshotItem[]>; // e.g. 'kerenValue' -> [{date, value}]
-}
 
 // Simple string hashing helper
 const hashString = (str: string): string => {
@@ -117,7 +108,7 @@ export class StorageService {
           id: 'demo_user_id',
           username: 'demo',
           passwordHash: hashString('123456'),
-          displayName: 'ישראל ישראלי',
+          displayName: '×™×©×¨××œ ×™×©×¨××œ×™',
           email: 'demo@finance.il',
           createdAt: new Date().toISOString(),
           profile: DEMO_PROFILE,
@@ -129,6 +120,7 @@ export class StorageService {
           budgetPlan: DEFAULT_BUDGET_PLAN,
           investments: DEMO_INVESTMENTS,
           snapshots: {
+            standingOrders: [],
             kerenValue: [
               { date: '2026-01-01', value: 78000 },
               { date: '2026-04-01', value: 81200 },
@@ -165,12 +157,12 @@ export class StorageService {
     const accounts = this.getAccounts();
     const cleanUser = username.trim().toLowerCase();
     if (accounts.some((a) => a.username.toLowerCase() === cleanUser)) {
-      throw new Error('שם המשתמש כבר קיים במערכת');
+      throw new Error('×©× ×”×ž×©×ª×ž×© ×›×‘×¨ ×§×™×™× ×‘×ž×¢×¨×›×ª');
     }
 
     const newId = 'u_' + Date.now();
     const defaultProfile: UserProfile = {
-      name: displayName.trim() || 'משתמש חדש',
+      name: displayName.trim() || '×ž×©×ª×ž×© ×—×“×©',
       netSalary: 0,
       grossSalary: 0,
       salaryDay: 10,
@@ -192,7 +184,7 @@ export class StorageService {
       id: newId,
       username: cleanUser,
       passwordHash: hashString(password),
-      displayName: displayName.trim() || 'משתמש חדש',
+      displayName: displayName.trim() || '×ž×©×ª×ž×© ×—×“×©',
       createdAt: new Date().toISOString(),
       profile: defaultProfile,
     };
@@ -215,6 +207,7 @@ export class StorageService {
         portfolioHistory: [],
       },
       snapshots: {},
+      standingOrders: [],
     };
 
     this.saveUserData(newId, initData);
@@ -237,7 +230,7 @@ export class StorageService {
     );
 
     if (!account) {
-      throw new Error('שם משתמש או סיסמה שגויים');
+      throw new Error('×©× ×ž×©×ª×ž×© ××• ×¡×™×¡×ž×” ×©×’×•×™×™×');
     }
 
     this.setActiveUserId(account.id);
@@ -251,7 +244,7 @@ export class StorageService {
       this.setActiveUserId(demo.id);
       return demo;
     }
-    return this.registerAccount('demo', '123456', 'ישראל ישראלי');
+    return this.registerAccount('demo', '123456', '×™×©×¨××œ ×™×©×¨××œ×™');
   }
 
   static logout(): void {
@@ -262,7 +255,9 @@ export class StorageService {
     try {
       const raw = localStorage.getItem(KEYS.DATA_PREFIX + userId);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.standingOrders) parsed.standingOrders = [];
+        return parsed;
       }
     } catch (e) {
       console.error('Error loading user data:', e);
@@ -275,11 +270,12 @@ export class StorageService {
         budgetPlan: DEFAULT_BUDGET_PLAN,
         investments: DEMO_INVESTMENTS,
         snapshots: {},
+        standingOrders: [],
       };
     }
     return {
       profile: {
-        name: 'משתמש חדש',
+        name: '×ž×©×ª×ž×© ×—×“×©',
         netSalary: 0,
         grossSalary: 0,
         salaryDay: 10,
@@ -308,6 +304,7 @@ export class StorageService {
         portfolioHistory: [],
       },
       snapshots: {},
+      standingOrders: [],
     };
   }
 
@@ -317,7 +314,7 @@ export class StorageService {
       const updated = { ...current, ...data };
       localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify(updated));
 
-      // Server sync — use in-memory token (always current, never stale closure)
+      // Server sync â€” use in-memory token (always current, never stale closure)
       const token = getMemToken();
       if (token) {
         fetch('/api/user/save', {
@@ -386,7 +383,7 @@ export class StorageService {
         d.getMonth() === now.getMonth() &&
         d.getFullYear() === now.getFullYear() &&
         t.amount > 0 &&
-        (t.cat === 'הכנסה' || t.description.includes('משכורת'))
+        (t.cat === '×”×›× ×¡×”' || t.description.includes('×ž×©×›×•×¨×ª'))
       );
     });
 
@@ -403,16 +400,16 @@ export class StorageService {
       year: 'numeric',
     }).format(now);
 
-    const cat = categorize('משכורת');
+    const cat = categorize('×ž×©×›×•×¨×ª');
     const newTx: Transaction = {
       id: Date.now(),
-      description: `משכורת חודשית — ${monthName}`,
+      description: `×ž×©×›×•×¨×ª ×—×•×“×©×™×ª â€” ${monthName}`,
       amount: Math.round(profile.netSalary * 100) / 100,
       date: dateStr,
       cat: cat.cat,
       color: cat.color,
       emoji: cat.emoji,
-      account: 'אוטומטי',
+      account: '××•×˜×•×ž×˜×™',
       auto: true,
     };
 
@@ -422,5 +419,62 @@ export class StorageService {
     const updatedTxs = [newTx, ...transactions];
     this.saveUserData(userId, { transactions: updatedTxs });
     return newTx;
+  }
+
+  static checkAutoStandingOrders(userId: string): Transaction[] {
+    const data = this.getUserData(userId);
+    const standingOrders: StandingOrder[] = data.standingOrders || [];
+    const { transactions } = data;
+    const now = new Date();
+    const today = now.getDate();
+    const monthKey = getMonthKey(now);
+    const trackKey = 'fil_so_m_' + userId;
+    let done: Record<string, string> = {};
+    try {
+      const raw = localStorage.getItem(trackKey);
+      if (raw) done = JSON.parse(raw);
+    } catch {}
+
+    const injected: Transaction[] = [];
+    const newTxs = [...transactions];
+
+    for (const so of standingOrders) {
+      if (!so.isActive) continue;
+      if (today < so.dayOfMonth) continue;
+      const soKey = String(so.id);
+      if (done[soKey] === monthKey) continue;
+      const acctTag = 'הוראת קבע:' + soKey;
+      const exists = transactions.some((t) => {
+        const d = new Date(t.date);
+        return (
+          t.account === acctTag &&
+          !isNaN(d.getTime()) &&
+          d.getMonth() === now.getMonth() &&
+          d.getFullYear() === now.getFullYear()
+        );
+      });
+      if (exists) { done[soKey] = monthKey; continue; }
+      const txDate = new Date(now.getFullYear(), now.getMonth(), so.dayOfMonth);
+      const newTx: Transaction = {
+        id: Date.now() + Math.random(),
+        description: so.description,
+        amount: so.amount,
+        date: txDate.toISOString().split('T')[0],
+        cat: so.cat,
+        color: so.color,
+        emoji: so.emoji,
+        account: acctTag,
+        auto: true,
+      };
+      newTxs.unshift(newTx);
+      injected.push(newTx);
+      done[soKey] = monthKey;
+    }
+
+    if (injected.length > 0) {
+      this.saveUserData(userId, { transactions: newTxs });
+      localStorage.setItem(trackKey, JSON.stringify(done));
+    }
+    return injected;
   }
 }

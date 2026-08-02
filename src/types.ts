@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FinanceIL - Application Types
  */
 
@@ -16,27 +16,41 @@ export interface UserProfile {
   name: string;
   netSalary: number;
   grossSalary: number;
-  salaryDay: number; // e.g. 10
-  creditDay: number; // e.g. 1
+  salaryDay: number;
+  creditDay: number;
   bankBalance: number;
   creditDebt: number;
   rent: number;
   rentDay: number;
   hasKeren: boolean;
-  kerenEmp: number; // employee % e.g. 2.5
-  kerenEr: number;  // employer % e.g. 7.5
+  kerenEmp: number;
+  kerenEr: number;
   hasPension: boolean;
-  pensionEmp: number; // employee % e.g. 6.0
-  pensionEr: number;  // employer % e.g. 14.83
+  pensionEmp: number;
+  pensionEr: number;
+  bituahLeumi?: number;
+  masHachnasa?: number;
   createdAt: string;
   onboardingDone?: boolean;
+}
+
+export interface StandingOrder {
+  id: string | number;
+  description: string;
+  amount: number;
+  dayOfMonth: number;
+  cat: string;
+  color: string;
+  emoji: string;
+  isActive: boolean;
+  account?: string;
 }
 
 export interface Transaction {
   id: string | number;
   description: string;
-  amount: number; // positive = income, negative = expense
-  date: string; // YYYY-MM-DD
+  amount: number;
+  date: string;
   cat: string;
   color: string;
   emoji: string;
@@ -65,7 +79,7 @@ export interface StockHolding {
   symbol: string;
   name: string;
   shares: number;
-  avgCost: number; // USD
+  avgCost: number;
   color: string;
   currentPrice?: number;
   changePercent?: number;
@@ -89,14 +103,14 @@ export interface SavingsAccount {
   name: string;
   bank: string;
   value: number;
-  rate: number; // annual %
+  rate: number;
 }
 
 export interface MoneyMarketFund {
   id: string | number;
   name: string;
   value: number;
-  yield: number; // annual %
+  yield: number;
 }
 
 export interface InvestmentState {
@@ -114,7 +128,7 @@ export interface InvestmentState {
 }
 
 export interface SnapshotItem {
-  date: string; // YYYY-MM-DD
+  date: string;
   value: number;
 }
 
@@ -124,9 +138,9 @@ export interface UserAppData {
   budgetPlan: BudgetPlanItem[];
   investments: InvestmentState;
   snapshots: Record<string, SnapshotItem[]>;
+  standingOrders: StandingOrder[];
 }
 
-// Finance-scraper microservice types
 export interface ScraperInstitution {
   id: string;
   company_id: string;
@@ -165,4 +179,3 @@ export interface PensionProfile {
   pension_current_balance: number;
   disability_pct: number;
 }
-

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { UserProfile, Transaction, BudgetPlanItem, StockHolding } from '../types';
+import { UserProfile, Transaction, BudgetPlanItem, StockHolding, StandingOrder } from '../types';
 import { calcBudget, spentPerBudget } from '../utils/categories';
 import { fmtILS, fmtUSD, fmtDate, daysUntil } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   AlertCircle,
   PieChart,
+  RefreshCw,
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -23,6 +24,7 @@ interface DashboardProps {
   budgetPlan: BudgetPlanItem[];
   holdings: StockHolding[];
   portfolioCash: number;
+  standingOrders: StandingOrder[];
   onAddTransaction: (tx: Transaction) => void;
   onUpdateCategory: (txId: string | number, newCat: string) => void;
   onNavigateToTab: (tab: string) => void;
@@ -34,6 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   budgetPlan,
   holdings,
   portfolioCash,
+  standingOrders,
   onAddTransaction,
   onUpdateCategory,
   onNavigateToTab,
@@ -167,6 +170,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6);
 
+  const upcomingSO = standingOrders
+    .filter((so) => so.isActive)
+    .map((so) => ({ so, daysLeft: daysUntil(so.dayOfMonth) }))
+    .filter((x) => x.daysLeft <= 14)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
   return (
     <div className="space-y-4 pb-32 text-right animate-fade-in">
       {/* Hero Card: Safe To Spend */}
@@ -241,6 +250,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="text-[11px] text-slate-500 mt-1 truncate">צבור: {fmtILS(creditCardAccumulated)}</div>
         </div>
       </div>
+
+            {/* Upcoming Standing Orders */}
+      {upcomingSO.length > 0 && (
+        <div className="bg-slate-900 border border-amber-500/20 rounded-3xl p-5 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-amber-400 font-bold">{upcomingSO.length} תשלומים קרובים</span>
+            <h3 className="font-bold text-white text-sm flex items-center gap-2">
+              <span>הוראות קבע קרובות</span>
+              <RefreshCw className="w-4 h-4 text-amber-400" />
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {upcomingSO.map(({ so, daysLeft }) => (
+              <div key={so.id} className="flex items-center gap-3 py-2 border-b border-slate-800 last:border-0">
+                <span className="text-base shrink-0">{so.emoji}</span>
+                <div className="flex-1 min-w-0 text-right">
+                  <p className="text-xs font-semibold text-white truncate">{so.description}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {daysLeft === 0 ? 'היום' : 'בעוד ' + daysLeft + ' ימים'}
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-red-400 font-num shrink-0">{fmtILS(so.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Investments Banner */}
       {holdings.length > 0 && (

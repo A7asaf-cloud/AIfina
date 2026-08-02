@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState } from './types';
+import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState, StandingOrder } from './types';
 import { StorageService } from './services/storage';
 import { useAuth, getMemToken } from './auth/AuthContext';
 import AuthPage from './auth/AuthPage';
@@ -62,6 +62,7 @@ export default function App() {
       const hasRealData = data.profile && (data.profile.netSalary > 0 || (data.transactions && data.transactions.length > 0));
       if (!data.profile?.onboardingDone && !localDone && !hasRealData) setNeedsOnboarding(true);
       const autoSalaryTx = StorageService.checkAutoSalary(authUser.id);
+      StorageService.checkAutoStandingOrders(authUser.id);
       if (autoSalaryTx) {
         setSalaryToast(autoSalaryTx.amount);
         setTimeout(() => setSalaryToast(null), 5000);
@@ -135,6 +136,31 @@ export default function App() {
     const updated = { ...appData, investments: updatedInv };
     setAppData(updated);
     StorageService.saveUserData(activeUser.id, { investments: updatedInv });
+  };
+
+
+  const handleAddStandingOrder = (so: StandingOrder) => {
+    if (!activeUser || !appData) return;
+    const orders = [...(appData.standingOrders || []), so];
+    const updated = { ...appData, standingOrders: orders };
+    setAppData(updated);
+    StorageService.saveUserData(activeUser.id, { standingOrders: orders });
+  };
+
+  const handleUpdateStandingOrder = (so: StandingOrder) => {
+    if (!activeUser || !appData) return;
+    const orders = (appData.standingOrders || []).map((o) => (o.id === so.id ? so : o));
+    const updated = { ...appData, standingOrders: orders };
+    setAppData(updated);
+    StorageService.saveUserData(activeUser.id, { standingOrders: orders });
+  };
+
+  const handleDeleteStandingOrder = (id: string | number) => {
+    if (!activeUser || !appData) return;
+    const orders = (appData.standingOrders || []).filter((o) => o.id !== id);
+    const updated = { ...appData, standingOrders: orders };
+    setAppData(updated);
+    StorageService.saveUserData(activeUser.id, { standingOrders: orders });
   };
 
   const handleLogout = () => { authLogout(); StorageService.logout(); setAppData(null); };
@@ -279,6 +305,7 @@ export default function App() {
             portfolioCash={appData.investments.portfolioCash || 0}
             onAddTransaction={handleAddTransaction}
             onUpdateCategory={handleUpdateCategory}
+            standingOrders={appData.standingOrders || []}
             onNavigateToTab={(t) => setActiveTab(t)}
           />
         )}
@@ -317,6 +344,10 @@ export default function App() {
             onUpdateBudget={handleUpdateBudget}
             onLogout={handleLogout}
             onResetData={handleResetData}
+            standingOrders={appData.standingOrders || []}
+            onAddStandingOrder={handleAddStandingOrder}
+            onUpdateStandingOrder={handleUpdateStandingOrder}
+            onDeleteStandingOrder={handleDeleteStandingOrder}
             onImportBackupData={handleImportBackup}
           />
         )}
