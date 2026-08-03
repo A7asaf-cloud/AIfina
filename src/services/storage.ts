@@ -417,7 +417,29 @@ export class StorageService {
     localStorage.setItem(salMonthsKey, JSON.stringify(doneMonths));
 
     const updatedTxs = [newTx, ...transactions];
-    this.saveUserData(userId, { transactions: updatedTxs });
+
+    // Auto-deposit to keren hishtalmut and pension
+    const inv = data.investments;
+    const updatedInv = { ...inv };
+    const updatedSnapshots = { ...data.snapshots };
+
+    if (profile.hasKeren && profile.grossSalary > 0) {
+      const kerenDeposit = Math.round(profile.grossSalary * ((profile.kerenEmp || 0) + (profile.kerenEr || 0)) / 100);
+      updatedInv.kerenValue = (inv.kerenValue || 0) + kerenDeposit;
+      const kerenSnaps = [...(updatedSnapshots.kerenValue || [])];
+      kerenSnaps.push({ date: dateStr, value: updatedInv.kerenValue });
+      updatedSnapshots.kerenValue = kerenSnaps;
+    }
+
+    if (profile.hasPension && profile.grossSalary > 0) {
+      const pensionDeposit = Math.round(profile.grossSalary * ((profile.pensionEmp || 0) + (profile.pensionEr || 0)) / 100);
+      updatedInv.pensionValue = (inv.pensionValue || 0) + pensionDeposit;
+      const pensionSnaps = [...(updatedSnapshots.pensionValue || [])];
+      pensionSnaps.push({ date: dateStr, value: updatedInv.pensionValue });
+      updatedSnapshots.pensionValue = pensionSnaps;
+    }
+
+    this.saveUserData(userId, { transactions: updatedTxs, investments: updatedInv, snapshots: updatedSnapshots });
     return newTx;
   }
 

@@ -6,6 +6,7 @@ import {
   SavingsAccount,
   MoneyMarketFund,
   StockHistoryItem,
+  SnapshotItem,
 } from '../types';
 import { fmtILS, fmtUSD, fmtDate } from '../utils/formatters';
 import { fetchStockQuoteClientSide } from '../utils/apiFallback';
@@ -27,6 +28,7 @@ import { ModalShell } from './ModalShell';
 interface InvestmentsTabProps {
   profile: UserProfile;
   investments: InvestmentState;
+  snapshots: Record<string, SnapshotItem[]>;
   onUpdateInvestments: (data: Partial<InvestmentState>) => void;
 }
 
@@ -123,6 +125,7 @@ function FundCard({ fund, balance, onClear }: {
 export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   profile,
   investments,
+  snapshots,
   onUpdateInvestments,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
@@ -881,7 +884,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               )}
             </div>
 
-            {/* Monthly deduction breakdown */}
+            {/* Monthly deduction + accumulation */}
             {profile.hasKeren && profile.grossSalary > 0 && (
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
                 <div className="text-xs font-bold text-slate-300 mb-3">הפרשה חודשית מהמשכורת</div>
@@ -899,6 +902,34 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 </div>
               </div>
             )}
+            {/* Accumulation history */}
+            {(() => {
+              const snaps = snapshots?.kerenValue || [];
+              if (snaps.length === 0) return null;
+              const last = snaps[snaps.length - 1];
+              const monthsCount = snaps.length;
+              const firstDate = snaps[0]?.date;
+              return (
+                <div className="bg-gradient-to-br from-amber-950/40 to-slate-950 border border-amber-500/20 rounded-2xl p-4 space-y-3">
+                  <div className="text-xs font-bold text-amber-400">📈 הצטברות עד עכשיו</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-lg font-black text-white font-num">{fmtILS(investments.kerenValue)}</div>
+                      <div className="text-[10px] text-slate-500">יתרה כוללת</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-black text-amber-400 font-num">{monthsCount}</div>
+                      <div className="text-[10px] text-slate-500">חודשים</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs font-bold text-slate-300">{last.date}</div>
+                      <div className="text-[10px] text-slate-500">הפקדה אחרונה</div>
+                    </div>
+                  </div>
+                  {firstDate && (<div className="text-[10px] text-slate-500 text-center">מאז {firstDate}</div>)}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -960,7 +991,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               )}
             </div>
 
-            {/* Monthly deduction breakdown */}
+            {/* Monthly deduction + accumulation */}
             {profile.hasPension && profile.grossSalary > 0 && (
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
                 <div className="text-xs font-bold text-slate-300 mb-3">הפרשה חודשית מהמשכורת</div>
@@ -982,6 +1013,34 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                 </div>
               </div>
             )}
+            {/* Accumulation history */}
+            {(() => {
+              const snaps = snapshots?.pensionValue || [];
+              if (snaps.length === 0) return null;
+              const last = snaps[snaps.length - 1];
+              const monthsCount = snaps.length;
+              const firstDate = snaps[0]?.date;
+              return (
+                <div className="bg-gradient-to-br from-purple-950/40 to-slate-950 border border-purple-500/20 rounded-2xl p-4 space-y-3">
+                  <div className="text-xs font-bold text-purple-400">📈 הצטברות עד עכשיו</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-lg font-black text-white font-num">{fmtILS(investments.pensionValue)}</div>
+                      <div className="text-[10px] text-slate-500">יתרה כוללת</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-black text-purple-400 font-num">{monthsCount}</div>
+                      <div className="text-[10px] text-slate-500">חודשים</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs font-bold text-slate-300">{last.date}</div>
+                      <div className="text-[10px] text-slate-500">הפקדה אחרונה</div>
+                    </div>
+                  </div>
+                  {firstDate && (<div className="text-[10px] text-slate-500 text-center">מאז {firstDate}</div>)}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

@@ -161,10 +161,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const daysToSalary = daysUntil(profile.salaryDay || 10);
   const daysToCredit = daysUntil(profile.creditDay || 1);
 
-  const stockPortfolioVal = holdings.reduce(
-    (s, h) => s + h.shares * (h.avgCost || 0),
-    0
-  );
+  const stockPortfolioCost = holdings.reduce((s, h) => s + h.shares * (h.avgCost || 0), 0);
+  const stockPortfolioVal = holdings.reduce((s, h) => s + h.shares * (h.currentPrice || h.avgCost || 0), 0);
+  const stockPortfolioGain = stockPortfolioVal - stockPortfolioCost;
 
   const recentTxs = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

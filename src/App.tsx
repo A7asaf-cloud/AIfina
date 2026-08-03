@@ -331,6 +331,7 @@ export default function App() {
           <InvestmentsTab
             profile={appData.profile}
             investments={appData.investments}
+            snapshots={appData.snapshots || {}}
             onUpdateInvestments={handleUpdateInvestments}
           />
         )}
