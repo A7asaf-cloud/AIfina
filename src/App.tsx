@@ -296,6 +296,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto px-4 pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+        <div key={activeTab} className="tab-content">
         {activeTab === 'dashboard' && (
           <Dashboard
             profile={appData.profile}
@@ -351,6 +352,7 @@ export default function App() {
             onImportBackupData={handleImportBackup}
           />
         )}
+        </div>
       </main>
 
       {/* Fixed Bottom Navigation */}
