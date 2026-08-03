@@ -163,6 +163,13 @@ export default function App() {
     StorageService.saveUserData(activeUser.id, { standingOrders: orders });
   };
 
+  const handleUpdateSnapshots = (newSnapshots: Record<string, import('./types').SnapshotItem[]>) => {
+    if (!activeUser || !appData) return;
+    const updated = { ...appData, snapshots: newSnapshots };
+    setAppData(updated);
+    StorageService.saveUserData(activeUser.id, { snapshots: newSnapshots });
+  };
+
   const handleLogout = () => { authLogout(); StorageService.logout(); setAppData(null); };
 
   const handleResetData = () => {
@@ -333,6 +340,7 @@ export default function App() {
             investments={appData.investments}
             snapshots={appData.snapshots || {}}
             onUpdateInvestments={handleUpdateInvestments}
+            onUpdateSnapshots={handleUpdateSnapshots}
           />
         )}
 

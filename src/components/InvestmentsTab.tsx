@@ -30,6 +30,7 @@ interface InvestmentsTabProps {
   investments: InvestmentState;
   snapshots: Record<string, SnapshotItem[]>;
   onUpdateInvestments: (data: Partial<InvestmentState>) => void;
+  onUpdateSnapshots: (s: Record<string, SnapshotItem[]>) => void;
 }
 
 function FundCard({ fund, balance, onClear }: {
@@ -127,6 +128,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   investments,
   snapshots,
   onUpdateInvestments,
+  onUpdateSnapshots,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
     'returns' | 'stocks' | 'keren' | 'pension' | 'savings' | 'mm'
@@ -404,6 +406,8 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
   const [kerenInput, setKerenInput] = useState(
     investments.kerenValue ? String(investments.kerenValue) : ''
   );
+  const [kerenStartDate, setKerenStartDate] = useState<string>(() => snapshots?.kerenValue?.[0]?.date || '');
+  const [pensionStartDate, setPensionStartDate] = useState<string>(() => snapshots?.pensionValue?.[0]?.date || '');
   const [pensionInput, setPensionInput] = useState(
     investments.pensionValue ? String(investments.pensionValue) : ''
   );
@@ -561,6 +565,14 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
     const v = parseFloat(kerenInput);
     if (!isNaN(v) && v >= 0) {
       onUpdateInvestments({ kerenValue: v, kerenTrack: kerenTrack || undefined });
+      if (kerenStartDate) {
+        const existingSnaps = snapshots?.kerenValue || [];
+        const hasDate = existingSnaps.some(s => s.date === kerenStartDate);
+        if (!hasDate) {
+          const newSnaps = { ...snapshots, kerenValue: [{ date: kerenStartDate, value: v }, ...existingSnaps.filter(s => s.date !== kerenStartDate)].sort((a, b) => a.date.localeCompare(b.date)) };
+          onUpdateSnapshots(newSnaps);
+        }
+      }
     }
   };
 
@@ -568,6 +580,14 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
     const v = parseFloat(pensionInput);
     if (!isNaN(v) && v >= 0) {
       onUpdateInvestments({ pensionValue: v, pensionTrack: pensionTrack || undefined });
+      if (pensionStartDate) {
+        const existingSnaps = snapshots?.pensionValue || [];
+        const hasDate = existingSnaps.some(s => s.date === pensionStartDate);
+        if (!hasDate) {
+          const newSnaps = { ...snapshots, pensionValue: [{ date: pensionStartDate, value: v }, ...existingSnaps.filter(s => s.date !== pensionStartDate)].sort((a, b) => a.date.localeCompare(b.date)) };
+          onUpdateSnapshots(newSnaps);
+        }
+      }
     }
   };
 
@@ -845,7 +865,12 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">שווי נוכחי בקרן (₪)</label>
               <div className="flex gap-2">
-                <input type="number" value={kerenInput} onChange={(e) => setKerenInput(e.target.value)}
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">תאריך תחילת חיסכון (לצורך מעקב)</label>
+              <input type="date" value={kerenStartDate} onChange={(e) => setKerenStartDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none mb-3"
+                max={new Date().toISOString().split('T')[0]} />
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">יתרה נוכחית (₪)</label>
+              <input type="number" value={kerenInput} onChange={(e) => setKerenInput(e.target.value)}
                   placeholder="85000"
                   className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
                 <button onClick={handleSaveKeren}
@@ -903,9 +928,8 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             )}
             {/* Accumulation history */}
-            {(() => {
-              const snaps = snapshots?.kerenValue || [];
-              if (snaps.length === 0) return null;
+            {investments.kerenValue > 0 && (() => {
+              const snaps = (snapshots?.kerenValue || []).slice().sort((a, b) => a.date.localeCompare(b.date));
               const last = snaps[snaps.length - 1];
               const monthsCount = snaps.length;
               const firstDate = snaps[0]?.date;
@@ -926,7 +950,8 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                       <div className="text-[10px] text-slate-500">הפקדה אחרונה</div>
                     </div>
                   </div>
-                  {firstDate && (<div className="text-[10px] text-slate-500 text-center">מאז {firstDate}</div>)}
+                  {firstDate && <div className="text-[10px] text-slate-500 text-center">מאז {firstDate}</div>}
+                  {snaps.length === 0 && <div className="text-[10px] text-amber-400/70 text-center pt-1">הגדר תאריך תחילת חיסכון ולחץ עדכן</div>}
                 </div>
               );
             })()}
@@ -952,7 +977,12 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">שווי נוכחי בפנסיה (₪)</label>
               <div className="flex gap-2">
-                <input type="number" value={pensionInput} onChange={(e) => setPensionInput(e.target.value)}
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">תאריך תחילת חיסכון (לצורך מעקב)</label>
+              <input type="date" value={pensionStartDate} onChange={(e) => setPensionStartDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none mb-3"
+                max={new Date().toISOString().split('T')[0]} />
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">יתרה נוכחית (₪)</label>
+              <input type="number" value={pensionInput} onChange={(e) => setPensionInput(e.target.value)}
                   placeholder="240000"
                   className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
                 <button onClick={handleSavePension}
@@ -1014,9 +1044,8 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
               </div>
             )}
             {/* Accumulation history */}
-            {(() => {
-              const snaps = snapshots?.pensionValue || [];
-              if (snaps.length === 0) return null;
+            {investments.pensionValue > 0 && (() => {
+              const snaps = (snapshots?.pensionValue || []).slice().sort((a, b) => a.date.localeCompare(b.date));
               const last = snaps[snaps.length - 1];
               const monthsCount = snaps.length;
               const firstDate = snaps[0]?.date;
@@ -1037,7 +1066,8 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                       <div className="text-[10px] text-slate-500">הפקדה אחרונה</div>
                     </div>
                   </div>
-                  {firstDate && (<div className="text-[10px] text-slate-500 text-center">מאז {firstDate}</div>)}
+                  {firstDate && <div className="text-[10px] text-slate-500 text-center">מאז {firstDate}</div>}
+                  {snaps.length === 0 && <div className="text-[10px] text-purple-400/70 text-center pt-1">הגדר תאריך תחילת חיסכון ולחץ עדכן</div>}
                 </div>
               );
             })()}
