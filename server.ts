@@ -1006,6 +1006,8 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
   app.get('/api/user/load/:userId', (req, res) => {
     try {
       const userId = req.params.userId;
+      const reqUserId = (req as any).userId;
+      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
       const data = readUserDataOnServer(userId);
       if (!data) {
         return res.status(404).json({ error: 'לא נמצאו נתונים עבור משתמש זה' });
@@ -1022,14 +1024,14 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
       if (!userId || !data) {
         return res.status(400).json({ error: 'נתונים חסרים לשמירה' });
       }
+      const reqUserId = (req as any).userId;
+      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
       writeUserDataOnServer(userId, data);
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'שגיאה בשמירת נתונים' });
     }
   });
-
-  // Vite middleware in dev mode
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

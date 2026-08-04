@@ -6,6 +6,7 @@ import OTPScreen from './OTPScreen';
 export default function AuthPage() {
   const { applySession } = useAuth();
   const [stage, setStage]           = useState<'entry' | 'otp'>('entry');
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [email, setEmail]           = useState('');
   const [sending, setSending]       = useState(false);
@@ -89,7 +90,18 @@ export default function AuthPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           {/* Google */}
           <button
-            onClick={() => { window.location.href = '/auth/google'; }}
+            onClick={async () => {
+              setGoogleLoading(true);
+              try {
+                const probe = await fetch('/auth/google', { redirect: 'manual' });
+                if (probe.status === 501) {
+                  alert('כניסה עם Google אינה מוגדרת. צור קשר עם מנהל המערכת.');
+                  setGoogleLoading(false);
+                  return;
+                }
+              } catch {}
+              window.location.href = '/auth/google';
+            }}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm py-3 rounded-2xl transition mb-4"
           >
             <GoogleIcon />

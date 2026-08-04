@@ -1,13 +1,20 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-const JWT_SECRET     = () => process.env.JWT_SECRET          || 'aifina-default-secret-key-change-in-production';
+const JWT_SECRET     = () => {
+  const s = process.env.JWT_SECRET;
+  if (!s || s === 'aifina-default-secret-key-change-in-production') console.warn('[AUTH] WARNING: JWT_SECRET not set — using insecure default. Set JWT_SECRET in .env');
+  return s || 'aifina-default-secret-key-change-in-production';
+};
 const REFRESH_SECRET = () => process.env.JWT_REFRESH_SECRET  || process.env.JWT_SECRET || 'aifina-refresh-secret-key-change-in-production';
 const ACCESS_EXPIRE_SEC   = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || '15') * 60;
 const REFRESH_EXPIRE_DAYS = () => parseInt(process.env.REFRESH_TOKEN_EXPIRE_DAYS   || '30');
 
 export const GOOGLE_REDIRECT_URI = () =>
-  process.env.GOOGLE_REDIRECT_URI || 'https://aifina.ai.studio/auth/google/callback';
+  process.env.GOOGLE_REDIRECT_URI ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://aifina.ai.studio/auth/google/callback'
+    : 'http://localhost:3000/auth/google/callback');
 
 export function hashOtp(email: string, code: string): string {
   return crypto.createHash('sha256').update(`${email.toLowerCase().trim()}:${code}`).digest('hex');
