@@ -6,6 +6,25 @@ import { CONFIG } from '../config';
 
 export async function generateGeminiContentClient(apiKey: string, contents: any): Promise<string> {
   const models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  // If no local key — try server proxy first (uses server GEMINI_API_KEY from .env)
+  if (!apiKey) {
+    try {
+      const res = await fetch('/api/gemini/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ contents }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.text) return data.text;
+      }
+    } catch (e) {
+      console.warn('Server Gemini proxy failed', e);
+    }
+    throw new Error('מפתח Gemini לא מוגדר. הגדר GEMINI_API_KEY בשרת או הזן מפתח בהגדרות.');
+  }
+
   let lastError: any = null;
 
   for (const model of models) {

@@ -439,6 +439,21 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
     }
   });
 
+  // Generic Gemini proxy — uses server GEMINI_API_KEY, no client key needed
+  app.post('/api/gemini/proxy', async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY לא מוגדר בשרת' });
+      const { contents } = req.body;
+      if (!contents) return res.status(400).json({ error: 'contents חסר' });
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await generateGeminiContent(ai, { contents });
+      return res.json({ text: response.text || '' });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message || 'שגיאת Gemini' });
+    }
+  });
+
   // Google Finance Quote Scraper Fallback
   async function fetchGoogleQuote(symbol: string) {
     let cleanSymbol = symbol.trim();

@@ -91,10 +91,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     try {
       const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-      if (!customKey) {
-        setAiError('מפתח GEMINI_API_KEY חסר. הגדר אותו תחילה בהגדרות.');
-        return;
-      }
       const insights = await handleClientFallback(customKey);
       setAiInsights(insights);
     } catch (err: any) {
