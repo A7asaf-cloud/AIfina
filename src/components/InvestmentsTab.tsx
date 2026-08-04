@@ -945,7 +945,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                       <div className="text-[10px] text-slate-500">חודשים</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs font-bold text-slate-300">{last.date}</div>
+                      <div className="text-xs font-bold text-slate-300">{last?.date || '—'}</div>
                       <div className="text-[10px] text-slate-500">הפקדה אחרונה</div>
                     </div>
                   </div>
@@ -1060,7 +1060,7 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
                       <div className="text-[10px] text-slate-500">חודשים</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs font-bold text-slate-300">{last.date}</div>
+                      <div className="text-xs font-bold text-slate-300">{last?.date || '—'}</div>
                       <div className="text-[10px] text-slate-500">הפקדה אחרונה</div>
                     </div>
                   </div>
