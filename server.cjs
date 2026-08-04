@@ -37,11 +37,15 @@ var import_crypto2 = __toESM(require("crypto"), 1);
 // server/authUtils.ts
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
-var JWT_SECRET = () => process.env.JWT_SECRET || "aifina-default-secret-key-change-in-production";
+var JWT_SECRET = () => {
+  const s = process.env.JWT_SECRET;
+  if (!s || s === "aifina-default-secret-key-change-in-production") console.warn("[AUTH] WARNING: JWT_SECRET not set \u2014 using insecure default. Set JWT_SECRET in .env");
+  return s || "aifina-default-secret-key-change-in-production";
+};
 var REFRESH_SECRET = () => process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "aifina-refresh-secret-key-change-in-production";
 var ACCESS_EXPIRE_SEC = () => parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || "15") * 60;
 var REFRESH_EXPIRE_DAYS = () => parseInt(process.env.REFRESH_TOKEN_EXPIRE_DAYS || "30");
-var GOOGLE_REDIRECT_URI = () => process.env.GOOGLE_REDIRECT_URI || "https://aifina.ai.studio/auth/google/callback";
+var GOOGLE_REDIRECT_URI = () => process.env.GOOGLE_REDIRECT_URI || (process.env.NODE_ENV === "production" ? "https://aifina.ai.studio/auth/google/callback" : "http://localhost:3000/auth/google/callback");
 function hashOtp(email, code) {
   return import_crypto.default.createHash("sha256").update(`${email.toLowerCase().trim()}:${code}`).digest("hex");
 }
@@ -1763,6 +1767,8 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
   app.get("/api/user/load/:userId", (req, res) => {
     try {
       const userId = req.params.userId;
+      const reqUserId = req.userId;
+      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
       const data = readUserDataOnServer(userId);
       if (!data) {
         return res.status(404).json({ error: "\u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0\u05D5 \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05E2\u05D1\u05D5\u05E8 \u05DE\u05E9\u05EA\u05DE\u05E9 \u05D6\u05D4" });
@@ -1778,6 +1784,8 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       if (!userId || !data) {
         return res.status(400).json({ error: "\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05D7\u05E1\u05E8\u05D9\u05DD \u05DC\u05E9\u05DE\u05D9\u05E8\u05D4" });
       }
+      const reqUserId = req.userId;
+      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
       writeUserDataOnServer(userId, data);
       res.json({ success: true });
     } catch (e) {
