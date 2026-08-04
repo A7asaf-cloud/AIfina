@@ -863,14 +863,13 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
           <div className="space-y-4 pt-2">
             {/* Current value */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">שווי נוכחי בקרן (₪)</label>
-              <div className="flex gap-2">
-                <label className="block text-[10px] font-semibold text-slate-400 mb-1">תאריך תחילת חיסכון (לצורך מעקב)</label>
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">תאריך תחילת חיסכון</label>
               <input type="date" value={kerenStartDate} onChange={(e) => setKerenStartDate(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none mb-3"
                 max={new Date().toISOString().split('T')[0]} />
-              <label className="block text-[10px] font-semibold text-slate-400 mb-1">יתרה נוכחית (₪)</label>
-              <input type="number" value={kerenInput} onChange={(e) => setKerenInput(e.target.value)}
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">יתרה נוכחית בקרן (₪)</label>
+              <div className="flex gap-2">
+                <input type="number" value={kerenInput} onChange={(e) => setKerenInput(e.target.value)}
                   placeholder="85000"
                   className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
                 <button onClick={handleSaveKeren}
@@ -975,18 +974,17 @@ export const InvestmentsTab: React.FC<InvestmentsTabProps> = ({
           <div className="space-y-4 pt-2">
             {/* Current value */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">שווי נוכחי בפנסיה (₪)</label>
-              <div className="flex gap-2">
-                <label className="block text-[10px] font-semibold text-slate-400 mb-1">תאריך תחילת חיסכון (לצורך מעקב)</label>
+              <label className="block text-[10px] font-semibold text-slate-400 mb-1">תאריך תחילת חיסכון</label>
               <input type="date" value={pensionStartDate} onChange={(e) => setPensionStartDate(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none mb-3"
                 max={new Date().toISOString().split('T')[0]} />
-              <label className="block text-[10px] font-semibold text-slate-400 mb-1">יתרה נוכחית (₪)</label>
-              <input type="number" value={pensionInput} onChange={(e) => setPensionInput(e.target.value)}
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">יתרה נוכחית בפנסיה (₪)</label>
+              <div className="flex gap-2">
+                <input type="number" value={pensionInput} onChange={(e) => setPensionInput(e.target.value)}
                   placeholder="240000"
-                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
+                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-3 text-white text-sm outline-none font-num" />
                 <button onClick={handleSavePension}
-                  className="px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer">
+                  className="px-5 bg-purple-500 hover:bg-purple-400 text-white font-bold text-sm rounded-xl cursor-pointer">
                   עדכן
                 </button>
               </div>
