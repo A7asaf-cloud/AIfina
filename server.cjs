@@ -1275,6 +1275,19 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       });
     }
   });
+  app.post("/api/gemini/proxy", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(503).json({ error: "GEMINI_API_KEY \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8 \u05D1\u05E9\u05E8\u05EA" });
+      const { contents } = req.body;
+      if (!contents) return res.status(400).json({ error: "contents \u05D7\u05E1\u05E8" });
+      const ai = new import_genai.GoogleGenAI({ apiKey });
+      const response = await generateGeminiContent(ai, { contents });
+      return res.json({ text: response.text || "" });
+    } catch (e) {
+      return res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05EA Gemini" });
+    }
+  });
   async function fetchGoogleQuote(symbol) {
     let cleanSymbol = symbol.trim();
     let exchange = "";
