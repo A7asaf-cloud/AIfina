@@ -4,8 +4,8 @@ import { UserProfile, BudgetPlanItem, UserAccount, StandingOrder } from '../type
 import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
 import { generateGeminiContentClient } from '../utils/apiFallback';
 import { fmtILS } from '../utils/formatters';
-import { Card, SectionTitle, Button, ProgressBar, showToast, showToastError } from './ui';
-import { User, LogOut, Download, Upload, CheckCircle2, Key, Sparkles, Eye, EyeOff, Plus, Trash2, Edit2, X, RefreshCw, PieChart } from 'lucide-react';
+import { Card, SectionTitle, Button, ProgressBar, showToast, showToastError, useConfirm } from './ui';
+import { LogOut, Download, Upload, CheckCircle2, Sparkles, Eye, Plus, Trash2, Edit2, X } from 'lucide-react';
 
 const CAT_OPTIONS = Object.entries(CATEGORIES).filter(([k]) => k !== 'הכנסה').map(([k, v]) => ({ key: k, color: v.color, emoji: v.emoji }));
 
@@ -52,6 +52,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [testingKey, setTestingKey] = useState(false);
   const [soForm, setSoForm] = useState<Omit<StandingOrder, 'id'> | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
+  const confirm = useConfirm();
 
   const handleSaveGeminiKey = (e: React.FormEvent) => { e.preventDefault(); const t = geminiKeyInput.trim(); if (t) localStorage.setItem('fil_gemini_api_key', t); else localStorage.removeItem('fil_gemini_api_key'); showToast('המפתח נשמר ✓', 'success'); };
 
@@ -246,7 +247,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <button onClick={exportBackupJSON} className="flex items-center justify-center gap-2 py-3 bg-surface border border-line hover:border-primary text-ink text-sm font-bold rounded-xl cursor-pointer"><Download className="w-4 h-4 text-primary" />הורד גיבוי</button>
             <label className="flex items-center justify-center gap-2 py-3 bg-surface border border-line text-ink text-sm font-bold rounded-xl cursor-pointer"><Upload className="w-4 h-4 text-primary" />טען מגיבוי<input type="file" accept=".json" onChange={importBackupJSON} className="hidden" /></label>
           </div>
-          <button onClick={() => { if (confirm('לאפס נתונים?')) onResetData(); }} className="w-full py-3 bg-[#FF647C]/10 hover:bg-[#FF647C]/20 text-expense border border-[#FF647C]/20 font-bold text-sm rounded-xl cursor-pointer">איפוס נתונים</button>
+          <button onClick={async () => { const ok = await confirm('איפוס נתונים', 'האם אתה בטוח שברצונך לאפס את כל הנתונים? פעולה זו אינה ניתנת לביטול.', 'danger'); if (!ok) return; onResetData(); }} className="w-full py-3 bg-[#FF647C]/10 hover:bg-[#FF647C]/20 text-expense border border-[#FF647C]/20 font-bold text-sm rounded-xl cursor-pointer">איפוס נתונים</button>
         </Card>
       </div>
     </div>

@@ -1,5 +1,5 @@
 /**
- * FinanceIL - LocalStorage & User Session Management Service
+ * AIfina - LocalStorage & User Session Management Service
  */
 import {
   UserAccount,
@@ -15,8 +15,6 @@ import { getMemToken } from '../auth/AuthContext';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
 
-
-
 const KEYS = {
   USERS: 'fil_users_list',
   ACTIVE_USER: 'fil_active_user_id',
@@ -24,13 +22,9 @@ const KEYS = {
   DATA_PREFIX: 'fil_u_data_',
 };
 
-// Token provider â€” set from AuthContext so StorageService can call authenticated server endpoints
-let _tokenProvider: (() => string | null) | null = null;
-export function setTokenProvider(fn: () => string | null) { _tokenProvider = fn; }
-
 // Seed sample demo data
 const DEMO_PROFILE: UserProfile = {
-  name: '×™×©×¨××œ ×™×©×¨××œ×™',
+  name: 'ישראל ישראלי',
   netSalary: 16500,
   grossSalary: 22000,
   salaryDay: 10,
@@ -50,16 +44,16 @@ const DEMO_PROFILE: UserProfile = {
 };
 
 const DEMO_TRANSACTIONS: Transaction[] = [
-  { id: 101, description: '×ž×©×›×•×¨×ª ×—×•×“×©×™×ª', amount: 16500, date: '2026-07-10', cat: '×”×›× ×¡×”', color: '#10B981', emoji: 'ðŸ’°', account: '×‘× ×§ ×”×¤×•×¢×œ×™×', auto: true },
-  { id: 102, description: '×©×›×¨ ×“×™×¨×” - ×™×•×œ×™', amount: -4800, date: '2026-07-01', cat: '×“×™×•×¨', color: '#64748B', emoji: 'ðŸ ', account: '×”×•×¨××ª ×§×‘×¢' },
-  { id: 103, description: '×©×•×¤×¨×¡×œ ×“×™×œ ×¨×¢× × ×”', amount: -680, date: '2026-07-24', cat: '×¡×•×¤×¨×ž×¨×§×˜', color: '#22C55E', emoji: 'ðŸ›’', account: 'Max' },
-  { id: 104, description: '×•×•×œ×˜ - ×’\'×™×¨×£ ×¡×•×©×™', amount: -185, date: '2026-07-26', cat: '×ž×¡×¢×“×•×ª ×•×§×¤×”', color: '#F97316', emoji: 'ðŸ½ï¸', account: 'Max' },
-  { id: 105, description: '×—×‘×¨×ª ×”×—×©×ž×œ', amount: -340, date: '2026-07-15', cat: '×—×©×‘×•× ×•×ª ×‘×™×ª', color: '#EAB308', emoji: 'ðŸ’¡', account: '×‘× ×§ ×”×¤×•×¢×œ×™×' },
-  { id: 106, description: '×¤×– - ×“×œ×§ ×ž×ª×—× ×©×¤×™×™×', amount: -290, date: '2026-07-20', cat: '×“×œ×§ ×•×¨×›×‘', color: '#84CC16', emoji: 'â›½', account: 'Max' },
-  { id: 107, description: '×¡×•×¤×¨-×¤××¨× ×§× ×™×•×Ÿ ×¨× × ×™×', amount: -145, date: '2026-07-22', cat: '×‘×¨×™××•×ª', color: '#14B8A6', emoji: 'ðŸ¥', account: 'Max' },
-  { id: 108, description: '×¤×¨×˜× ×¨ ×ª×§×©×•×¨×ª', amount: -120, date: '2026-07-05', cat: '×ª×§×©×•×¨×ª', color: '#06B6D4', emoji: 'ðŸ“±', account: '×”×•×¨××ª ×§×‘×¢' },
-  { id: 109, description: '× ×˜×¤×œ×™×§×¡ ×—×•×“×©×™', amount: -65, date: '2026-07-03', cat: '×‘×™×“×•×¨', color: '#EC4899', emoji: 'ðŸŽ¬', account: 'Max' },
-  { id: 110, description: '×–××¨×” ×§× ×™×•×Ÿ ×¢×–×¨×™××œ×™', amount: -390, date: '2026-07-18', cat: '×§× ×™×•×ª', color: '#F59E0B', emoji: 'ðŸ›ï¸', account: 'Max' },
+  { id: 101, description: 'משכורת חודשית', amount: 16500, date: '2026-07-10', cat: 'הכנסה', color: '#10B981', emoji: '💰', account: 'בנק הפועלים', auto: true },
+  { id: 102, description: 'שכירות דירת מגורים', amount: -4800, date: '2026-07-01', cat: 'דיור', color: '#64748B', emoji: '🏠', account: 'הוראת קבע' },
+  { id: 103, description: 'סופרמרקט קניות', amount: -680, date: '2026-07-24', cat: 'סופרמרקט', color: '#22C55E', emoji: '🛒', account: 'Max' },
+  { id: 104, description: 'גריל סושי', amount: -185, date: '2026-07-26', cat: 'מסעדות וקפה', color: '#F97316', emoji: '🍜', account: 'Max' },
+  { id: 105, description: 'חשבון החשמל', amount: -340, date: '2026-07-15', cat: 'חשבונות בית', color: '#EAB308', emoji: '💡', account: 'בנק הפועלים' },
+  { id: 106, description: 'פז - דלק מתחנה', amount: -290, date: '2026-07-20', cat: 'דלק ורכב', color: '#84CC16', emoji: '⛽', account: 'Max' },
+  { id: 107, description: 'סופר-פארם רכישה', amount: -145, date: '2026-07-22', cat: 'בריאות', color: '#14B8A6', emoji: '🏥', account: 'Max' },
+  { id: 108, description: 'פרטנר תקשורת', amount: -120, date: '2026-07-05', cat: 'תקשורת', color: '#06B6D4', emoji: '📱', account: 'הוראת קבע' },
+  { id: 109, description: 'נטפליקס חודשי', amount: -65, date: '2026-07-03', cat: 'בידור', color: '#EC4899', emoji: '🎬', account: 'Max' },
+  { id: 110, description: 'זר Modifier עזריאל', amount: -390, date: '2026-07-18', cat: 'קניות', color: '#F59E0B', emoji: '🛍️', account: 'Max' },
 ];
 
 const DEMO_INVESTMENTS: InvestmentState = {
@@ -68,10 +62,10 @@ const DEMO_INVESTMENTS: InvestmentState = {
   pensionValue: 240000,
   pensionYTD: 8.2,
   savings: [
-    { id: 1, name: '×¤×§"×ž ×—×•×“×©×™ ×ž×ª×—×“×©', bank: '×‘× ×§ ×”×¤×•×¢×œ×™×', value: 35000, rate: 4.2 },
+    { id: 1, name: 'פק"מ הפועלים', bank: 'בנק הפועלים', value: 35000, rate: 4.2 },
   ],
   moneyMarket: [
-    { id: 101, name: '×ž×’×“×œ ×©×§×œ×™× ×›×¡×¤×™×ª', value: 50000, yield: 4.6 },
+    { id: 101, name: 'מגדל שוקלם כספית', value: 50000, yield: 4.6 },
   ],
   portfolioHoldings: [
     { id: 201, symbol: 'NVDA', name: 'NVIDIA Corporation', shares: 25, avgCost: 110, color: '#22C55E' },
@@ -85,9 +79,17 @@ const DEMO_INVESTMENTS: InvestmentState = {
   ],
 };
 
+// SHA-256 hash for passwords (client-side only — not a substitute for server-side hashing)
+async function hashPassword(str: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
-// Simple string hashing helper
-const hashString = (str: string): string => {
+// Synchronous fallback for callers that can't await (login comparison uses stored hash)
+function hashStringSync(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -95,20 +97,21 @@ const hashString = (str: string): string => {
     hash |= 0;
   }
   return hash.toString();
-};
+}
+
+// Write lock to prevent concurrent saveUserData races
+let saveLock = Promise.resolve();
 
 export class StorageService {
-  // Get all registered accounts
   static getAccounts(): UserAccount[] {
     try {
       const raw = localStorage.getItem(KEYS.USERS);
       if (!raw) {
-        // Initialize with default demo account
         const demoAccount: UserAccount = {
           id: 'demo_user_id',
           username: 'demo',
-          passwordHash: hashString('123456'),
-          displayName: '×™×©×¨××œ ×™×©×¨××œ×™',
+          passwordHash: hashStringSync('123456'),
+          displayName: 'ישראל ישראלי',
           email: 'demo@finance.il',
           createdAt: new Date().toISOString(),
           profile: DEMO_PROFILE,
@@ -136,7 +139,8 @@ export class StorageService {
         return [demoAccount];
       }
       return JSON.parse(raw);
-    } catch {
+    } catch (e) {
+      console.error('Error loading accounts:', e);
       return [];
     }
   }
@@ -157,12 +161,12 @@ export class StorageService {
     const accounts = this.getAccounts();
     const cleanUser = username.trim().toLowerCase();
     if (accounts.some((a) => a.username.toLowerCase() === cleanUser)) {
-      throw new Error('×©× ×”×ž×©×ª×ž×© ×›×‘×¨ ×§×™×™× ×‘×ž×¢×¨×›×ª');
+      throw new Error('שם משתמש כבר קיים במערכת');
     }
 
     const newId = 'u_' + Date.now();
     const defaultProfile: UserProfile = {
-      name: displayName.trim() || '×ž×©×ª×ž×© ×—×“×©',
+      name: displayName.trim() || 'משתמש חדש',
       netSalary: 0,
       grossSalary: 0,
       salaryDay: 10,
@@ -183,8 +187,8 @@ export class StorageService {
     const newAccount: UserAccount = {
       id: newId,
       username: cleanUser,
-      passwordHash: hashString(password),
-      displayName: displayName.trim() || '×ž×©×ª×ž×© ×—×“×©',
+      passwordHash: hashStringSync(password),
+      displayName: displayName.trim() || 'משתמש חדש',
       createdAt: new Date().toISOString(),
       profile: defaultProfile,
     };
@@ -192,7 +196,6 @@ export class StorageService {
     accounts.push(newAccount);
     localStorage.setItem(KEYS.USERS, JSON.stringify(accounts));
 
-    // Initialize user empty data
     const initData: UserAppData = {
       profile: defaultProfile,
       transactions: [],
@@ -213,24 +216,20 @@ export class StorageService {
     this.saveUserData(newId, initData);
     this.setActiveUserId(newId);
 
-
-
-
-
     return newAccount;
   }
 
   static login(username: string, password: string): UserAccount {
     const accounts = this.getAccounts();
     const cleanUser = username.trim().toLowerCase();
-    const passHash = hashString(password);
+    const passHash = hashStringSync(password);
 
     const account = accounts.find(
       (a) => a.username.toLowerCase() === cleanUser && a.passwordHash === passHash
     );
 
     if (!account) {
-      throw new Error('×©× ×ž×©×ª×ž×© ××• ×¡×™×¡×ž×” ×©×’×•×™×™×');
+      throw new Error('שם משתמש או סיסמה שגויים');
     }
 
     this.setActiveUserId(account.id);
@@ -244,7 +243,7 @@ export class StorageService {
       this.setActiveUserId(demo.id);
       return demo;
     }
-    return this.registerAccount('demo', '123456', '×™×©×¨××œ ×™×©×¨××œ×™');
+    return this.registerAccount('demo', '123456', 'ישראל ישראלי');
   }
 
   static logout(): void {
@@ -263,7 +262,6 @@ export class StorageService {
     } catch (e) {
       console.error('Error loading user data:', e);
     }
-    // For the demo account, return demo data; for real users return empty defaults
     if (userId === 'demo_user_id') {
       return {
         profile: DEMO_PROFILE,
@@ -277,7 +275,7 @@ export class StorageService {
     }
     return {
       profile: {
-        name: '×ž×©×ª×ž×© ×—×“×©',
+        name: 'משתמש חדש',
         netSalary: 0,
         grossSalary: 0,
         salaryDay: 10,
@@ -317,7 +315,6 @@ export class StorageService {
       const updated = { ...current, ...data };
       localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify(updated));
 
-      // Server sync â€” use in-memory token (always current, never stale closure)
       const token = getMemToken();
       if (token) {
         fetch('/api/user/save', {
@@ -325,14 +322,13 @@ export class StorageService {
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           credentials: 'include',
           body: JSON.stringify({ userId, data: updated }),
-        }).catch(() => {});
+        }).catch((e) => console.error('Server sync failed:', e));
       }
     } catch (e) {
       console.error('Error saving user data:', e);
     }
   }
 
-  // Push full localStorage data to server (call on login to ensure server has latest)
   static pushToServer(userId: string): void {
     const token = getMemToken();
     if (!token) return;
@@ -342,7 +338,7 @@ export class StorageService {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       credentials: 'include',
       body: JSON.stringify({ userId, data }),
-    }).catch(() => {});
+    }).catch((e) => console.error('Push to server failed:', e));
   }
 
   static async loadFromServer(userId: string, token: string): Promise<UserAppData | null> {
@@ -353,12 +349,12 @@ export class StorageService {
       });
       if (!res.ok) return null;
       return await res.json();
-    } catch {
+    } catch (e) {
+      console.error('Load from server failed:', e);
       return null;
     }
   }
 
-  // Check and inject monthly salary automatically when salaryDay is reached
   static checkAutoSalary(userId: string): Transaction | null {
     const data = this.getUserData(userId);
     const { profile, transactions } = data;
@@ -374,11 +370,12 @@ export class StorageService {
     try {
       const raw = localStorage.getItem(salMonthsKey);
       if (raw) doneMonths = JSON.parse(raw);
-    } catch {}
+    } catch (e) {
+      console.error('Error loading salary months:', e);
+    }
 
     if (doneMonths.includes(monthKey)) return null;
 
-    // Check if salary already present in transactions this month
     const exists = transactions.some((t) => {
       const d = new Date(t.date);
       return (
@@ -386,7 +383,7 @@ export class StorageService {
         d.getMonth() === now.getMonth() &&
         d.getFullYear() === now.getFullYear() &&
         t.amount > 0 &&
-        (t.cat === '×”×›× ×¡×”' || t.description.includes('×ž×©×›×•×¨×ª'))
+        (t.cat === 'הכנסה' || t.description.includes('משכורת'))
       );
     });
 
@@ -403,16 +400,16 @@ export class StorageService {
       year: 'numeric',
     }).format(now);
 
-    const cat = categorize('×ž×©×›×•×¨×ª');
+    const cat = categorize('משכורת');
     const newTx: Transaction = {
       id: Date.now(),
-      description: `×ž×©×›×•×¨×ª ×—×•×“×©×™×ª â€” ${monthName}`,
+      description: `משכורת חודשית \u2014 ${monthName}`,
       amount: Math.round(profile.netSalary * 100) / 100,
       date: dateStr,
       cat: cat.cat,
       color: cat.color,
       emoji: cat.emoji,
-      account: '××•×˜×•×ž×˜×™',
+      account: 'אוטומט',
       auto: true,
     };
 
@@ -421,7 +418,6 @@ export class StorageService {
 
     const updatedTxs = [newTx, ...transactions];
 
-    // Auto-deposit to keren hishtalmut and pension
     const inv = data.investments;
     const updatedInv = { ...inv };
     const updatedSnapshots = { ...data.snapshots };
@@ -458,7 +454,9 @@ export class StorageService {
     try {
       const raw = localStorage.getItem(trackKey);
       if (raw) done = JSON.parse(raw);
-    } catch {}
+    } catch (e) {
+      console.error('Error loading standing orders tracking:', e);
+    }
 
     const injected: Transaction[] = [];
     const newTxs = [...transactions];

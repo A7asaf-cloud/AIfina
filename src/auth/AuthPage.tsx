@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, Mail, Chrome } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Sparkles, ArrowRight, ShieldCheck, Mail } from 'lucide-react';
 import { useAuth, AuthUser } from './AuthContext';
 import OTPScreen from './OTPScreen';
 
@@ -13,7 +13,7 @@ export default function AuthPage() {
   const [error, setError]           = useState('');
   const [demoLoading, setDemoLoading] = useState(false);
 
-  async function handleSend(e: React.FormEvent) {
+  async function handleSend(e: FormEvent) {
     e.preventDefault();
     const addr = emailInput.trim().toLowerCase();
     if (!addr.includes('@')) { setError('הזן כתובת אימייל תקינה'); return; }
@@ -48,35 +48,33 @@ export default function AuthPage() {
   if (stage === 'otp') return <OTPScreen email={email} onBack={() => setStage('entry')} />;
 
   return (
-    <div className="min-h-dvh bg-slate-950 flex flex-col items-center p-4 py-8 relative overflow-x-clip overflow-y-auto" dir="rtl">
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-dvh bg-surface flex flex-col items-center p-4 py-8 relative overflow-x-clip overflow-y-auto" dir="rtl">
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-income/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md z-10 my-auto">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-500/20 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-income to-income text-white shadow-lg shadow-income/20 mb-4">
             <span className="text-3xl">💎</span>
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">FinanceIL</h1>
-          <p className="text-slate-400 text-sm mt-1">ניהול תזרים מזומנים ותקציב חכם</p>
+          <h1 className="text-3xl font-black text-ink tracking-tight">FinanceIL</h1>
+          <p className="text-muted text-sm mt-1">ניהול תזרים מזומנים ותקציב חכם</p>
         </div>
 
-        {/* Demo card */}
-        <div className="mb-5 bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-xl">
+        <div className="mb-5 bg-gradient-to-r from-income/10 to-card border border-income/30 rounded-2xl p-4 shadow-xl">
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-sm">
+              <div className="flex items-center gap-1.5 text-income font-bold text-sm">
                 <Sparkles className="w-4 h-4" />
                 <span>כניסה מיידית ללא התעסקות!</span>
               </div>
-              <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+              <p className="text-muted text-xs mt-1 leading-relaxed">
                 רוצה לראות את האפליקציה בפעולה? התחבר בלחיצה אחת לחשבון הדמו המוכנה מראש.
               </p>
             </div>
           </div>
           <button onClick={handleDemo} disabled={demoLoading} type="button"
-            className="mt-3 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer">
+            className="mt-3 w-full py-2.5 px-4 bg-income hover:bg-income/90 active:bg-income/80 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-income/20 flex items-center justify-center gap-2 cursor-pointer">
             {demoLoading ? 'טוען...' : (
               <>
                 <span>כניסה מהירה (חשבון הדגמה)</span>
@@ -86,38 +84,35 @@ export default function AuthPage() {
           </button>
         </div>
 
-        {/* Auth card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
-          {/* Google */}
+        <div className="bg-card border border-line rounded-3xl p-6 sm:p-8 shadow-2xl">
           <button
             onClick={async () => {
               setGoogleLoading(true);
               try {
                 const probe = await fetch('/auth/google', { redirect: 'manual' });
                 if (probe.status === 501) {
-                  alert('כניסה עם Google אינה מוגדרת. צור קשר עם מנהל המערכת.');
+                  setError('כניסה עם Google אינה מוגדרת. צור קשר עם מנהל המערכת.');
                   setGoogleLoading(false);
                   return;
                 }
               } catch {}
               window.location.href = '/auth/google';
             }}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm py-3 rounded-2xl transition mb-4"
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm py-3 rounded-2xl transition border border-line mb-4"
           >
             <GoogleIcon />
             המשך עם Google
           </button>
 
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-slate-800" />
-            <span className="text-xs text-slate-600">או</span>
-            <div className="flex-1 h-px bg-slate-800" />
+            <div className="flex-1 h-px bg-line" />
+            <span className="text-xs text-muted">או</span>
+            <div className="flex-1 h-px bg-line" />
           </div>
 
-          {/* Email OTP */}
           <form onSubmit={handleSend} className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">כתובת אימייל</label>
+              <label className="block text-xs font-semibold text-ink mb-1.5">כתובת אימייל</label>
               <input
                 type="email"
                 value={emailInput}
@@ -125,21 +120,22 @@ export default function AuthPage() {
                 placeholder="you@example.com"
                 autoComplete="email"
                 dir="ltr"
-                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-white text-sm outline-none transition-colors text-left"
+                aria-label="כתובת אימייל"
+                className="w-full bg-surface border border-line focus:border-income rounded-xl px-4 py-3 text-ink text-sm outline-none transition-colors text-left"
               />
             </div>
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl">{error}</div>
+              <div className="bg-expense/10 border border-expense/20 text-expense text-xs p-3 rounded-xl">{error}</div>
             )}
             <button type="submit" disabled={sending}
-              className="w-full py-3 px-4 bg-slate-100 hover:bg-white text-slate-950 font-extrabold text-sm rounded-xl transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2">
+              className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2">
               <Mail className="w-4 h-4" />
               {sending ? 'שולח...' : 'שלח קוד אימות'}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-center gap-2 text-slate-500 text-xs">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          <div className="mt-6 pt-4 border-t border-line flex items-center justify-center gap-2 text-muted text-xs">
+            <ShieldCheck className="w-4 h-4 text-income" />
             <span>כניסה מאובטחת עם JWT — ללא סיסמאות</span>
           </div>
         </div>

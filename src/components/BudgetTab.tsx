@@ -5,7 +5,7 @@ import { calcBudget, spentPerBudget, DEFAULT_BUDGET_PLAN, CATEGORIES } from '../
 import { fmtILS, fmtPercent } from '../utils/formatters';
 import { Card, SectionTitle, Button, ProgressBar, showToastError, showToast } from './ui';
 import { ModalShell } from './ModalShell';
-import { PieChart, Edit2 } from 'lucide-react';
+import { Edit2 } from 'lucide-react';
 
 interface BudgetTabProps {
   profile: UserProfile;
@@ -16,7 +16,6 @@ interface BudgetTabProps {
 
 export const BudgetTab: React.FC<BudgetTabProps> = ({ profile, transactions, budgetPlan, onUpdateBudget }) => {
   const [editing, setEditing] = useState(false);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [tempPlan, setTempPlan] = useState<BudgetPlanItem[]>([]);
 
   const net = profile.netSalary || 0;

@@ -293,9 +293,9 @@ ${content.slice(0, 9000)}
             const ytd = parseFloat(data.result.ytd) || 0;
             if (onUpdateInvestment) {
               if (ocrDocType === 'keren') {
-                onUpdateInvestment({ kerenHishtalmut: val, kerenYtdReturn: ytd });
+                onUpdateInvestment({ kerenValue: val, kerenYtdReturn: ytd });
               } else {
-                onUpdateInvestment({ pensionTotal: val, pensionYtdReturn: ytd });
+                onUpdateInvestment({ pensionValue: val, pensionYtdReturn: ytd });
               }
             }
             setPreviewTxs([

@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode, StrictMode } from 'react';
+import { Component, ErrorInfo, ReactNode, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { AuthProvider } from './auth/AuthContext.tsx';
@@ -50,7 +50,8 @@ class ErrorBoundary extends Component<Props, State> {
             )}
             <button
               onClick={() => {
-                localStorage.clear();
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => { if (key.startsWith('fil_')) localStorage.removeItem(key); });
                 window.location.reload();
               }}
               className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer transition-all"

@@ -2,11 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { UserProfile, Transaction, BudgetPlanItem, StockHolding, StandingOrder } from '../types';
 import { calcBudget, spentPerBudget } from '../utils/categories';
-import { fmtILS, fmtUSD, fmtDate, daysUntil, todayLabelHe } from '../utils/formatters';
+import { fmtILS, fmtDate, daysUntil, todayLabelHe } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
 import { generateGeminiContentClient } from '../utils/apiFallback';
 import { Card, SectionTitle, Button, ProgressBar, Skeleton, showToastError } from './ui';
-import { Bell, Plus, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, ChevronLeft } from 'lucide-react';
+import { Bell, Plus, Calendar, CreditCard, RefreshCw } from 'lucide-react';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -92,7 +92,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <p className="text-sm text-muted">{todayLabelHe()}</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="w-10 h-10 rounded-full bg-card border border-line flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer">
+          <button aria-label="התראות" className="w-10 h-10 rounded-full bg-card border border-line flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer">
             <Bell className="w-5 h-5" />
           </button>
           <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
@@ -209,7 +209,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </motion.div>
 
       {/* FAB */}
-      <button onClick={() => setShowAddModal(true)} className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-5 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center z-40 transition-transform active:scale-95 cursor-pointer">
+      <button aria-label="הוסף עסקה" onClick={() => setShowAddModal(true)} className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-5 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center z-40 transition-transform active:scale-95 cursor-pointer">
         <Plus className="w-7 h-7" />
       </button>
 

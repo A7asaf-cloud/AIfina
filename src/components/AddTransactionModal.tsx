@@ -25,7 +25,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClos
     const raw = parseFloat(amount);
     if (isNaN(raw) || raw <= 0) return;
     const finalAmount = type === 'expense' ? -Math.abs(raw) : Math.abs(raw);
-    const catDetails = activeCat || { cat: 'אחר', color: '#8E9BB5', emoji: '📦' };
+    const catDetails = activeCat || { cat: 'שונות', color: '#8E9BB5', emoji: '📦' };
     onAdd({
       id: Date.now() + Math.random(),
       description: desc.trim() || (type === 'expense' ? 'הוצאה' : 'הכנסה'),

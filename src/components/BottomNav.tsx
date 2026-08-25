@@ -18,7 +18,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
-            <button key={tab.id} onClick={() => onTabChange(tab.id)} className="flex flex-1 min-w-0 flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl transition-all cursor-pointer">
+            <button key={tab.id} onClick={() => onTabChange(tab.id)} aria-label={tab.label} aria-current={active ? 'page' : undefined} className="flex flex-1 min-w-0 flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl transition-all cursor-pointer">
               <Icon className={`w-5 h-5 transition-colors ${active ? 'text-primary' : 'text-muted'}`} strokeWidth={active ? 2.5 : 2} />
               <span className={`text-[10px] font-semibold leading-none transition-colors ${active ? 'text-primary' : 'text-muted'}`}>{tab.label}</span>
             </button>

@@ -7,7 +7,7 @@ import { AddTransactionModal } from './AddTransactionModal';
 import { ImportTab } from './ImportTab';
 import { ModalShell } from './ModalShell';
 import { Card, Badge, Button, SectionTitle, showToastError } from './ui';
-import { Search, Plus, Trash2, Download, Upload, Edit2, X } from 'lucide-react';
+import { Search, Plus, Trash2, Download, Upload, X } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -62,6 +62,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
     link.href = url;
     link.setAttribute('download', `עסקאות_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -135,7 +136,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span dir="ltr" className={`text-sm font-semibold font-num ${isIncome ? 'text-income' : 'text-expense'}`}>{isIncome ? '+' : ''}{fmtILS(tx.amount)}</span>
-                      <button onClick={() => onDeleteTransaction(tx.id)} title="מחק" className="p-1.5 text-muted hover:text-expense rounded-lg transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button aria-label="מחק עסקה" onClick={() => onDeleteTransaction(tx.id)} title="מחק" className="p-1.5 text-muted hover:text-expense rounded-lg transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 );

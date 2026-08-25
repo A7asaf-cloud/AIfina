@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState, StandingOrder } from './types';
 import { StorageService } from './services/storage';
 import { useAuth, getMemToken } from './auth/AuthContext';
 import { CATEGORIES, CategoryKey } from './utils/categories';
 import AuthPage from './auth/AuthPage';
-import { setTokenProvider } from './services/storage';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { TransactionsTab } from './components/TransactionsTab';
@@ -12,16 +11,11 @@ import { BudgetTab } from './components/BudgetTab';
 import { InvestmentsTab } from './components/InvestmentsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { BottomNav } from './components/BottomNav';
-import { ToastHost } from './components/ui';
+import { ToastHost, ConfirmProvider } from './components/ui';
 import { fmtILS } from './utils/formatters';
 
 export default function App() {
   const { user: authUser, accessToken, isLoading: authLoading, logout: authLogout, logoutAll: authLogoutAll } = useAuth();
-
-  // Register token provider so StorageService can sync data to server
-  useEffect(() => {
-    setTokenProvider(() => accessToken);
-  }, [accessToken]);
 
   const [appData, setAppData] = useState<UserAppData | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -73,7 +67,7 @@ export default function App() {
     });
   }, [authUser?.id]); // eslint-disable-line
 
-  const handleOnboardingDone = (newProfile: UserProfile) => {
+  const handleOnboardingDone = useCallback((newProfile: UserProfile) => {
     if (!activeUser) return;
     const doneProfile = { ...newProfile, onboardingDone: true };
     const updated = { ...appData!, profile: doneProfile };
@@ -82,7 +76,7 @@ export default function App() {
     // Persist onboarding completion in browser — survives server restarts
     localStorage.setItem(`fil_onboarded_${activeUser.id}`, '1');
     setNeedsOnboarding(false);
-  };
+  }, [activeUser, appData]);
 
   const handleAddTransaction = (newTx: Transaction) => {
     if (!activeUser || !appData) return;
@@ -279,6 +273,7 @@ export default function App() {
   }
 
   return (
+    <ConfirmProvider>
     <div className="min-h-dvh bg-surface text-ink font-sans relative overflow-x-clip">
       {/* Salary Toast */}
       {salaryToast && (
@@ -357,5 +352,6 @@ export default function App() {
       <ToastHost />
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
+    </ConfirmProvider>
   );
 }

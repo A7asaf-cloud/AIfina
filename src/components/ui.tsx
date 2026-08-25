@@ -1,9 +1,12 @@
-import React, { ReactNode, useEffect, useState } from 'react';
+import React, { ReactNode, useCallback, useContext, useEffect, useRef, useState, createContext } from 'react';
 import { motion } from 'motion/react';
 
-export const Card: React.FC<{ children: ReactNode; className?: string; onClick?: () => void }> = ({ children, className = '', onClick }) => (
-  <div onClick={onClick} className={`bg-card rounded-2xl shadow-sm border border-line p-4 ${onClick ? 'cursor-pointer active:scale-[0.99] transition-transform' : ''} ${className}`}>{children}</div>
+export const Card = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string; onClick?: () => void }>(
+  ({ children, className = '', onClick }, ref) => (
+    <div ref={ref} onClick={onClick} className={`bg-card rounded-2xl shadow-sm border border-line p-4 ${onClick ? 'cursor-pointer active:scale-[0.99] transition-transform' : ''} ${className}`}>{children}</div>
+  )
 );
+Card.displayName = 'Card';
 
 export const AnimatedCard: React.FC<{ children: ReactNode; className?: string; onClick?: () => void; delay?: number }> = ({ children, className = '', onClick, delay = 0 }) => (
   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay }}>
@@ -50,6 +53,159 @@ export const SkeletonCard: React.FC<{ lines?: number }> = ({ lines = 3 }) => (
   </Card>
 );
 
+export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
+  const cls = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' }[size];
+  return <div className={`${cls} rounded-full border-2 border-line border-t-primary animate-spin`} />;
+};
+
+export const EmptyState: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  action?: { label: string; onClick: () => void };
+}> = ({ icon, title, description, action }) => (
+  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+    <div className="text-muted mb-3">{icon}</div>
+    <h3 className="text-base font-bold text-ink mb-1">{title}</h3>
+    {description && <p className="text-sm text-muted mb-4 max-w-xs">{description}</p>}
+    {action && <button onClick={action.onClick} className="h-10 rounded-xl font-semibold text-sm px-5 bg-primary text-white shadow-sm transition-all cursor-pointer">{action.label}</button>}
+  </div>
+);
+
+export type ConfirmVariant = 'danger' | 'warning' | 'info';
+const CONFIRM_COLORS: Record<ConfirmVariant, string> = {
+  danger: '#FF647C',
+  warning: '#F2C94C',
+  info: '#4A6FFF',
+};
+
+export const ConfirmDialog: React.FC<{
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: ConfirmVariant;
+  onConfirm: () => void;
+  onCancel: () => void;
+}> = ({ open, title, message, confirmLabel = 'אישור', cancelLabel = 'ביטול', variant = 'info', onConfirm, onCancel }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => confirmBtnRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
+      if (e.key === 'Tab') {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onCancel]);
+
+  const color = CONFIRM_COLORS[variant];
+
+  return (
+    <div
+      className={`fixed inset-0 z-[80] flex items-center justify-center p-4 transition-all duration-200 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-message"
+    >
+      <div className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onCancel} />
+      <div
+        ref={dialogRef}
+        className={`relative bg-card rounded-2xl shadow-xl border border-line w-full max-w-sm p-6 transition-all duration-200 ${open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+      >
+        <button
+          onClick={onCancel}
+          className="absolute top-3 left-3 w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-surface transition-colors cursor-pointer"
+          aria-label="סגור"
+        >
+          ✕
+        </button>
+        <h3 id="confirm-title" className="text-base font-bold text-ink mb-2 pr-8">{title}</h3>
+        <p id="confirm-message" className="text-sm text-muted mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="h-11 flex-1 rounded-xl font-semibold text-sm bg-surface text-ink transition-colors cursor-pointer">{cancelLabel}</button>
+          <button
+            ref={confirmBtnRef}
+            onClick={onConfirm}
+            className="h-11 flex-1 rounded-xl font-semibold text-sm text-white shadow-sm transition-colors cursor-pointer"
+            style={{ backgroundColor: color }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface ConfirmContextValue {
+  confirm: (title: string, message: string, variant?: ConfirmVariant) => Promise<boolean>;
+}
+
+const ConfirmContext = createContext<ConfirmContextValue>({ confirm: () => Promise.resolve(false) });
+
+export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: ConfirmVariant;
+    resolve: (v: boolean) => void;
+  } | null>(null);
+
+  const confirm = useCallback((title: string, message: string, variant: ConfirmVariant = 'info') => {
+    return new Promise<boolean>((resolve) => {
+      setState({ open: true, title, message, variant, resolve });
+    });
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    state?.resolve(true);
+    setState(null);
+  }, [state]);
+
+  const handleCancel = useCallback(() => {
+    state?.resolve(false);
+    setState(null);
+  }, [state]);
+
+  return (
+    <ConfirmContext.Provider value={{ confirm }}>
+      {children}
+      <ConfirmDialog
+        open={state?.open ?? false}
+        title={state?.title ?? ''}
+        message={state?.message ?? ''}
+        variant={state?.variant ?? 'info'}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    </ConfirmContext.Provider>
+  );
+};
+
+export const useConfirm = () => useContext(ConfirmContext).confirm;
+
 let toastId = 0;
 let pushFn: ((t: { id: number; message: string; kind: string }) => void) | null = null;
 
@@ -68,7 +224,7 @@ export const ToastHost: React.FC = () => {
   }, []);
   if (!items.length) return null;
   return (
-    <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
+    <div role="alert" aria-live="polite" className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
       {items.map(t => <div key={t.id} className={`${TOAST_BG[t.kind] || 'bg-ink'} text-white animate-slide-up rounded-xl shadow-lg px-4 py-3 text-sm font-semibold text-center`}>{t.message}</div>)}
     </div>
   );
