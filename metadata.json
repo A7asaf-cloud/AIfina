@@ -1,0 +1,6 @@
+{
+  "name": "FinanceIL - ניהול תזרים מזומנים והוצאות",
+  "description": "אפליקציה מתקדמת לניהול תזרים מזומנים, תקציב חודשי, הוצאות, ייבוא עסקאות והשקעות",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
