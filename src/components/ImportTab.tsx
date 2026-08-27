@@ -4,7 +4,7 @@ import { readFileAsText } from '../utils/bankParsers';
 import { categorize, CAT_RULES, getCustomRules, CATEGORIES, CategoryKey } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
-import { BankScraper } from './BankScraper';
+import { BankLinkDemo } from './BankLinkDemo';
 import {
   FileSpreadsheet,
   Camera,
@@ -374,9 +374,9 @@ ${content.slice(0, 9000)}
 
   return (
     <div className="space-y-4 pb-24 text-right animate-fade-in">
-      {/* Bank scraper view */}
+      {/* Bank connection demo view */}
       {method === 'scraper' && (
-        <BankScraper
+        <BankLinkDemo
           onImportTransactions={(txs) => {
             onImportTransactions(txs);
             setMethod('choose');
@@ -388,27 +388,27 @@ ${content.slice(0, 9000)}
       {/* Method Selection view */}
       {method === 'choose' && (
         <div className="space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-            <h2 className="text-xl font-extrabold text-white mb-1">ייבוא נתונים ועסקאות</h2>
-            <p className="text-slate-400 text-xs">בחר את הדרך הנוחה ביותר להזנת הנתונים שלך:</p>
+          <div className="bg-card border border-line rounded-3xl p-6 shadow-sm">
+            <h2 className="text-xl font-extrabold text-ink mb-1">ייבוא נתונים ועסקאות</h2>
+            <p className="text-muted text-xs">בחר את הדרך הנוחה ביותר להזנת הנתונים שלך:</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-              {/* Direct bank scraper — top card, full width */}
+              {/* Direct bank connection — top card, full width */}
               <button
                 onClick={() => setMethod('scraper')}
-                className="sm:col-span-2 bg-slate-950 border border-violet-500/30 hover:border-violet-500/60 hover:bg-violet-500/5 p-5 rounded-2xl text-right transition-all group cursor-pointer"
+                className="sm:col-span-2 bg-surface border border-primary/20 hover:border-primary/50 p-5 rounded-2xl text-right transition-all group cursor-pointer"
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 text-violet-400 flex items-center justify-center shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                     <Building2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-base group-hover:text-violet-400 transition-colors flex items-center gap-2">
-                      ייבוא ישיר מהבנק
-                      <span className="text-[10px] font-bold bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">חדש</span>
+                    <h3 className="font-bold text-ink text-base group-hover:text-primary transition-colors flex items-center gap-2">
+                      חיבור ישיר לבנק
+                      <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">מומלץ</span>
                     </h3>
-                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-                      התחבר ישירות לבנק הפועלים, לאומי, דיסקונט, מזרחי, Max, Cal ועוד 11 מוסדות — משיכת עסקאות אוטומטית.
+                    <p className="text-muted text-xs mt-1 leading-relaxed">
+                      התחבר קריאה-בלבד להפועלים, לאומי, דיסקונט, מזרחי, Max, Cal, ישראכרט ועוד — משיכת עסקאות אוטומטית.
                     </p>
                   </div>
                 </div>
@@ -447,17 +447,17 @@ ${content.slice(0, 9000)}
           </div>
 
           {/* Israeli Bank Connection Info Banner */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3">
+          <div className="bg-surface border border-line rounded-3xl p-5 shadow-sm space-y-3">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center flex-shrink-0 font-bold">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center flex-shrink-0 font-bold">
                 <HelpCircle className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm">איך עובד ייבוא ישיר מהבנק?</h4>
-                <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-                  השירות משתמש בספריית israeli-bank-scrapers — מתחבר לאתר הבנק שלך בדפדפן מוסתר ומושך עסקאות.
-                  גישה לקריאה בלבד. הפרטים מוצפנים AES-256 ונשמרים רק בשרת המקומי שלך.
-                  דרוש: <code className="bg-slate-800 px-1 rounded break-all">cd finance-scraper && npm run dev</code> בטרמינל נפרד.
+                <h4 className="font-bold text-ink text-sm">איך עובד חיבור ישיר מהבנק?</h4>
+                <p className="text-muted text-xs mt-1 leading-relaxed">
+                  החיבור מבוסס Open Banking ופועל ישירות באפליקציה — גישה לקריאה בלבד, ללא צורך בשרת.
+                  תבחר את הבנק, תאשר הרשאה, ומושכות עסקאות 60 הימים האחרונים לניתוח מיידי.
+                  בגרסה הנוכחית מוצגים נתוני דמו — לחיבור חי אמיתי נדרש רישיון TPP ושרת מאובטח.
                 </p>
               </div>
             </div>
