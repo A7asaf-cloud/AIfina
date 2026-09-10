@@ -23,16 +23,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // server.ts
 var import_express3 = __toESM(require("express"), 1);
-var import_cookie_parser = __toESM(require("cookie-parser"), 1);
-var import_path2 = __toESM(require("path"), 1);
-var import_vite = require("vite");
-var import_genai = require("@google/genai");
-var import_dotenv = __toESM(require("dotenv"), 1);
-var import_fs2 = __toESM(require("fs"), 1);
-
-// server/authRouter.ts
-var import_express = require("express");
-var import_crypto2 = __toESM(require("crypto"), 1);
 
 // server/authUtils.ts
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
@@ -80,6 +70,48 @@ function createRefreshToken(userId, email, tokenVersion) {
 function verifyRefreshToken(token) {
   return import_jsonwebtoken.default.verify(token, REFRESH_SECRET());
 }
+
+// server/integrationConfig.ts
+var configuredAiModel = () => process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
+var serverAiKey = () => {
+  const value = process.env.GEMINI_API_KEY?.trim();
+  return value && !value.startsWith("your_") ? value : void 0;
+};
+var integrationAuth = (req, res, next) => {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "aifina-default-secret-key-change-in-production") {
+    res.status(503).json({ error: "Configure a secure JWT_SECRET on the server." });
+    return;
+  }
+  try {
+    const auth = req.headers.authorization || "";
+    if (!auth.startsWith("Bearer ")) throw new Error("missing");
+    const payload = decodeAccessToken(auth.slice(7));
+    if (payload.type !== "access" || !payload.sub) throw new Error("invalid");
+    next();
+  } catch {
+    res.status(401).json({ error: "Authentication required" });
+  }
+};
+var integrationStatus = (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    ai: { configured: Boolean(serverAiKey()), model: configuredAiModel() },
+    openBanking: { status: "requires_provider_approval", provider: "Feezback", documentationUrl: "https://docs.feezback.cloud/docs/introduction-to-open-banking-data" },
+    imports: { available: true }
+  });
+};
+
+// server.ts
+var import_cookie_parser = __toESM(require("cookie-parser"), 1);
+var import_path2 = __toESM(require("path"), 1);
+var import_vite = require("vite");
+var import_genai = require("@google/genai");
+var import_dotenv = __toESM(require("dotenv"), 1);
+var import_fs2 = __toESM(require("fs"), 1);
+
+// server/authRouter.ts
+var import_express = require("express");
+var import_crypto2 = __toESM(require("crypto"), 1);
 
 // server/authFileStore.ts
 var import_fs = __toESM(require("fs"), 1);
@@ -1044,6 +1076,7 @@ async function startServer() {
   app.use(import_express3.default.json({ limit: "20mb" }));
   app.use((0, import_cookie_parser.default)());
   app.use("/auth", authRouter);
+  app.get("/api/integrations/status", integrationAuth, integrationStatus);
   app.use("/api/scraper", router);
   app.use((req, res, next) => {
     const secret = process.env.JWT_SECRET;
@@ -1218,17 +1251,18 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     });
   });
   function getGeminiApiKey(req) {
-    let key = req.headers["x-gemini-api-key"] || req.body?.geminiApiKey;
+    if (serverAiKey()) return serverAiKey();
+    let key = req.headers["x-gemini-key"] || req.headers["x-gemini-api-key"] || req.body?.geminiApiKey;
     if (key && typeof key === "string") {
       key = key.trim();
     }
     if (key && key !== "undefined" && key !== "null" && key.length > 5) {
       return key;
     }
-    return process.env.GEMINI_API_KEY;
+    return serverAiKey();
   }
   async function generateGeminiContent(ai, params) {
-    const modelsToTry = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const modelsToTry = [configuredAiModel()];
     let lastError = null;
     for (const modelName of modelsToTry) {
       try {
@@ -1241,13 +1275,13 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
           return response;
         }
       } catch (e) {
-        console.warn(`Gemini model ${modelName} failed:`, e.message || e);
+        console.warn("Gemini request failed");
         lastError = e;
       }
     }
     throw lastError || new Error("\u05DB\u05DC \u05D3\u05D2\u05DE\u05D9 Gemini \u05E0\u05DB\u05E9\u05DC\u05D5 \u05D1\u05DE\u05E2\u05E0\u05D4");
   }
-  app.post("/api/test-ai", async (req, res) => {
+  app.post("/api/test-ai", integrationAuth, async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
       if (!apiKey) {
@@ -1272,16 +1306,16 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
         });
       }
     } catch (e) {
-      console.error("Test AI Key Error:", e);
+      console.error("Test AI request failed");
       return res.status(400).json({
         success: false,
-        error: `\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D0\u05D9\u05DE\u05D5\u05EA \u05DE\u05E4\u05EA\u05D7: ${e.message || "\u05D4\u05DE\u05E4\u05EA\u05D7 \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF \u05D0\u05D5 \u05D7\u05E1\u05D5\u05DD"}`
+        error: "AI provider unavailable; check configuration and quota."
       });
     }
   });
-  app.post("/api/gemini/proxy", async (req, res) => {
+  app.post("/api/gemini/proxy", integrationAuth, async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = getGeminiApiKey(req);
       if (!apiKey) return res.status(503).json({ error: "GEMINI_API_KEY \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8 \u05D1\u05E9\u05E8\u05EA" });
       const { contents } = req.body;
       if (!contents) return res.status(400).json({ error: "contents \u05D7\u05E1\u05E8" });
@@ -1289,7 +1323,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       const response = await generateGeminiContent(ai, { contents });
       return res.json({ text: response.text || "" });
     } catch (e) {
-      return res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05EA Gemini" });
+      return res.status(502).json({ error: "AI provider unavailable" });
     }
   });
   async function fetchGoogleQuote(symbol) {
@@ -1457,9 +1491,9 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     }
     async function fetchYahooChart(ticker) {
       const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
-      for (const host of hosts) {
+      for (const host2 of hosts) {
         try {
-          const url = `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+          const url = `https://${host2}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
           const response = await fetch(url, {
             headers: {
               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -1805,8 +1839,9 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       res.sendFile(import_path2.default.join(distPath, "index.html"));
     });
   }
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  const host = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
+  app.listen(PORT, host, () => {
+    console.log(`Server running on http://${host}:${PORT}`);
   });
 }
 startServer();
