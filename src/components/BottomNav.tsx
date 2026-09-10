@@ -1,30 +1,14 @@
 import React from 'react';
-import { Home, CreditCard, PieChart, TrendingUp, Settings } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, ChartPie, TrendingUp, Settings, Sprout } from 'lucide-react';
 
 interface BottomNavProps { activeTab: string; onTabChange: (tab: string) => void; }
-
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
   const tabs = [
-    { id: 'dashboard', label: 'ראשי', icon: Home },
-    { id: 'transactions', label: 'עסקאות', icon: CreditCard },
-    { id: 'budget', label: 'תקציב', icon: PieChart },
+    { id: 'dashboard', label: 'התזרים שלי', icon: LayoutDashboard },
+    { id: 'transactions', label: 'תנועות', icon: ArrowLeftRight },
+    { id: 'budget', label: 'התקציב שלי', icon: ChartPie },
     { id: 'investments', label: 'השקעות', icon: TrendingUp },
     { id: 'settings', label: 'הגדרות', icon: Settings },
   ];
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-line shadow-sm">
-      <div className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto flex items-center px-1 sm:px-2 pb-safe pt-1.5">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button key={tab.id} onClick={() => onTabChange(tab.id)} aria-label={tab.label} aria-current={active ? 'page' : undefined} className="flex flex-1 min-w-0 flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl transition-all cursor-pointer">
-              <Icon className={`w-5 h-5 transition-colors ${active ? 'text-primary' : 'text-muted'}`} strokeWidth={active ? 2.5 : 2} />
-              <span className={`text-[10px] font-semibold leading-none transition-colors ${active ? 'text-primary' : 'text-muted'}`}>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
+  return <nav className="v2-navigation" aria-label="ניווט ראשי" dir="rtl"><button className="v2-nav-brand" onClick={() => onTabChange('dashboard')} aria-label="AIfina — התזרים שלי"><span className="v2-brand-symbol">✳</span><span>AIfina<small>הכסף שלך. בדרך שלך.</small></span></button><div className="v2-nav-label">המרחב שלך</div><div className="v2-nav-items">{tabs.map(tab => { const Icon = tab.icon; const active = activeTab === tab.id; return <button key={tab.id} onClick={() => onTabChange(tab.id)} aria-current={active ? 'page' : undefined} className={`v2-nav-item ${active ? 'is-active' : ''} ${tab.id === 'settings' ? 'v2-nav-settings' : ''}`}><Icon size={20} strokeWidth={active ? 2 : 1.6} /><span>{tab.label}</span>{active && <i />}</button>; })}</div><div className="v2-nav-bottom"><div className="v2-nav-message"><Sprout size={24} /><strong>הרגלים קטנים.<br />שינוי גדול.</strong><p>כל מבט בתזרים הוא עוד צעד לשליטה בכסף שלך.</p></div><div className="v2-nav-version"><span>AIfina V2</span><span>המרחב הפיננסי שלך</span></div></div></nav>;
 };

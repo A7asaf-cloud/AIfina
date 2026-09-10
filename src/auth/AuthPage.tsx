@@ -57,8 +57,8 @@ export default function AuthPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-income to-income text-white shadow-lg shadow-income/20 mb-4">
             <span className="text-3xl">💎</span>
           </div>
-          <h1 className="text-3xl font-black text-ink tracking-tight">FinanceIL</h1>
-          <p className="text-muted text-sm mt-1">ניהול תזרים מזומנים ותקציב חכם</p>
+          <h1 className="text-3xl font-black text-ink tracking-tight">AIfina</h1>
+          <p className="text-muted text-sm mt-1">הכסף שלך, בתמונה ברורה</p>
         </div>
 
         <div className="mb-5 bg-gradient-to-r from-income/10 to-card border border-income/30 rounded-2xl p-4 shadow-xl">
@@ -69,7 +69,7 @@ export default function AuthPage() {
                 <span>כניסה מיידית ללא התעסקות!</span>
               </div>
               <p className="text-muted text-xs mt-1 leading-relaxed">
-                רוצה לראות את האפליקציה בפעולה? התחבר בלחיצה אחת לחשבון הדמו המוכנה מראש.
+                התנסה בתזרים, בתקציב ובתכנון הוצאות עם נתוני הדגמה. השינויים בהדגמה נשמרים רק בדפדפן הזה.
               </p>
             </div>
           </div>

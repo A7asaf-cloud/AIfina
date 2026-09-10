@@ -14,6 +14,7 @@ import {
 import { getMemToken } from '../auth/AuthContext';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
+import { createDemoV2 } from './demoV2';
 
 const KEYS = {
   USERS: 'fil_users_list',
@@ -251,6 +252,11 @@ export class StorageService {
   }
 
   static getUserData(userId: string): UserAppData {
+    if (userId === 'demo_user_id') {
+      const raw = localStorage.getItem('fil_demo_v2_data');
+      if (raw) { try { return JSON.parse(raw); } catch {} }
+      return createDemoV2();
+    }
     try {
       const raw = localStorage.getItem(KEYS.DATA_PREFIX + userId);
       if (raw) {
@@ -310,6 +316,10 @@ export class StorageService {
   }
 
   static saveUserData(userId: string, data: Partial<UserAppData>): void {
+    if (userId === 'demo_user_id') {
+      localStorage.setItem('fil_demo_v2_data', JSON.stringify({ ...this.getUserData(userId), ...data }));
+      return;
+    }
     try {
       const current = this.getUserData(userId);
       const updated = { ...current, ...data };

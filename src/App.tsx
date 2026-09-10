@@ -12,14 +12,12 @@ import { InvestmentsTab } from './components/InvestmentsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { BottomNav } from './components/BottomNav';
 import { ToastHost, ConfirmProvider } from './components/ui';
-import { fmtILS } from './utils/formatters';
 
 export default function App() {
   const { user: authUser, accessToken, isLoading: authLoading, logout: authLogout, logoutAll: authLogoutAll } = useAuth();
 
   const [appData, setAppData] = useState<UserAppData | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [salaryToast, setSalaryToast] = useState<number | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   // Build UserAccount-compatible object from JWT user for StorageService compatibility
@@ -37,6 +35,11 @@ export default function App() {
   useEffect(() => {
     if (!authUser || !accessToken) { setAppData(null); setNeedsOnboarding(false); return; }
     StorageService.setActiveUserId(authUser.id);
+    if (authUser.id === 'demo_user_id') {
+      setAppData(StorageService.getUserData(authUser.id));
+      setNeedsOnboarding(false);
+      return;
+    }
 
     // Cross-device sync strategy:
     // 1. Try to load from server (another device may have saved data there)
@@ -57,13 +60,7 @@ export default function App() {
       const localDone = localStorage.getItem(`fil_onboarded_${authUser.id}`) === '1';
       const hasRealData = data.profile && (data.profile.netSalary > 0 || (data.transactions && data.transactions.length > 0));
       if (!data.profile?.onboardingDone && !localDone && !hasRealData) setNeedsOnboarding(true);
-      const autoSalaryTx = StorageService.checkAutoSalary(authUser.id);
-      StorageService.checkAutoStandingOrders(authUser.id);
-      if (autoSalaryTx) {
-        setSalaryToast(autoSalaryTx.amount);
-        setTimeout(() => setSalaryToast(null), 5000);
-        setAppData(StorageService.getUserData(authUser.id));
-      }
+      // Recurring payments remain forecasts until a transaction confirms execution.
     });
   }, [authUser?.id]); // eslint-disable-line
 
@@ -92,6 +89,13 @@ export default function App() {
     const updated = { ...appData, transactions: updatedTxs };
     setAppData(updated);
     StorageService.saveUserData(activeUser.id, { transactions: updatedTxs });
+  };
+
+  const handleUpdateTransaction = (transaction: Transaction) => {
+    if (!activeUser || !appData) return;
+    const transactions = appData.transactions.map(t => t.id === transaction.id ? transaction : t);
+    setAppData({ ...appData, transactions });
+    StorageService.saveUserData(activeUser.id, { transactions });
   };
 
   const handleDeleteTransaction = (id: string | number) => {
@@ -135,9 +139,14 @@ export default function App() {
 
   const handleUpdateProfile = (newProfile: UserProfile) => {
     if (!activeUser || !appData) return;
-    const updated = { ...appData, profile: newProfile };
+    const snapshotChanged = newProfile.bankBalance !== appData.profile.bankBalance || newProfile.balanceAsOf !== appData.profile.balanceAsOf;
+    const transactions = snapshotChanged && newProfile.balanceAsOf ? appData.transactions.map(t =>
+      t.status === 'posted' && (t.cashflowDate || t.date) <= newProfile.balanceAsOf!
+        ? { ...t, balanceIncluded: true } : t
+    ) : appData.transactions;
+    const updated = { ...appData, profile: newProfile, transactions };
     setAppData(updated);
-    StorageService.saveUserData(activeUser.id, { profile: newProfile });
+    StorageService.saveUserData(activeUser.id, { profile: newProfile, transactions });
   };
 
   const handleUpdateBudget = (newPlan: BudgetPlanItem[]) => {
@@ -274,19 +283,13 @@ export default function App() {
 
   return (
     <ConfirmProvider>
-    <div className="min-h-dvh bg-surface text-ink font-sans relative overflow-x-clip">
-      {/* Salary Toast */}
-      {salaryToast && (
-        <div className="fixed top-[calc(1rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[45] bg-income text-white font-bold px-4 py-3 rounded-2xl shadow-lg flex items-center gap-2 text-sm animate-slide-up w-[calc(100%-2rem)] max-w-sm text-center">
-          <span>💰</span>
-          <span>משכורת חודשית בסך {fmtILS(salaryToast)} התווספה אוטומטית!</span>
-        </div>
-      )}
-
-      <main className="max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))]">
+    <div className="aifina-shell min-h-dvh bg-surface text-ink font-sans relative overflow-x-clip">
+      <main className="aifina-main mx-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <div key={activeTab} className="tab-content">
         {activeTab === 'dashboard' && (
           <Dashboard
+            isDemo={authUser.id === 'demo_user_id'}
+            onUpdateTransaction={handleUpdateTransaction}
             profile={appData.profile}
             transactions={appData.transactions}
             budgetPlan={appData.budgetPlan}
@@ -301,6 +304,7 @@ export default function App() {
 
         {activeTab === 'transactions' && (
           <TransactionsTab
+            onUpdateTransaction={handleUpdateTransaction}
             transactions={appData.transactions}
             onAddTransaction={handleAddTransaction}
             onDeleteTransaction={handleDeleteTransaction}

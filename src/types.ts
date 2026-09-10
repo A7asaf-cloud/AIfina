@@ -32,6 +32,10 @@ export interface UserProfile {
   masHachnasa?: number;
   createdAt: string;
   onboardingDone?: boolean;
+  balanceAsOf?: string;
+  safetyBuffer?: number;
+  monthlyVariableBudget?: number;
+  creditDebtDueDate?: string;
 }
 
 export interface StandingOrder {
@@ -57,6 +61,15 @@ export interface Transaction {
   account?: string;
   auto?: boolean;
   notes?: string;
+  status?: 'posted' | 'pending' | 'planned' | 'cancelled';
+  kind?: 'income' | 'expense' | 'transfer' | 'credit-settlement';
+  expenseType?: 'fixed' | 'variable';
+  paymentMethod?: 'bank' | 'cash' | 'credit';
+  cashflowDate?: string;
+  recurringId?: string | number;
+  settlementId?: string;
+  sourceId?: string;
+  balanceIncluded?: boolean;
 }
 
 export interface CategoryRule {

@@ -3,80 +3,44 @@
  */
 
 import { CONFIG } from '../config';
+import { getMemToken } from '../auth/AuthContext';
 
 export async function generateGeminiContentClient(apiKey: string, contents: any): Promise<string> {
-  const models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-  // If no local key — try server proxy first (uses server GEMINI_API_KEY from .env)
-  if (!apiKey) {
-    try {
-      const res = await fetch('/api/gemini/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ contents }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.text) return data.text;
-      }
-    } catch (e) {
-      console.warn('Server Gemini proxy failed', e);
-    }
-    throw new Error('מפתח Gemini לא מוגדר. הגדר GEMINI_API_KEY בשרת או הזן מפתח בהגדרות.');
+  const token = getMemToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  // Legacy user-supplied keys go only to our configured backend, never a public proxy.
+  if (apiKey?.trim()) headers['x-gemini-key'] = apiKey.trim();
+
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl('/api/gemini/proxy'), {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      redirect: 'error',
+      body: JSON.stringify({ contents }),
+    });
+  } catch {
+    throw new Error('לא ניתן להתחבר לשרת התובנות. בדקו את החיבור ונסו שוב.');
   }
 
-  let lastError: any = null;
-
-  for (const model of models) {
-    try {
-      const baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      
-      // 1. Try Direct Call
-      try {
-        const res = await fetch(baseUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ contents }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) return text;
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP error! status: ${res.status}`);
-        }
-      } catch (directErr: any) {
-        console.warn(`Direct client Gemini call for ${model} failed, trying via CORS proxy...`, directErr.message || directErr);
-        
-        // 2. Try via CORS Proxy
-        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(baseUrl)}`;
-        const res = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ contents }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) return text;
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP error via proxy! status: ${res.status}`);
-        }
-      }
-    } catch (e: any) {
-      console.warn(`Client Gemini model ${model} failed:`, e.message || e);
-      lastError = e;
-    }
+  if (response.status === 401) {
+    throw new Error('ההתחברות הסתיימה. התחברו שוב כדי לקבל תובנות.');
   }
-  throw lastError || new Error('כל דגמי Gemini נכשלו במענה מקליינט');
+  if (response.status === 503) {
+    throw new Error('שירות התובנות אינו מוגדר או אינו זמין כרגע בשרת. נסו שוב לאחר חיבור השירות.');
+  }
+  if (!response.ok) {
+    // Avoid reflecting upstream payloads, which may contain credentials or request data.
+    throw new Error(`שירות התובנות לא הצליח להשלים את הבקשה (קוד ${response.status}). נסו שוב.`);
+  }
+
+  const data = await response.json().catch(() => null);
+  if (typeof data?.text !== 'string' || !data.text.trim()) {
+    throw new Error('שירות התובנות החזיר תשובה ריקה או לא תקינה. נסו שוב.');
+  }
+  return data.text;
 }
 
 export async function fetchYahooQuoteClientSide(ticker: string) {

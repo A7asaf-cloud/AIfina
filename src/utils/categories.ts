@@ -233,10 +233,10 @@ export function spentPerBudget(txs: Transaction[], budget: BudgetPlanItem[], bil
   const now = new Date();
   const cutoff = billingStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
   txs
-    .filter(t => t.amount < 0)
+    .filter(t => t.amount < 0 && t.status !== 'planned' && t.status !== 'pending' && t.status !== 'cancelled' && t.kind !== 'transfer' && t.kind !== 'credit-settlement')
     .forEach(t => {
       const d = new Date(t.date);
-      if (!isNaN(d.getTime()) && d >= cutoff) {
+      if (!isNaN(d.getTime()) && d >= cutoff && d <= now) {
         const bk = CAT_TO_BUDGET[t.cat] || 'שונות';
         if (map[bk] !== undefined) map[bk] += Math.abs(t.amount);
         else if (map['שונות'] !== undefined) map['שונות'] += Math.abs(t.amount);

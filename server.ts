@@ -1,4 +1,5 @@
 import express from 'express';
+import { configuredAiModel, serverAiKey, integrationAuth, integrationStatus } from './server/integrationConfig';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -167,6 +168,7 @@ async function startServer() {
 
   // ── Auth routes ──────────────────────────────────────────────────────────────
   app.use('/auth', authRouter);
+  app.get('/api/integrations/status', integrationAuth, integrationStatus);
 
   // ── Finance-scraper proxy (forwards /api/scraper/* → localhost:3001/api/*) ──
   app.use('/api/scraper', scraperProxy);
@@ -370,19 +372,20 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
 
   // Helper to extract Gemini API key from headers, body, or environment
   function getGeminiApiKey(req: express.Request): string | undefined {
-    let key = (req.headers['x-gemini-api-key'] as string) || req.body?.geminiApiKey;
+    if (serverAiKey()) return serverAiKey();
+    let key = (req.headers['x-gemini-key'] as string) || (req.headers['x-gemini-api-key'] as string) || req.body?.geminiApiKey;
     if (key && typeof key === 'string') {
       key = key.trim();
     }
     if (key && key !== 'undefined' && key !== 'null' && key.length > 5) {
       return key;
     }
-    return process.env.GEMINI_API_KEY;
+    return serverAiKey();
   }
 
   // Multi-model fallback helper for Gemini API calls
   async function generateGeminiContent(ai: GoogleGenAI, params: { contents: any; config?: any }) {
-    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const modelsToTry = [configuredAiModel()];
     let lastError: any = null;
 
     for (const modelName of modelsToTry) {
@@ -396,7 +399,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
           return response;
         }
       } catch (e: any) {
-        console.warn(`Gemini model ${modelName} failed:`, e.message || e);
+        console.warn('Gemini request failed');
         lastError = e;
       }
     }
@@ -404,7 +407,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
   }
 
   // Test Gemini AI Key Endpoint
-  app.post('/api/test-ai', async (req, res) => {
+  app.post('/api/test-ai', integrationAuth, async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
       if (!apiKey) {
@@ -431,18 +434,18 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
         });
       }
     } catch (e: any) {
-      console.error('Test AI Key Error:', e);
+      console.error('Test AI request failed');
       return res.status(400).json({
         success: false,
-        error: `שגיאה באימות מפתח: ${e.message || 'המפתח לא תקין או חסום'}`,
+        error: 'AI provider unavailable; check configuration and quota.',
       });
     }
   });
 
   // Generic Gemini proxy — uses server GEMINI_API_KEY, no client key needed
-  app.post('/api/gemini/proxy', async (req, res) => {
+  app.post('/api/gemini/proxy', integrationAuth, async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = getGeminiApiKey(req);
       if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY לא מוגדר בשרת' });
       const { contents } = req.body;
       if (!contents) return res.status(400).json({ error: 'contents חסר' });
@@ -450,7 +453,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
       const response = await generateGeminiContent(ai, { contents });
       return res.json({ text: response.text || '' });
     } catch (e: any) {
-      return res.status(500).json({ error: e.message || 'שגיאת Gemini' });
+      return res.status(502).json({ error: 'AI provider unavailable' });
     }
   });
 
@@ -1046,8 +1049,9 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
+  app.listen(PORT, host, () => {
+    console.log(`Server running on http://${host}:${PORT}`);
   });
 }
 

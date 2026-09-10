@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
+import { IntegrationsStatus } from './IntegrationsStatus';
 import { motion } from 'motion/react';
 import { UserProfile, BudgetPlanItem, UserAccount, StandingOrder } from '../types';
 import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
@@ -31,12 +32,15 @@ const emptyOrder = (): Omit<StandingOrder, 'id'> => ({
   isActive: true, account: 'הוראת קבע',
 });
 
-const InputField: React.FC<{ label: string; value: any; onChange: (v: any) => void; type?: string; step?: string; min?: string; max?: string; placeholder?: string; className?: string }> = ({ label, value, onChange, type = 'text', ...rest }) => (
+const InputField: React.FC<{ label: string; value: any; onChange: (v: any) => void; type?: string; step?: string; min?: string; max?: string; placeholder?: string; className?: string }> = ({ label, value, onChange, type = 'text', ...rest }) => {
+  const id = useId();
+  return (
   <div>
-    <label className="block text-sm font-semibold text-ink mb-1">{label}</label>
-    <input type={type} value={value} onChange={e => onChange(type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value)} className={`w-full bg-surface border border-line focus:border-primary rounded-xl px-4 py-2.5 text-sm text-ink outline-none text-right font-num ${rest.className || ''}`} {...rest} />
+    <label htmlFor={id} className="block text-sm font-semibold text-ink mb-1">{label}</label>
+    <input id={id} type={type} value={value} onChange={e => onChange(type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value)} className={`w-full bg-surface border border-line focus:border-primary rounded-xl px-4 py-2.5 text-sm text-ink outline-none text-right font-num ${rest.className || ''}`} {...rest} />
   </div>
-);
+  );
+};
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   profile, budgetPlan, account, appData, standingOrders,
@@ -59,7 +63,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const handleTestGeminiKey = async () => {
     setTestingKey(true); setTestResult(null);
     const key = geminiKeyInput.trim() || localStorage.getItem('fil_gemini_api_key') || '';
-    if (!key) { setTestResult({ success: false, message: 'הזן מפתח API' }); setTestingKey(false); return; }
     try {
       const text = await generateGeminiContentClient(key, [{ role: 'user', parts: [{ text: 'תגיב במילה אחת: OK' }] }]);
       setTestResult(text?.toLowerCase().includes('ok') ? { success: true, message: 'מפתח תקין ✓' } : { success: false, message: 'תשובה לא תקינה' });
@@ -127,6 +130,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {savedMsg && <div className="bg-[#00C48C]/10 border border-[#00C48C]/20 text-income p-3 rounded-2xl text-xs font-bold flex items-center justify-between"><span>השינויים נשמרו!</span><CheckCircle2 className="w-4 h-4" /></div>}
 
       {/* Gemini API Key */}
+      <IntegrationsStatus />
+      <p className="text-xs text-muted">מפתח השרת משמש אוטומטית. המפתח האישי למטה הוא אפשרות תאימות בלבד ונשמר בדפדפן.</p>
       <form onSubmit={handleSaveGeminiKey}>
         <SectionTitle title="מפתח Gemini API" action={<span className={`text-[10px] font-bold px-2 py-1 rounded-full ${geminiKeyInput.trim() ? 'bg-[#00C48C]/15 text-income' : 'bg-[#F2C94C]/15 text-[#F2C94C]'}`}><Sparkles className="w-3 h-3 inline" /> {geminiKeyInput.trim() ? 'מוגדר ✓' : 'לא הוגדר'}</span>} />
         <Card className="space-y-3">
@@ -147,6 +152,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <SectionTitle title="עריכת פרופיל ושכר" />
         <Card className="space-y-4">
           <InputField label="שם מלא" value={p.name} onChange={(v: string) => setP({ ...p, name: v })} />
+          <div className="border-b border-line pb-4 space-y-3">
+            <h2 className="font-bold">הנחות התזרים</h2>
+            <p className="text-sm text-muted">היתרה היא תמונת מצב שהזנת. בעדכון יתרה ותאריך, תנועות שכבר בוצעו עד אותו יום ייחשבו כלולות בה.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <InputField label="יתרה בחשבון (₪)" type="number" value={p.bankBalance} onChange={(v: number) => setP({ ...p, bankBalance: v })} />
+              <InputField label="היתרה נכונה לתאריך" type="date" value={p.balanceAsOf || ''} onChange={(v: string) => setP({ ...p, balanceAsOf: v })} />
+              <InputField label="כרית ביטחון (₪)" type="number" min="0" value={p.safetyBuffer ?? ''} onChange={(v: number) => setP({ ...p, safetyBuffer: v })} />
+              <InputField label="תקציב הוצאות משתנות לחודש (₪)" type="number" min="0" value={p.monthlyVariableBudget ?? ''} onChange={(v: number) => setP({ ...p, monthlyVariableBudget: v })} />
+              <InputField label="חיוב אשראי ידוע (₪)" type="number" min="0" value={p.creditDebt} onChange={(v: number) => setP({ ...p, creditDebt: v })} />
+              <InputField label="מועד חיוב האשראי" type="date" value={p.creditDebtDueDate || ''} onChange={(v: string) => setP({ ...p, creditDebtDueDate: v })} />
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <InputField label="שכר נטו (₪)" type="number" value={p.netSalary} onChange={(v: number) => setP({ ...p, netSalary: v })} />
             <InputField label="שכר ברוטו (₪)" type="number" value={p.grossSalary} onChange={(v: number) => setP({ ...p, grossSalary: v })} />

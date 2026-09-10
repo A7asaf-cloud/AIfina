@@ -1,219 +1,112 @@
-import React, { useState, useMemo } from 'react';
-import { motion } from 'motion/react';
-import { UserProfile, Transaction, BudgetPlanItem, StockHolding, StandingOrder } from '../types';
-import { calcBudget, spentPerBudget } from '../utils/categories';
-import { fmtILS, fmtDate, daysUntil, todayLabelHe } from '../utils/formatters';
+import React, { useMemo, useState } from 'react';
+import { ArrowDownLeft, ArrowUpRight, ArrowLeft, ChevronDown, CalendarDays, Plus, Wallet, ShieldCheck, Sparkles, TrendingUp, Info, Check, CircleAlert, Pencil } from 'lucide-react';
+import { BudgetPlanItem, StandingOrder, StockHolding, Transaction, UserProfile } from '../types';
+import { calcBudget, CATEGORIES, CategoryKey } from '../utils/categories';
+import { calculateCashflow, localDateKey, CashflowItem } from '../utils/cashflow';
+import { fmtDate, fmtILS, monthLabelHe } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
-import { generateGeminiContentClient } from '../utils/apiFallback';
-import { Card, SectionTitle, Button, ProgressBar, Skeleton, showToastError } from './ui';
-import { Bell, Plus, Calendar, CreditCard, RefreshCw } from 'lucide-react';
+import '../dashboard-v2.css';
 
 interface DashboardProps {
-  profile: UserProfile;
-  transactions: Transaction[];
-  budgetPlan: BudgetPlanItem[];
-  holdings: StockHolding[];
-  portfolioCash: number;
-  standingOrders: StandingOrder[];
+  profile: UserProfile; transactions: Transaction[]; budgetPlan: BudgetPlanItem[];
+  holdings: StockHolding[]; portfolioCash: number; standingOrders: StandingOrder[];
   onAddTransaction: (tx: Transaction) => void;
   onUpdateCategory: (txId: string | number, newCat: string) => void;
   onNavigateToTab: (tab: string) => void;
+  onUpdateTransaction?: (tx: Transaction) => void;
+  isDemo?: boolean;
 }
+const Money = ({ value, className = '' }: { value: number; className?: string }) => <span className={`v2-money ${className}`} dir="ltr">{fmtILS(value)}</span>;
+const sourceLabel: Record<string, string> = { transaction: 'מתוכננת', 'standing-order': 'הוראת קבע', salary: 'הכנסה צפויה', rent: 'שכירות צפויה', credit: 'חיוב אשראי' };
 
-export const Dashboard: React.FC<DashboardProps> = ({
-  profile, transactions, budgetPlan, holdings, portfolioCash, standingOrders,
-  onAddTransaction, onUpdateCategory, onNavigateToTab,
-}) => {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-
-  const net = profile.netSalary || 0;
-  const budget = useMemo(() => calcBudget(net, budgetPlan), [net, budgetPlan]);
+export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, budgetPlan, standingOrders, onAddTransaction, onNavigateToTab, onUpdateTransaction, isDemo = false }) => {
+  const [modal, setModal] = useState<'posted' | 'planned' | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showCalculation, setShowCalculation] = useState(false);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const now = new Date();
-  const creditDay = profile.creditDay || 1;
-  const today = now.getDate();
-  const billingStart = today >= creditDay
-    ? new Date(now.getFullYear(), now.getMonth(), creditDay)
-    : new Date(now.getFullYear(), now.getMonth() - 1, creditDay);
-  const spent = useMemo(() => spentPerBudget(transactions, budget, billingStart), [transactions, budget]);
+  const today = localDateKey(now);
+  const month = today.slice(0, 7);
+  const flow = useMemo(() => calculateCashflow(profile, transactions, standingOrders, now), [profile, transactions, standingOrders, today]);
+  const budget = useMemo(() => calcBudget(profile.netSalary || 0, budgetPlan), [profile.netSalary, budgetPlan]);
+  const actual = transactions.filter(tx => tx.date.slice(0, 7) === month && tx.date <= today && (!tx.status || tx.status === 'posted') && tx.kind !== 'transfer' && tx.kind !== 'credit-settlement');
+  const categoryMap = new Map<string, number>();
+  actual.filter(tx => tx.amount < 0).forEach(tx => categoryMap.set(tx.cat, (categoryMap.get(tx.cat) || 0) + Math.abs(tx.amount)));
+  const categories = [...categoryMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const totalActualExpenses = flow.actualFixedExpenses + flow.actualVariableExpenses;
+  const points = flow.dailyForecast.length ? flow.dailyForecast : [{ date: today, balance: flow.currentBalance, income: 0, expenses: 0 }];
+  const activeIndex = Math.min(selectedPoint ?? points.length - 1, points.length - 1);
+  const activePoint = points[activeIndex];
+  const activeEvents = flow.upcoming.filter(item => item.date === activePoint.date);
+  const chartMax = Math.max(1, ...points.map(point => point.balance)) * 1.12;
+  const chartMin = Math.min(0, ...points.map(point => point.balance)) - Math.max(1, chartMax) * .06;
+  const x = (index: number) => 42 + index / Math.max(1, points.length - 1) * 616;
+  const y = (balance: number) => 170 - (balance - chartMin) / (chartMax - chartMin) * 150;
+  const chartPath = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.balance)}`).join(' ');
+  const chartArea = `${chartPath} L ${x(points.length - 1)} 180 L 42 180 Z`;
+  const upcoming = showAllUpcoming ? flow.upcoming : flow.upcoming.slice(0, 4);
+  const uncategorized = actual.filter(tx => tx.amount < 0 && tx.cat === 'שונות').length;
+  const overspent = categories.find(([cat, amount]) => { const target = budget.find(item => item.key === cat)?.amount || 0; return target > 0 && amount > target; });
+  const scrollToUpcoming = () => document.getElementById('v2-upcoming')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  const currentMonthTxs = transactions.filter(t => {
-    const d = new Date(t.date);
-    return !isNaN(d.getTime()) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const monthIncome = currentMonthTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const billingPeriodExpenses = transactions.filter(t => {
-    const d = new Date(t.date);
-    return !isNaN(d.getTime()) && d >= billingStart && t.amount < 0;
-  });
-  const monthExpense = Math.abs(billingPeriodExpenses.reduce((s, t) => s + t.amount, 0));
-  const safeToSpend = Math.max(0, net - monthExpense);
-  const expensePct = net > 0 ? Math.min(100, (monthExpense / net) * 100) : 0;
-  const incomePct = 100 - expensePct;
-
-  const daysToSalary = daysUntil(profile.salaryDay || 10);
-  const daysToCredit = daysUntil(profile.creditDay || 1);
-  const stockVal = holdings.reduce((s, h) => s + h.shares * (h.currentPrice || h.avgCost || 0), 0);
-  const stockCost = holdings.reduce((s, h) => s + h.shares * (h.avgCost || 0), 0);
-  const stockGain = stockVal - stockCost;
-  const recentTxs = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-
-  const topCats = (Object.entries(spent) as [string, number][]).sort((a, b) => b[1] - a[1]).slice(0, 4);
-
-  const fetchAiInsight = async () => {
-    setAiLoading(true);
-    try {
-      const prompt = `אתה יועץ פיננסי. תן תובנה אחת קצרה, ממוקדת ומעשית בעברית. נתוני המשתמש: משכורת ₪${net}, הוצאות ₪${monthExpense}, יתרה ₪${safeToSpend}. החזר JSON: {"insight":"..."}`;
-      const customKey = localStorage.getItem('fil_gemini_api_key') || '';
-      const text = await generateGeminiContentClient(customKey, [{ role: 'user', parts: [{ text: prompt }] }]);
-      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const firstBrace = cleaned.indexOf('{');
-      const lastBrace = cleaned.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        const json = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
-        setAiInsight(json.insight || json.insights?.[0] || text);
-      } else {
-        setAiInsight(text);
-      }
-    } catch (err: any) {
-      showToastError(err.message || 'שגיאה בקבלת תובנה');
-    } finally {
-      setAiLoading(false);
-    }
+  const editUpcoming = (item: CashflowItem) => {
+    const existing = transactions.find(tx => tx.id === item.id);
+    if (existing) { setEditingTransaction(existing); return; }
+    const recurringId = item.source === 'salary' ? 'salary' : item.source === 'rent' ? 'rent'
+      : standingOrders.find(order => item.id === `standing-${order.id}-${month}`)?.id;
+    const category = CATEGORIES[item.cat as CategoryKey] || CATEGORIES['שונות'];
+    setEditingTransaction({
+      id: item.id, description: item.description, amount: item.amount,
+      date: item.date, cat: item.cat, emoji: item.emoji, color: category.color,
+      status: 'planned', expenseType: item.expenseType, paymentMethod: 'bank',
+      recurringId, kind: item.source === 'credit' ? 'credit-settlement' : item.amount > 0 ? 'income' : 'expense',
+      balanceIncluded: false, account: 'תכנון תזרים',
+    });
+  };
+  const saveEditedTransaction = (tx: Transaction) => {
+    if (transactions.some(existing => existing.id === tx.id)) onUpdateTransaction?.(tx);
+    else onAddTransaction(tx);
   };
 
-  return (
-    <div className="space-y-5 pb-4 text-right animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-1">
-        <div>
-          <h1 className="text-xl font-bold text-ink">שלום, {profile.name}! 👋</h1>
-          <p className="text-sm text-muted">{todayLabelHe()}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button aria-label="התראות" className="w-10 h-10 rounded-full bg-card border border-line flex items-center justify-center text-muted hover:text-ink transition-colors cursor-pointer">
-            <Bell className="w-5 h-5" />
-          </button>
-          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-            {(profile.name || '?')[0]}
-          </div>
-        </div>
-      </div>
-
-      {/* Hero Card */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <div className="bg-gradient-to-br from-[#4A6FFF] to-[#7B95FF] rounded-2xl p-5 text-white relative overflow-hidden shadow-sm">
-          <p className="text-sm font-medium opacity-80">💳 יתרה פנויה לחודש</p>
-          <p dir="ltr" className="font-black text-3xl font-num mt-1">{fmtILS(safeToSpend)}</p>
-          <div className="flex items-center gap-4 mt-4 text-sm opacity-90">
-            <span>הכנסות ↑ <span dir="ltr" className="font-num font-bold">{fmtILS(monthIncome || net)}</span></span>
-            <span>הוצאות ↓ <span dir="ltr" className="font-num font-bold">{fmtILS(monthExpense)}</span></span>
-          </div>
-          <div className="mt-3 h-2.5 bg-white/20 rounded-full overflow-hidden flex">
-            <div className="h-full bg-income rounded-r-full transition-all duration-700" style={{ width: `${incomePct}%` }} />
-            <div className="h-full bg-expense rounded-l-full transition-all duration-700" style={{ width: `${expensePct}%` }} />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Countdowns */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold text-muted">💰 משכורת</span>
-          </div>
-          <p className="text-sm font-extrabold text-ink">{daysToSalary === 0 ? 'נכנסת היום! 🎉' : `בעוד ${daysToSalary} ימים`}</p>
-          <p className="text-xs text-muted mt-1">כל ה-{profile.salaryDay} בחודש</p>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 mb-2">
-            <CreditCard className="w-4 h-4 text-expense" />
-            <span className="text-xs font-bold text-muted">💳 אשראי</span>
-          </div>
-          <p className="text-sm font-extrabold text-ink">{daysToCredit === 0 ? 'חיוב היום! ⚠️' : `בעוד ${daysToCredit} ימים`}</p>
-          <p className="text-xs text-muted mt-1">צבור: <span dir="ltr" className="font-num">{fmtILS(monthExpense)}</span></p>
-        </Card>
-      </div>
-
-      {/* Expense Categories */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-        <SectionTitle title="הוצאות לפי קטגוריה" />
-        <div className="grid grid-cols-2 gap-3">
-          {topCats.map(([key, amount]) => {
-            const cat = budget.find(b => b.key === key);
-            if (!cat || !cat.amount) return null;
-            const catAmt = cat.amount as number;
-            const pctVal = Math.min(100, (amount / catAmt) * 100);
-            const barColor = pctVal > 85 ? '#FF647C' : pctVal > 65 ? '#F2C94C' : '#00C48C';
-            return (
-              <Card key={key}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{cat.emoji}</span>
-                  <span className="text-sm font-semibold text-ink truncate">{key}</span>
-                </div>
-                <p dir="ltr" className="font-black text-lg font-num text-ink">{fmtILS(amount as number)}</p>
-                <ProgressBar value={amount as number} max={catAmt} color={barColor} heightClass="h-1.5" />
-                <p className="text-xs text-muted mt-1">{Math.round(pctVal)}% מהתקציב</p>
-              </Card>
-            );
-          })}
-        </div>
-      </motion.div>
-
-      {/* Recent Transactions */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
-        <SectionTitle title="עסקאות אחרונות" action={
-          <button onClick={() => onNavigateToTab('transactions')} className="text-xs text-primary font-bold hover:underline cursor-pointer">ראה הכל ›</button>
-        } />
-        <Card>
-          {recentTxs.length === 0 ? (
-            <p className="text-center text-muted text-sm py-8">אין עסקאות עדיין</p>
-          ) : recentTxs.map(tx => {
-            const isIncome = tx.amount > 0;
-            return (
-              <div key={tx.id} className="flex items-center justify-between py-3 border-b border-line last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-xl">{tx.emoji}</div>
-                  <div>
-                    <p className="text-sm font-medium text-ink">{tx.description}</p>
-                    <p className="text-xs text-muted">{fmtDate(tx.date)}</p>
-                  </div>
-                </div>
-                <span dir="ltr" className={`font-semibold text-sm font-num ${isIncome ? 'text-income' : 'text-expense'}`}>
-                  {isIncome ? '+' : ''}{fmtILS(tx.amount)}
-                </span>
-              </div>
-            );
-          })}
-        </Card>
-      </motion.div>
-
-      {/* AI Insight */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }}>
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">✨</span>
-              <span className="text-sm font-bold text-ink">תובנת AI</span>
-            </div>
-            <button onClick={fetchAiInsight} disabled={aiLoading} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-xl cursor-pointer hover:bg-primary/20 transition-colors disabled:opacity-50">
-              {aiLoading ? <span className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              <span>{aiInsight ? 'רענן' : 'קבל טיפ'}</span>
-            </button>
-          </div>
-          {aiLoading && !aiInsight && <Skeleton className="h-10 w-full" />}
-          {aiInsight && <p className="text-sm text-muted leading-relaxed">{aiInsight}</p>}
-        </Card>
-      </motion.div>
-
-      {/* FAB */}
-      <button aria-label="הוסף עסקה" onClick={() => setShowAddModal(true)} className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-5 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center z-40 transition-transform active:scale-95 cursor-pointer">
-        <Plus className="w-7 h-7" />
-      </button>
-
-      {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} onAdd={onAddTransaction} />}
+  return <div className="v2-dashboard" dir="rtl">
+    <header className="v2-page-header">
+      <div><div className="v2-eyebrow">מרחב אישי · {profile.name || 'הכסף שלך'}</div><h1>התזרים שלי<span className="v2-title-dot">.</span></h1><p>כל החודש מול העיניים. צעד אחד יותר ברור.</p></div>
+      <div className="v2-header-actions"><span className="v2-month"><CalendarDays size={16} />{monthLabelHe(now.getFullYear(), now.getMonth())}</span><button className="v2-button" onClick={() => setModal('posted')}><Plus size={17} />הוספת תנועה</button></div>
+    </header>
+    {isDemo && <div className="v2-demo-notice"><span><Sparkles size={15} />סביבת הדגמה אינטראקטיבית</span><span>נתונים לדוגמה · אפשר להתנסות בהוספת תנועות</span></div>}
+    <div className="v2-top-grid">
+      <section className="v2-spend-card" aria-labelledby="spend-title">
+        <div className="v2-spend-top"><span className="v2-pill"><span className="v2-status-dot" />{flow.safeToSpend > 0 ? 'יש מקום לנשום' : 'כדאי לשים לב'}</span><ShieldCheck size={25} strokeWidth={1.5} /></div>
+        <h2 id="spend-title">פנוי להוצאה עד סוף החודש</h2><Money value={flow.safeToSpend} className="v2-hero-amount" />
+        <p className="v2-spend-description">אחרי ההתחייבויות הידועות ורשת הביטחון</p>
+        <div className="v2-spend-footer"><div><span className="v2-daily"><Money value={flow.dailyAllowance} /> <small>ליום, בממוצע</small></span><span className="v2-days">נשארו {flow.daysRemaining} ימים בחודש</span></div><button className="v2-explain-button" onClick={() => setShowCalculation(!showCalculation)} aria-expanded={showCalculation}>איך חישבנו?<ChevronDown size={16} className={showCalculation ? 'v2-rotated' : ''} /></button></div>
+        {showCalculation && <div className="v2-calculation"><div><span>יתרה נוכחית</span><Money value={flow.currentBalance} /></div><div><span>התחייבויות שנותרו</span><Money value={-flow.remainingCommitted} /></div><div><span>שמירה להוצאות שוטפות</span><Money value={-flow.variableReserve} /></div><div><span>רשת ביטחון</span><Money value={-flow.buffer} /></div><p>החישוב נשען על המידע שהוזן. הכנסות עתידיות אינן כסף זמין היום; הוצאות חדשות עשויות לשנות את הסכום.</p></div>}
+      </section>
+      <section className="v2-balance-card v2-panel"><div className="v2-card-label"><span className="v2-icon-box"><Wallet size={20} /></span><span>המצב בחשבון</span></div><div className="v2-balance-value"><span>יתרה נוכחית</span><Money value={flow.currentBalance} /></div><div className="v2-balance-divider" /><div className="v2-projection"><div><span>צפי לסוף החודש</span><Money value={flow.projectedEndBalance} className={flow.projectedEndBalance < 0 ? 'v2-negative' : ''} /></div><span className="v2-projection-icon"><TrendingUp size={24} /></span></div><p className="v2-footnote"><Info size={13} />לפי היתרה שהוזנה והתנועות הידועות</p></section>
     </div>
-  );
+    <section className="v2-metrics" aria-label="החודש במספרים">
+      <button className="v2-metric" onClick={() => onNavigateToTab('transactions')}><span className="v2-metric-heading"><span className="v2-mini-icon green"><ArrowDownLeft size={17} /></span>הכנסות שהתקבלו</span><Money value={flow.actualIncome} /><span className="v2-metric-note">נכנסו החודש לחשבון</span></button>
+      <button className="v2-metric" onClick={scrollToUpcoming}><span className="v2-metric-heading"><span className="v2-mini-icon blue"><CalendarDays size={17} /></span>הכנסות בדרך</span><Money value={flow.expectedIncome} /><span className="v2-metric-note">צפויות עד סוף החודש</span></button>
+      <button className="v2-metric" onClick={() => onNavigateToTab('transactions')}><span className="v2-metric-heading"><span className="v2-mini-icon sand"><ArrowUpRight size={17} /></span>הוצאות קבועות</span><Money value={flow.actualFixedExpenses} /><span className="v2-metric-note">עוד <Money value={flow.expectedFixedExpenses} /> צפויים החודש</span></button>
+      <button className="v2-metric" onClick={() => onNavigateToTab('budget')}><span className="v2-metric-heading"><span className="v2-mini-icon lilac"><ArrowUpRight size={17} /></span>הוצאות משתנות</span><Money value={flow.actualVariableExpenses} /><span className="v2-metric-note">עוד <Money value={flow.expectedVariableExpenses} /> מתוכננים</span></button>
+    </section>
+    <div className="v2-middle-grid">
+      <section className="v2-panel v2-chart-card"><div className="v2-section-heading"><div><h2>המשך החודש, במבט קדימה</h2><p>היתרה הצפויה לפי התנועות שכבר ידועות</p></div><span className="v2-chart-legend"><i />תחזית</span></div>
+        <div className="v2-chart-value"><Money value={activePoint.balance} /><span>{activePoint.date === today ? 'היום' : fmtDate(activePoint.date)}{activeEvents.length ? ` · ${activeEvents.map(item => item.description).join(', ')}` : ' · יתרה צפויה'}</span></div>
+        <div className="v2-chart" dir="ltr"><svg viewBox="0 0 700 212" role="img" aria-label={`תחזית יתרה מהיום עד סוף החודש. יתרת סיום ${fmtILS(flow.projectedEndBalance)}. יתרה נמוכה ביותר ${fmtILS(flow.lowestProjectedBalance)} בתאריך ${fmtDate(flow.lowestBalanceDate)}`}><defs><linearGradient id="v2-chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#79B19A" stopOpacity=".28" /><stop offset="100%" stopColor="#79B19A" stopOpacity=".015" /></linearGradient></defs>{[.25, .55, .85].map(ratio => <line key={ratio} x1="42" x2="658" y1={20 + ratio * 150} y2={20 + ratio * 150} stroke="#E7EBE6" strokeDasharray="3 5" />)}{chartMin < 0 && <line x1="42" x2="658" y1={y(0)} y2={y(0)} stroke="#D8DCD6" />}<path d={chartArea} fill="url(#v2-chart-fill)" /><path d={chartPath} fill="none" stroke="#2D7964" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />{points.map((point, index) => <g key={point.date}><title>{fmtDate(point.date)}: {fmtILS(point.balance)}</title>{(point.income > 0 || index === 0 || index === points.length - 1 || index === activeIndex) && <circle cx={x(index)} cy={y(point.balance)} r={index === activeIndex ? 6 : 4} fill={index === points.length - 1 ? '#D7F281' : '#FFF'} stroke="#2D7964" strokeWidth="2" />}<rect x={x(index) - 13} y="0" width="26" height="190" fill="transparent" onMouseEnter={() => setSelectedPoint(index)} onMouseLeave={() => setSelectedPoint(null)} onClick={() => setSelectedPoint(index)} /></g>)}{[0, Math.floor((points.length - 1) / 2), points.length - 1].filter((index, i, array) => array.indexOf(index) === i).map(index => <text key={index} x={x(index)} y="207" textAnchor="middle" fill="#77837C" fontSize="11">{index === 0 ? 'היום' : `${Number(points[index].date.slice(-2))}.${now.getMonth() + 1}`}</text>)}</svg></div>
+        <input className="v2-chart-slider" type="range" min={0} max={points.length - 1} value={activeIndex} onChange={event => setSelectedPoint(Number(event.target.value))} aria-label="בחרו יום בתחזית" />
+        <div className="v2-chart-bottom"><span><span className="v2-small-dot" />היתרה הנמוכה הצפויה</span><strong><Money value={flow.lowestProjectedBalance} /> <span>ב־{fmtDate(flow.lowestBalanceDate)}</span></strong></div>
+      </section>
+      <aside className="v2-insights"><div className="v2-insight-title"><Sparkles size={18} /><span>שווה תשומת לב</span></div><div className="v2-insight-main"><span className="v2-insight-art">{flow.lowestProjectedBalance < 0 ? <CircleAlert size={26} /> : <Check size={28} />}</span><h2>{flow.lowestProjectedBalance < 0 ? 'מזהים פער מראש' : flow.safeToSpend > 0 ? 'החודש בידיים שלך' : 'שומרים על מרווח נשימה'}</h2><p>{flow.lowestProjectedBalance < 0 ? `ב־${fmtDate(flow.lowestBalanceDate)} צפויה יתרה של ${fmtILS(flow.lowestProjectedBalance)}. כדאי לבדוק אילו הוצאות אפשר להזיז.` : flow.safeToSpend > 0 ? `קצב של כ־${fmtILS(flow.dailyAllowance)} ביום יעזור לשמור על הסכום הפנוי עד סוף החודש.` : 'היתרה הנוכחית כבר שמורה להתחייבויות ולרשת הביטחון. כדאי לעבור על התנועות הקרובות.'}</p></div><button className="v2-insight-link" onClick={() => onNavigateToTab(overspent ? 'budget' : uncategorized ? 'transactions' : 'budget')}><div><strong>{overspent ? `חריגה בתקציב ${overspent[0]}` : uncategorized ? `${uncategorized} תנועות מחכות לסיווג` : 'לתת לכל שקל כיוון'}</strong><p>{overspent ? 'אפשר לעדכן את התכנון להמשך החודש' : uncategorized ? 'סיווג קצר ייתן תמונה מדויקת יותר' : 'התקציב עוזר להפוך כוונה להרגל'}</p></div><ArrowLeft size={18} /></button></aside>
+    </div>
+    {flow.warnings.length > 0 && <details className="v2-data-warnings"><summary><Info size={15} />{flow.warnings.length} פרטים שכדאי להשלים לדיוק התחזית</summary><ul>{flow.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
+    <div className="v2-bottom-grid">
+      <section className="v2-panel" id="v2-upcoming"><div className="v2-section-heading"><div><h2>בקרוב בחשבון</h2><p>{flow.upcoming.length} תנועות צפויות עד סוף החודש</p></div><button className="v2-text-button" onClick={() => setModal('planned')}><Plus size={14} />תכנון תנועה</button></div><div className="v2-upcoming-list">{upcoming.length ? upcoming.map(item => <div className="v2-upcoming-row" key={String(item.id)}><span className={`v2-transaction-icon ${item.amount > 0 ? 'is-income' : ''}`}>{item.emoji}</span><div className="v2-transaction-description"><strong>{item.description}</strong><span>{fmtDate(item.date)} <i>·</i> {item.overdue ? 'ממתינה לאישור ביצוע' : sourceLabel[item.source]}</span></div><Money value={item.amount} className={item.amount > 0 ? 'v2-positive' : ''} />{onUpdateTransaction && <button className="v2-edit-transaction" aria-label={`עריכת ${item.description}`} onClick={() => editUpcoming(item)}><Pencil size={13} /></button>}</div>) : <div className="v2-empty"><CalendarDays size={28} /><strong>המשך החודש פנוי מתכנונים</strong><p>אפשר להוסיף הכנסות והוצאות צפויות כדי לחדד את התמונה.</p></div>}</div>{flow.upcoming.length > 4 && <button className="v2-all-button" onClick={() => setShowAllUpcoming(!showAllUpcoming)}>{showAllUpcoming ? 'הצגת פחות תנועות' : `לכל ${flow.upcoming.length} התנועות`}<ChevronDown size={15} className={showAllUpcoming ? 'v2-rotated' : ''} /></button>}</section>
+      <section className="v2-panel"><div className="v2-section-heading"><div><h2>לאן הכסף הולך?</h2><p>הוצאות שבוצעו החודש לפי קטגוריה</p></div><button className="v2-text-button" onClick={() => onNavigateToTab('budget')}>לכל התקציב<ArrowLeft size={14} /></button></div><div className="v2-category-list">{categories.length ? categories.map(([cat, amount], index) => { const item = budget.find(entry => entry.key === cat); const cap = item?.amount || 0; const percent = cap ? amount / cap * 100 : amount / Math.max(1, totalActualExpenses) * 100; return <button className="v2-category" key={cat} onClick={() => onNavigateToTab('budget')}><div className="v2-category-heading"><span><i className={`v2-category-dot color-${index}`} />{cat}</span><Money value={amount} /></div><div className="v2-progress"><i className={`color-${index}`} style={{ width: `${Math.min(100, percent)}%` }} /></div><div className="v2-category-caption"><span>{cap ? amount > cap ? `חריגה של ${fmtILS(amount - cap)}` : `נשארו ${fmtILS(cap - amount)}` : 'ללא תקציב מוגדר'}</span><span>{cap ? `מתוך ${fmtILS(cap)}` : `${Math.round(percent)}% מההוצאות`}</span></div></button>; }) : <div className="v2-empty"><Wallet size={28} /><strong>כאן מתחילה התמונה שלך</strong><p>אחרי הוספת הוצאות יופיע כאן הפירוט לפי קטגוריות.</p></div>}</div></section>
+    </div>
+    <footer className="v2-dashboard-footer"><span className="v2-footer-brand">AIfina<span>✳</span></span><span>קצת יותר בהירות. קצת יותר שקט.</span><span>התחזית מבוססת על הנתונים שהוזנו</span></footer>
+    {modal && <AddTransactionModal initialStatus={modal} onClose={() => setModal(null)} onAdd={onAddTransaction} />}
+    {editingTransaction && onUpdateTransaction && <AddTransactionModal initialTransaction={editingTransaction} onClose={() => setEditingTransaction(null)} onAdd={saveEditedTransaction} />}
+  </div>;
 };
