@@ -1,8 +1,9 @@
 # Google sign-in setup
 
 Google Cloud project created for this app: `aifina-508221`.
-Branding creation is pending the account owner's acceptance of Google's User Data Policy.
-No OAuth client or secret has been created yet. Sign-in is not live.
+The account owner completed branding and accepted Google's User Data Policy.
+The `AIfina Local Web` OAuth client is configured for local development, and the owner's account is registered as a test user.
+Credentials are installed only in the ignored local `.env`. The local server redirects successfully to Google's AIfina account chooser; completion of account consent and the callback is still pending user verification.
 
 After completing branding, create an OAuth client of type Web application.
 For local development authorize `http://localhost:3000/auth/google/callback`.
