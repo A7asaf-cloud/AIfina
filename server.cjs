@@ -111,7 +111,16 @@ var import_fs2 = __toESM(require("fs"), 1);
 
 // server/authRouter.ts
 var import_express = require("express");
+var import_crypto3 = __toESM(require("crypto"), 1);
+
+// server/googleOAuth.ts
 var import_crypto2 = __toESM(require("crypto"), 1);
+function googleConfigured() {
+  return Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim());
+}
+function validGoogleState(received, expected) {
+  return typeof received === "string" && typeof expected === "string" && /^[a-f0-9]{64}$/.test(received) && /^[a-f0-9]{64}$/.test(expected) && import_crypto2.default.timingSafeEqual(Buffer.from(received), Buffer.from(expected));
+}
 
 // server/authFileStore.ts
 var import_fs = __toESM(require("fs"), 1);
@@ -304,7 +313,7 @@ authRouter.post("/otp/request", async (req, res) => {
     return res.status(429).json({ detail: "\u05D9\u05D5\u05EA\u05E8 \u05DE\u05D3\u05D9 \u05D1\u05E7\u05E9\u05D5\u05EA \u2014 \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D1\u05E2\u05D5\u05D3 15 \u05D3\u05E7\u05D5\u05EA" });
   const code = generateOtp();
   saveOtp({
-    id: import_crypto2.default.randomUUID(),
+    id: import_crypto3.default.randomUUID(),
     email,
     code: hashOtp(email, code),
     expiresAt: new Date(Date.now() + OTP_EXPIRE_MIN * 6e4).toISOString(),
@@ -330,7 +339,7 @@ authRouter.post("/otp/verify", async (req, res) => {
   markOtpUsed(matched.id);
   let user = findAuthUserByEmail(email);
   if (!user) {
-    user = makeUser({ id: import_crypto2.default.randomUUID(), email, name: "" });
+    user = makeUser({ id: import_crypto3.default.randomUUID(), email, name: "" });
     saveAuthUser(user);
   } else {
     user = { ...user, isVerified: true, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
@@ -339,15 +348,24 @@ authRouter.post("/otp/verify", async (req, res) => {
   const accessToken = issueSession(res, user);
   return res.json({ access_token: accessToken, user: formatUser(user) });
 });
+authRouter.get("/google/status", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  return res.json({ configured: googleConfigured() });
+});
 authRouter.get("/google", (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) return res.status(501).json({ detail: "Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8" });
+  if (!googleConfigured()) return res.status(501).json({ detail: "Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8" });
+  const callback = new URL(GOOGLE_REDIRECT_URI());
+  if (req.get("host") !== callback.host) return res.redirect(`${callback.origin}/auth/google`);
+  const state = import_crypto3.default.randomBytes(32).toString("hex");
+  res.cookie("google_oauth_state", state, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/auth/google", maxAge: 6e5 });
+  res.setHeader("Cache-Control", "no-store");
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: GOOGLE_REDIRECT_URI(),
     response_type: "code",
     scope: "openid email profile",
-    access_type: "offline",
+    state,
     prompt: "select_account"
   });
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -359,6 +377,12 @@ authRouter.get("/google/callback", async (req, res) => {
   const redirectUri = GOOGLE_REDIRECT_URI();
   const frontendUrl = process.env.FRONTEND_URL || "https://aifina.ai.studio/";
   if (!clientId || !clientSecret) return res.status(501).send("Google OAuth \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8");
+  const validState = validGoogleState(req.query.state, req.cookies?.google_oauth_state);
+  res.clearCookie("google_oauth_state", { path: "/auth/google" });
+  res.setHeader("Cache-Control", "no-store");
+  if (!validState || typeof code !== "string" || !code || req.query.error) {
+    return res.redirect(`${frontendUrl.replace(/\/$/, "")}/#auth_error=google_failed`);
+  }
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -373,11 +397,12 @@ authRouter.get("/google/callback", async (req, res) => {
     if (!infoRes.ok) throw new Error("User info fetch failed");
     const info = await infoRes.json();
     const email = (info.email || "").toLowerCase().trim();
-    if (!email) throw new Error("No email from Google");
+    if (!email || info.email_verified !== true || typeof info.sub !== "string" || !info.sub) throw new Error("Unverified Google identity");
     let user = findAuthUserByEmail(email);
+    if (user?.googleId && user.googleId !== info.sub) throw new Error("Google identity mismatch");
     if (!user) {
       user = makeUser({
-        id: import_crypto2.default.randomUUID(),
+        id: import_crypto3.default.randomUUID(),
         email,
         name: info.name || "",
         avatarUrl: info.picture || "",
@@ -396,7 +421,7 @@ authRouter.get("/google/callback", async (req, res) => {
     const accessToken = issueSession(res, user);
     return res.redirect(`${frontendUrl}/#access_token=${accessToken}`);
   } catch (err) {
-    console.error("Google OAuth error:", err);
+    console.error("Google OAuth authentication failed");
     return res.redirect(`${process.env.FRONTEND_URL || "https://aifina.ai.studio/"}/#auth_error=google_failed`);
   }
 });
