@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { LOCAL_USER_ID } from './auth/localSession';
 import { UserAccount, UserAppData, Transaction, UserProfile, BudgetPlanItem, InvestmentState, StandingOrder } from './types';
 import { StorageService } from './services/storage';
 import { useAuth, getMemToken } from './auth/AuthContext';
@@ -19,6 +20,12 @@ export default function App() {
   const [appData, setAppData] = useState<UserAppData | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [localSaveFailed, setLocalSaveFailed] = useState(false);
+  useEffect(() => {
+    const onFailure = () => setLocalSaveFailed(true);
+    window.addEventListener('aifina-local-save-failed', onFailure);
+    return () => window.removeEventListener('aifina-local-save-failed', onFailure);
+  }, []);
 
   // Build UserAccount-compatible object from JWT user for StorageService compatibility
   const activeUser: UserAccount | null = authUser ? {
@@ -33,8 +40,14 @@ export default function App() {
 
   // Load user data whenever the authenticated user changes
   useEffect(() => {
-    if (!authUser || !accessToken) { setAppData(null); setNeedsOnboarding(false); return; }
+    if (!authUser || (!accessToken && authUser.id !== LOCAL_USER_ID)) { setAppData(null); setNeedsOnboarding(false); return; }
     StorageService.setActiveUserId(authUser.id);
+    if (authUser.id === LOCAL_USER_ID) {
+      const data = StorageService.getUserData(authUser.id);
+      setAppData(data);
+      setNeedsOnboarding(!data.profile?.onboardingDone);
+      return;
+    }
     if (authUser.id === 'demo_user_id') {
       setAppData(StorageService.getUserData(authUser.id));
       setNeedsOnboarding(false);
@@ -286,6 +299,10 @@ export default function App() {
     <div className="aifina-shell min-h-dvh bg-surface text-ink font-sans relative overflow-x-clip">
       <main className="aifina-main mx-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <div key={activeTab} className="tab-content">
+        {authUser.id === LOCAL_USER_ID && <div className="mb-4 rounded-xl border border-income/30 p-3 text-sm" role="status">
+          {localSaveFailed ? 'השמירה בדפדפן נכשלה. אל תסגור את החלון; הורד גיבוי עכשיו מההגדרות.' : 'חשבון מקומי — הנתונים נשמרים בדפדפן הזה בלבד. מומלץ להוריד גיבוי.'}
+          <button className="mr-2 underline" onClick={() => setActiveTab('settings')}>הגדרות וגיבוי</button>
+        </div>}
         {activeTab === 'dashboard' && (
           <Dashboard
             isDemo={authUser.id === 'demo_user_id'}

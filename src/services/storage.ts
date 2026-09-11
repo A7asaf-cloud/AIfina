@@ -15,6 +15,7 @@ import { getMemToken } from '../auth/AuthContext';
 import { categorize, DEFAULT_BUDGET_PLAN } from '../utils/categories';
 import { getMonthKey } from '../utils/formatters';
 import { createDemoV2 } from './demoV2';
+import { LOCAL_USER_ID } from '../auth/localSession';
 
 const KEYS = {
   USERS: 'fil_users_list',
@@ -316,6 +317,14 @@ export class StorageService {
   }
 
   static saveUserData(userId: string, data: Partial<UserAppData>): void {
+    if (userId === LOCAL_USER_ID) {
+      try {
+        localStorage.setItem(KEYS.DATA_PREFIX + userId, JSON.stringify({ ...this.getUserData(userId), ...data }));
+      } catch {
+        window.dispatchEvent(new Event('aifina-local-save-failed'));
+      }
+      return;
+    }
     if (userId === 'demo_user_id') {
       localStorage.setItem('fil_demo_v2_data', JSON.stringify({ ...this.getUserData(userId), ...data }));
       return;
@@ -340,6 +349,7 @@ export class StorageService {
   }
 
   static pushToServer(userId: string): void {
+    if (userId === LOCAL_USER_ID) return;
     const token = getMemToken();
     if (!token) return;
     const data = this.getUserData(userId);
@@ -352,6 +362,7 @@ export class StorageService {
   }
 
   static async loadFromServer(userId: string, token: string): Promise<UserAppData | null> {
+    if (userId === LOCAL_USER_ID) return null;
     try {
       const res = await fetch(`/api/user/load/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` },

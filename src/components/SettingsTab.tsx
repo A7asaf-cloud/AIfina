@@ -1,5 +1,6 @@
 import React, { useId, useState } from 'react';
 import { IntegrationsStatus } from './IntegrationsStatus';
+import { LOCAL_USER_ID } from '../auth/localSession';
 import { motion } from 'motion/react';
 import { UserProfile, BudgetPlanItem, UserAccount, StandingOrder } from '../types';
 import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
@@ -131,6 +132,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       {/* Gemini API Key */}
       <IntegrationsStatus />
+      {account.id === LOCAL_USER_ID && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">מצב מקומי: הנתונים נשמרים רק בדפדפן הזה, בלי סנכרון ובלי הגנת סיסמה. מומלץ להוריד גיבוי באופן קבוע דרך ״גיבוי ושחזור״ למטה.</p>}
       <p className="text-xs text-muted">מפתח השרת משמש אוטומטית. המפתח האישי למטה הוא אפשרות תאימות בלבד ונשמר בדפדפן.</p>
       <form onSubmit={handleSaveGeminiKey}>
         <SectionTitle title="מפתח Gemini API" action={<span className={`text-[10px] font-bold px-2 py-1 rounded-full ${geminiKeyInput.trim() ? 'bg-[#00C48C]/15 text-income' : 'bg-[#F2C94C]/15 text-[#F2C94C]'}`}><Sparkles className="w-3 h-3 inline" /> {geminiKeyInput.trim() ? 'מוגדר ✓' : 'לא הוגדר'}</span>} />

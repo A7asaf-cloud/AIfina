@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { isLocalMode, enterLocalMode, leaveLocalMode, localUser } from './localSession';
 
 export interface AuthUser {
   id: string;
@@ -9,6 +10,7 @@ export interface AuthUser {
 }
 
 interface AuthContextType {
+  startLocal: () => void;
   user: AuthUser | null;
   accessToken: string | null;
   isAuthenticated: boolean;
@@ -26,7 +28,7 @@ const USER_KEY     = 'fil_auth_user';
 // Module-level reference — always current, no closure staleness
 let _memToken: string | null = localStorage.getItem(TOKEN_KEY);
 
-export function getMemToken(): string | null { return _memToken; }
+export function getMemToken(): string | null { return isLocalMode() ? null : _memToken; }
 export function setMemToken(t: string | null) {
   _memToken = t;
   if (t) localStorage.setItem(TOKEN_KEY, t);
@@ -42,6 +44,8 @@ function setCachedUser(u: AuthUser | null) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [localMode, setLocalMode] = useState(isLocalMode);
+  const startLocal = () => { enterLocalMode(); setLocalMode(true); };
   const [user, setUser]               = useState<AuthUser | null>(getCachedUser);
   const [accessToken, setAccessToken] = useState<string | null>(_memToken);
   const [isLoading, setIsLoading]     = useState(!_memToken); // skip spinner if token already in LS
@@ -116,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const hash = window.location.hash;
+    if (isLocalMode()) { setIsLoading(false); return; }
     const params = new URLSearchParams(hash.slice(1));
     const fragmentToken = params.get('access_token');
 
@@ -134,12 +139,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!accessToken) return;
     const interval = setInterval(() => {
+      if (isLocalMode()) return;
       silentRefresh();
     }, 13 * 60 * 1000); // 13 minutes
     return () => clearInterval(interval);
   }, [accessToken, silentRefresh]);
 
   const logout = useCallback(async () => {
+    if (isLocalMode()) { leaveLocalMode(); setLocalMode(false); clearSession(); return; }
     try {
       await fetch('/auth/logout', {
         method: 'POST', credentials: 'include',
@@ -150,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [accessToken, clearSession]);
 
   const logoutAll = useCallback(async () => {
+    if (isLocalMode()) { leaveLocalMode(); setLocalMode(false); clearSession(); return; }
     try {
       await fetch('/auth/logout-all', {
         method: 'POST', credentials: 'include',
@@ -161,7 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, accessToken, isAuthenticated: !!user, isLoading,
+      user: localMode ? localUser : user, accessToken: localMode ? null : accessToken,
+      isAuthenticated: localMode || !!user, isLoading: localMode ? false : isLoading, startLocal,
       applySession, logout, logoutAll,
     }}>
       {children}

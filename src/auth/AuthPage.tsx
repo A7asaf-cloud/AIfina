@@ -4,7 +4,7 @@ import { useAuth, AuthUser } from './AuthContext';
 import OTPScreen from './OTPScreen';
 
 export default function AuthPage() {
-  const { applySession } = useAuth();
+  const { applySession, startLocal } = useAuth();
   const [stage, setStage]           = useState<'entry' | 'otp'>('entry');
   const [googleLoading, setGoogleLoading] = useState(false);
   const [emailInput, setEmailInput] = useState('');
@@ -61,6 +61,12 @@ export default function AuthPage() {
           <p className="text-muted text-sm mt-1">הכסף שלך, בתמונה ברורה</p>
         </div>
 
+        <div className="mb-5 rounded-2xl border border-income/40 bg-card p-5">
+          <button type="button" className="w-full rounded-xl bg-income px-4 py-3 font-bold text-white" onClick={() => {
+            try { startLocal(); } catch { setError('הדפדפן חוסם שמירת נתונים. אפשר אחסון מקומי ונסה שוב.'); }
+          }}>כניסה בלי הרשמה — הנתונים שלי</button>
+          <p className="mt-3 text-xs leading-6 text-muted">חשבון אישי ריק, ללא Google וללא סיסמה. נשמר אוטומטית בדפדפן הזה בלבד. אין סנכרון בין מכשירים או כתובות אתר. מחיקת נתוני האתר או שימוש בגלישה פרטית עלולים למחוק את המידע. בהגדרות אפשר להוריד גיבוי ולשחזר אותו. לכל מי שמשתמש בדפדפן הזה תהיה גישה לנתונים.</p>
+        </div>
         <div className="mb-5 bg-gradient-to-r from-income/10 to-card border border-income/30 rounded-2xl p-4 shadow-xl">
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
