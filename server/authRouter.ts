@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import { googleConfigured, validGoogleState } from './googleOAuth';
 import {
   hashOtp, verifyOtp, generateOtp,
   createAccessToken, decodeAccessToken,
@@ -117,16 +118,27 @@ authRouter.post('/otp/verify', async (req: Request, res: Response) => {
 
 
 // ── GET /auth/google ──────────────────────────────────────────────────────────
+authRouter.get('/google/status', (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ configured: googleConfigured() });
+});
+
 authRouter.get('/google', (req: Request, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) return res.status(501).json({ detail: 'Google OAuth לא מוגדר' });
+  if (!googleConfigured()) return res.status(501).json({ detail: 'Google OAuth לא מוגדר' });
+  // Start on the callback host so the same browser receives the state cookie.
+  const callback = new URL(GOOGLE_REDIRECT_URI());
+  if (req.get('host') !== callback.host) return res.redirect(`${callback.origin}/auth/google`);
+  const state = crypto.randomBytes(32).toString('hex');
+  res.cookie('google_oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/auth/google', maxAge: 600_000 });
+  res.setHeader('Cache-Control', 'no-store');
 
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: clientId!,
     redirect_uri: GOOGLE_REDIRECT_URI(),
     response_type: 'code',
     scope: 'openid email profile',
-    access_type: 'offline',
+    state,
     prompt: 'select_account',
   });
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -142,6 +154,12 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
   const frontendUrl  = process.env.FRONTEND_URL || 'https://aifina.ai.studio/';
 
   if (!clientId || !clientSecret) return res.status(501).send('Google OAuth לא מוגדר');
+  const validState = validGoogleState(req.query.state, req.cookies?.google_oauth_state);
+  res.clearCookie('google_oauth_state', { path: '/auth/google' });
+  res.setHeader('Cache-Control', 'no-store');
+  if (!validState || typeof code !== 'string' || !code || req.query.error) {
+    return res.redirect(`${frontendUrl.replace(/\/$/, '')}/#auth_error=google_failed`);
+  }
 
   try {
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -159,9 +177,10 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
     const info: any = await infoRes.json();
 
     const email = (info.email || '').toLowerCase().trim();
-    if (!email) throw new Error('No email from Google');
+    if (!email || info.email_verified !== true || typeof info.sub !== 'string' || !info.sub) throw new Error('Unverified Google identity');
 
     let user = findAuthUserByEmail(email);
+    if (user?.googleId && user.googleId !== info.sub) throw new Error('Google identity mismatch');
     if (!user) {
       user = makeUser({
         id: crypto.randomUUID(), email,
@@ -183,7 +202,7 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
     const accessToken = issueSession(res, user);
     return res.redirect(`${frontendUrl}/#access_token=${accessToken}`);
   } catch (err: any) {
-    console.error('Google OAuth error:', err);
+    console.error('Google OAuth authentication failed');
     return res.redirect(`${process.env.FRONTEND_URL || 'https://aifina.ai.studio/'}/#auth_error=google_failed`);
   }
 });

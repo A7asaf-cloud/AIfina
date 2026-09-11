@@ -89,16 +89,23 @@ export default function AuthPage() {
             onClick={async () => {
               setGoogleLoading(true);
               try {
-                const probe = await fetch('/auth/google', { redirect: 'manual' });
-                if (probe.status === 501) {
+                const probe = await fetch('/auth/google/status', { cache: 'no-store' });
+                if (!probe.ok) throw new Error('status unavailable');
+                const status = await probe.json();
+                if (!status.configured) {
                   setError('כניסה עם Google אינה מוגדרת. צור קשר עם מנהל המערכת.');
                   setGoogleLoading(false);
                   return;
                 }
-              } catch {}
+              } catch {
+                setError('לא ניתן לבדוק את חיבור Google כרגע. נסה שוב בעוד רגע.');
+                setGoogleLoading(false);
+                return;
+              }
               window.location.href = '/auth/google';
             }}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm py-3 rounded-2xl transition border border-line mb-4"
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm py-3 rounded-2xl transition border border-line mb-4 disabled:opacity-60"
           >
             <GoogleIcon />
             המשך עם Google
