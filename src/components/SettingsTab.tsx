@@ -73,7 +73,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setApiStatus('בודק חיבור…');
     try {
       await testGeminiConnection(geminiKey);
-      setApiStatus('החיבור ל־Gemini פעיל.');
+      localStorage.setItem('fil_gemini_api_key', geminiKey.trim());
+      setApiStatus('החיבור ל־Gemini פעיל והמפתח נשמר לייבוא הקבצים.');
     } catch (error: any) { setApiStatus(error?.message || 'החיבור נכשל.'); }
   };
 
