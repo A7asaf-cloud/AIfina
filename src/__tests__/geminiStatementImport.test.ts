@@ -17,4 +17,15 @@ describe('Gemini statement import', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ description: 'פז', amount: -250, cat: 'תחבורה' });
   });
+
+  it('retries a temporary 503 and falls back to another model', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"date":"2026-09-12","description":"פז","amount":-20,"cat":"תחבורה"}]' }] } }] }), { status: 200 }));
+    const result = await importStatementWithGemini('קובץ עסקה', 'test-key');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2][0]).toContain('gemini-2.5-flash');
+    expect(result).toHaveLength(1);
+  });
 });
