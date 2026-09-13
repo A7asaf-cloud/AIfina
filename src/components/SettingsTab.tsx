@@ -4,7 +4,6 @@ import { motion } from 'motion/react';
 import { UserProfile, BudgetPlanItem, UserAccount, StandingOrder } from '../types';
 import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
 import { fmtILS } from '../utils/formatters';
-import { generateGeminiContentClient } from '../utils/apiFallback';
 import { Card, SectionTitle, Button, ProgressBar, showToast, showToastError, useConfirm } from './ui';
 import { LogOut, Download, Upload, CheckCircle2, Plus, Trash2, Edit2, X } from 'lucide-react';
 
@@ -71,8 +70,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const testGeminiKey = async () => {
     if (!geminiKey.trim()) { setApiStatus('הזן מפתח לפני הבדיקה.'); return; }
     setApiStatus('בודק חיבור…');
-    try { await generateGeminiContentClient(geminiKey, 'החזר OK בלבד'); setApiStatus('החיבור ל־Gemini פעיל.'); }
-    catch (error: any) { setApiStatus(error?.message || 'החיבור נכשל.'); }
+    try {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey.trim() },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with OK only.' }] }] }),
+      });
+      if (!response.ok) throw new Error(`Gemini החזיר קוד ${response.status}. בדוק שהמפתח פעיל ומורשה ל־Gemini API.`);
+      setApiStatus('החיבור ל־Gemini פעיל.');
+    } catch (error: any) { setApiStatus(error?.message || 'החיבור נכשל.'); }
   };
 
   const gross = p.grossSalary || 0;
