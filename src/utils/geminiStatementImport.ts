@@ -34,10 +34,12 @@ async function callGemini(apiKey: string, body: Record<string, unknown>): Promis
       });
       if (response.ok) return response.json();
       lastStatus = response.status;
-      if (response.status !== 503) break;
+      // A model may be unavailable for a specific API key (404), just like a temporary 503.
+      if (response.status !== 503 && response.status !== 404) break;
     }
   }
   if (lastStatus === 503) throw new Error('Gemini אינו זמין כרגע לאחר ניסיונות חוזרים. נסה שוב בעוד דקה.');
+  if (lastStatus === 404) throw new Error('לא נמצא מודל Gemini זמין עבור המפתח הזה. בדוק שה־Gemini API מופעל בפרויקט Google AI Studio.');
   throw new Error(`Gemini החזיר קוד ${lastStatus}. בדוק את המפתח, ההרשאות והמכסה.`);
 }
 
