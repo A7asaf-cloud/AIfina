@@ -10,6 +10,17 @@ describe('Gemini statement import', () => {
     expect(result[0]).toMatchObject({ description: 'רמי לוי', amount: -125.5, cat: 'מזון ושוק', account: 'ייבוא Gemini' });
   });
 
+  it('normalizes common Gemini date, amount and type variants', () => {
+    const result = parseGeminiTransactions([
+      { transactionDate: '12/09/2026', merchant: 'סופר פארם', amount: '1,234.50', type: 'expense', cat: 'בריאות' },
+      { date: '13.09.26', name: 'משכורת', sum: '10,000', type: 'income', cat: 'הכנסה' },
+    ]);
+    expect(result).toMatchObject([
+      { date: '2026-09-12', description: 'סופר פארם', amount: -1234.5, cat: 'בריאות' },
+      { date: '2026-09-13', description: 'משכורת', amount: 10000, cat: 'הכנסה' },
+    ]);
+  });
+
   it('sends the file to Gemini and returns validated transactions', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"date":"2026-09-12","description":"פז","amount":-250,"cat":"תחבורה"}]' }] } }] }), { status: 200 }));
     const result = await importStatementWithGemini('תאריך,תיאור,סכום\\n12/09/2026,פז,-250', 'test-key');

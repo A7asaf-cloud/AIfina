@@ -2,7 +2,27 @@ import { Transaction } from '../types';
 import { categorize, CATEGORIES, CategoryKey, getCustomRules } from './categories';
 
 const MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-const validDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const normalizeDate = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const local = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  const year = Number(iso?.[1] || (local?.[3] && local[3].length === 2 ? `20${local[3]}` : local?.[3]));
+  const month = Number(iso?.[2] || local?.[2]); const day = Number(iso?.[3] || local?.[1]);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+const normalizeAmount = (value: unknown): number | null => {
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0 ? value : null;
+  if (typeof value !== 'string') return null;
+  const raw = value.trim().replace(/[₪$\s]/g, '').replace(/[^0-9,().-]/g, '');
+  if (!/[0-9]/.test(raw)) return null;
+  const negative = raw.includes('(') || raw.startsWith('-'); const comma = raw.lastIndexOf(','); const dot = raw.lastIndexOf('.');
+  const commaIsThousands = comma >= 0 && dot < 0 && raw.length - comma - 1 === 3;
+  const normalized = comma > dot && !commaIsThousands ? raw.replace(/[().-]/g, '').replace(',', '.') : raw.replace(/[,()]/g, '');
+  const amount = Number(normalized.replace(/^-/, ''));
+  return Number.isFinite(amount) && amount !== 0 ? (negative ? -amount : amount) : null;
+};
 
 async function callGemini(apiKey: string, body: Record<string, unknown>): Promise<any> {
   let lastStatus = 0;
@@ -30,14 +50,16 @@ export function parseGeminiTransactions(payload: unknown): Transaction[] {
   if (!Array.isArray(items)) return [];
   const customRules = getCustomRules();
   return items.flatMap((item: any, index) => {
-    const description = typeof item?.description === 'string' ? item.description.trim() : '';
-    const amount = Number(item?.amount);
-    if (!description || description.length > 200 || !/[א-תA-Za-z]/.test(description) || !Number.isFinite(amount) || amount === 0 || !validDate(item?.date)) return [];
+    const description = String(item?.description || item?.merchant || item?.name || '').trim();
+    const parsedAmount = normalizeAmount(item?.amount ?? item?.sum);
+    const date = normalizeDate(item?.date ?? item?.transactionDate);
+    if (!description || description.length > 200 || !/[א-תA-Za-z]/.test(description) || parsedAmount == null || !date) return [];
+    const amount = item?.type === 'expense' ? -Math.abs(parsedAmount) : item?.type === 'income' ? Math.abs(parsedAmount) : parsedAmount;
     const customCategory = Object.entries(customRules).find(([rule]) => description.toLowerCase().includes(rule.toLowerCase()))?.[1] as CategoryKey | undefined;
     const suggestedCategory = item.cat as CategoryKey;
     const category = customCategory || (CATEGORIES[suggestedCategory] ? suggestedCategory : categorize(description).cat);
     const details = CATEGORIES[category];
-    return [{ id: `gemini-${Date.now()}-${index}-${Math.random()}`, description, amount, date: item.date, cat: category, color: details.color, emoji: details.emoji, account: 'ייבוא Gemini', status: 'posted' }];
+    return [{ id: `gemini-${Date.now()}-${index}-${Math.random()}`, description, amount, date, cat: category, color: details.color, emoji: details.emoji, account: 'ייבוא Gemini', status: 'posted' }];
   });
 }
 
