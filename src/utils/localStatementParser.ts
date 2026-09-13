@@ -13,13 +13,25 @@ const splitRow = (row: string, delimiter: string) => {
 };
 const delimiterFor = (row: string) => ['\t', ';', ','].map(d => ({ d, n: splitRow(row, d).length })).sort((a, b) => b.n - a.n)[0].d;
 const headerIndex = (headers: string[], terms: string[]) => headers.findIndex(header => terms.some(term => header.includes(term)));
+const formatDate = (year: number, month: number, day: number): string | null => {
+  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
 const parseDate = (s: string): string | null => {
-  const match = s.trim().match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$|^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  const value = s.trim();
+  // Excel exports can preserve dates as serial numbers. Only accept the normal modern range.
+  if (/^\d{4,5}$/.test(value)) {
+    const serial = Number(value);
+    if (serial >= 36526 && serial <= 73050) {
+      const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      return formatDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    }
+  }
+  const match = value.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$|^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
   if (!match) return null;
   const year = Number(match[3] ? (match[3].length === 2 ? `20${match[3]}` : match[3]) : match[4]);
   const month = Number(match[2] || match[5]); const day = Number(match[1] || match[6]);
-  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null;
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return formatDate(year, month, day);
 };
 const parseAmount = (value?: string): number | null => {
   if (!value) return null;
@@ -34,14 +46,14 @@ const validDescription = (value?: string) => Boolean(value && /[א-תA-Za-z]/.te
 /** Strict offline importer: headers and exact transaction columns are mandatory. */
 export function parseLocalStatement(content: string): Transaction[] {
   const lines = content.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const headerLine = lines.findIndex(line => /תאריך|date/i.test(line) && /תיאור|פרטי|פרטים|עסק|description|name/i.test(line) && /סכום|חובה|זכות|amount|debit|credit/i.test(line));
+  const headerLine = lines.findIndex(line => /תאריך|מועד|date|posting/i.test(line) && /תיאור|פרטי|פרטים|פעולה|עסק|מוטב|description|merchant|name/i.test(line) && /סכום|חיוב|זיכוי|חובה|זכות|amount|debit|credit/i.test(line));
   if (headerLine < 0) return [];
   const delimiter = delimiterFor(lines[headerLine]);
   const headers = splitRow(lines[headerLine], delimiter).map(normalize);
   const columns: Columns = {
-    date: headerIndex(headers, ['תאריך', 'date']),
-    description: headerIndex(headers, ['תיאור', 'פרטי', 'פרטים', 'בית עסק', 'שם עסק', 'description', 'merchant', 'name']),
-    amount: headerIndex(headers, ['סכום', 'amount']),
+    date: headerIndex(headers, ['תאריך', 'מועד', 'date', 'posting']),
+    description: headerIndex(headers, ['תיאור', 'פרטי', 'פרטים', 'פעולה', 'בית עסק', 'שם עסק', 'מוטב', 'description', 'merchant', 'name']),
+    amount: headerIndex(headers, ['סכום', 'חיוב', 'זיכוי', 'amount']),
     debit: headerIndex(headers, ['חובה', 'debit']), credit: headerIndex(headers, ['זכות', 'credit']),
   };
   if (columns.date < 0 || columns.description < 0 || (columns.amount! < 0 && columns.debit! < 0 && columns.credit! < 0)) return [];
