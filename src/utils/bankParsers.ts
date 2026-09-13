@@ -1,6 +1,6 @@
 /**
  * FinanceIL - File reader for bank statements.
- * Parsing is done by Gemini AI via /api/parse-statement.
+ * Parsing is performed locally in the browser after this reader normalizes files.
  */
 import * as XLSX from 'xlsx';
 

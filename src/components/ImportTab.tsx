@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Transaction } from '../types';
 import { readFileAsText } from '../utils/bankParsers';
+import { parseLocalStatement } from '../utils/localStatementParser';
 import { categorize, CAT_RULES, getCustomRules, CATEGORIES, CategoryKey } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
@@ -49,6 +50,15 @@ export const ImportTab: React.FC<ImportTabProps> = ({
     setErrorMsg(null);
 
     try {
+      const legacyContent = await readFileAsText(file);
+      const localTxs = parseLocalStatement(legacyContent);
+      if (!localTxs.length) {
+        setErrorMsg('לא זוהו תנועות בקובץ. יש לייצא CSV/Excel עם תאריך, תיאור וסכום, או להוסיף תנועה ידנית.');
+        return;
+      }
+      setPreviewTxs(localTxs);
+      return;
+
       const geminiKey = localStorage.getItem('fil_gemini_api_key') || '';
       if (!geminiKey) {
         setErrorMsg('נדרש מפתח Gemini API. הגדר אותו בהגדרות האפליקציה.');
@@ -62,7 +72,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
 להלן תוכן קובץ CSV/Excel של דף חשבון:
 ---
-${content.slice(0, 9000)}
+${legacyContent.slice(0, 9000)}
 ---
 
 משימה: חלץ את כל שורות העסקאות בלבד. התעלם מכותרות, סיכומים ומידע כללי.
@@ -429,20 +439,6 @@ ${content.slice(0, 9000)}
                 </p>
               </button>
 
-              <button
-                onClick={() => setMethod('ocr')}
-                className="bg-slate-950 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl text-right transition-all group cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-2xl mb-3">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <h3 className="font-bold text-white text-base group-hover:text-blue-400 transition-colors">
-                  סריקת תמונה / קבלה (Gemini AI)
-                </h3>
-                <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-                  העלאת צילום מסך של דף תנועות או קבלה — אלגוריתם AI יחלץ את העסקאות אוטומטית!
-                </p>
-              </button>
             </div>
           </div>
 
