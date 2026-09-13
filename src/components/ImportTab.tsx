@@ -50,105 +50,18 @@ export const ImportTab: React.FC<ImportTabProps> = ({
     setErrorMsg(null);
 
     try {
-      const legacyContent = await readFileAsText(file);
-      const localTxs = parseLocalStatement(legacyContent);
+      const content = await readFileAsText(file);
+      const localTxs = parseLocalStatement(content);
       if (!localTxs.length) {
         setErrorMsg('לא זוהו תנועות בקובץ. יש לייצא CSV/Excel עם תאריך, תיאור וסכום, או להוסיף תנועה ידנית.');
         return;
       }
       setPreviewTxs(localTxs);
-      return;
-
-      const geminiKey = localStorage.getItem('fil_gemini_api_key') || '';
-      if (!geminiKey) {
-        setErrorMsg('נדרש מפתח Gemini API. הגדר אותו בהגדרות האפליקציה.');
-        return;
-      }
-
-      const content = await readFileAsText(file);
-
-      const VALID_CATS = ['הכנסה','מזון ושוק','דיור','תחבורה','חשבונות','בריאות','בידור','קניות','חיסכון','שונות'];
-      const prompt = `אתה מומחה בניתוח דפי חשבון בנק וכרטיסי אשראי ישראליים.
-
-להלן תוכן קובץ CSV/Excel של דף חשבון:
----
-${legacyContent.slice(0, 9000)}
----
-
-משימה: חלץ את כל שורות העסקאות בלבד. התעלם מכותרות, סיכומים ומידע כללי.
-לכל עסקה:
-- date: תאריך בפורמט YYYY-MM-DD (שנה 2 ספרות → הנח 20XX)
-- description: שם בית העסק / תיאור הפעולה (לא תאריך, לא מספר בלבד)
-- amount: הסכום כמספר חיובי בלבד
-- type: "expense" = חיוב/הוצאה | "income" = זיכוי/הכנסה
-- cat: קטגוריה אחת מהרשימה: ${VALID_CATS.join(' | ')}
-
-כללים:
-- אם יש שתי עמודות תאריך (עסקה + חיוב) — קח תאריך עסקה
-- סכום שלילי בקובץ = expense
-- עמודת זכות עם ערך = income
-- קובץ אשראי (Max/Cal) — כל העסקאות הן expense
-
-החזר אך ורק JSON תקין ללא markdown:
-[{"date":"YYYY-MM-DD","description":"שם","amount":number,"type":"expense","cat":"מזון ושוק"}]`;
-
-      const raw = await generateGeminiContentClient(geminiKey, [
-        { role: 'user', parts: [{ text: prompt }] }
-      ]);
-
-      const clean = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const first = clean.indexOf('[');
-      const last  = clean.lastIndexOf(']');
-      if (first === -1 || last === -1) throw new Error('Gemini לא החזיר JSON תקין');
-
-      const parsed: any[] = JSON.parse(clean.substring(first, last + 1));
-      const customRules = getCustomRules();
-      const txs: Transaction[] = parsed
-        .filter(t => t.description && t.amount > 0 && t.date)
-        .map((t, i) => {
-          const cleanDesc = String(t.description).trim();
-          const cleanDescLower = cleanDesc.toLowerCase();
-
-          let matchedCat: CategoryKey | null = null;
-          for (const [descKey, catVal] of Object.entries(customRules)) {
-            if (descKey.toLowerCase().trim() === cleanDescLower || cleanDescLower.includes(descKey.toLowerCase().trim())) {
-              matchedCat = catVal as CategoryKey;
-              break;
-            }
-          }
-
-          let catDetails;
-          if (matchedCat) {
-            catDetails = CATEGORIES[matchedCat] || CATEGORIES['שונות'];
-          } else {
-            const aiCat = VALID_CATS.includes(t.cat) ? t.cat : 'שונות';
-            const rule = CAT_RULES.find(r => r.cat === aiCat) || CAT_RULES[CAT_RULES.length - 1];
-            catDetails = { cat: rule.cat, color: rule.color, emoji: rule.emoji };
-          }
-
-          const absAmt = Math.abs(parseFloat(t.amount) || 0);
-          return {
-            id: Date.now() + i + Math.random(),
-            description: cleanDesc,
-            amount: t.type === 'income' ? absAmt : -absAmt,
-            date: String(t.date).slice(0, 10),
-            cat: catDetails.cat,
-            color: catDetails.color,
-            emoji: catDetails.emoji,
-            account: 'ייבוא',
-          };
-        });
-
-      if (txs.length === 0) {
-        setErrorMsg('Gemini לא זיהה עסקאות בקובץ זה. ודא שמדובר בקובץ תנועות תקין.');
-        return;
-      }
-
-      setPreviewTxs(txs);
     } catch (err: any) {
-      setErrorMsg(err.message || 'שגיאה בניתוח הקובץ. ודא שמפתח Gemini תקין ומוגדר בהגדרות.');
+      setErrorMsg(err.message || 'שגיאה בקריאת הקובץ. נסה לייצא מחדש CSV או Excel מדף התנועות של הבנק.');
     } finally {
       setFileLoading(false);
+      e.target.value = '';
     }
   };
 
