@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, ArrowLeft, ChevronDown, CalendarDays, Plus
 import { BudgetPlanItem, StandingOrder, StockHolding, Transaction, UserProfile } from '../types';
 import { calcBudget, CATEGORIES, CategoryKey } from '../utils/categories';
 import { calculateCashflow, localDateKey, CashflowItem } from '../utils/cashflow';
+import { createLocalInsights } from '../utils/localInsights';
 import { fmtDate, fmtILS, monthLabelHe } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
 import '../dashboard-v2.css';
@@ -48,6 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, bud
   const upcoming = showAllUpcoming ? flow.upcoming : flow.upcoming.slice(0, 4);
   const uncategorized = actual.filter(tx => tx.amount < 0 && tx.cat === 'שונות').length;
   const overspent = categories.find(([cat, amount]) => { const target = budget.find(item => item.key === cat)?.amount || 0; return target > 0 && amount > target; });
+  const localInsights = useMemo(() => createLocalInsights(flow, transactions, budget, month), [flow, transactions, budget, month]);
   const scrollToUpcoming = () => document.getElementById('v2-upcoming')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
   const editUpcoming = (item: CashflowItem) => {
@@ -98,7 +100,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, bud
         <input className="v2-chart-slider" type="range" min={0} max={points.length - 1} value={activeIndex} onChange={event => setSelectedPoint(Number(event.target.value))} aria-label="בחרו יום בתחזית" />
         <div className="v2-chart-bottom"><span><span className="v2-small-dot" />היתרה הנמוכה הצפויה</span><strong><Money value={flow.lowestProjectedBalance} /> <span>ב־{fmtDate(flow.lowestBalanceDate)}</span></strong></div>
       </section>
-      <aside className="v2-insights"><div className="v2-insight-title"><Sparkles size={18} /><span>שווה תשומת לב</span></div><div className="v2-insight-main"><span className="v2-insight-art">{flow.lowestProjectedBalance < 0 ? <CircleAlert size={26} /> : <Check size={28} />}</span><h2>{flow.lowestProjectedBalance < 0 ? 'מזהים פער מראש' : flow.safeToSpend > 0 ? 'החודש בידיים שלך' : 'שומרים על מרווח נשימה'}</h2><p>{flow.lowestProjectedBalance < 0 ? `ב־${fmtDate(flow.lowestBalanceDate)} צפויה יתרה של ${fmtILS(flow.lowestProjectedBalance)}. כדאי לבדוק אילו הוצאות אפשר להזיז.` : flow.safeToSpend > 0 ? `קצב של כ־${fmtILS(flow.dailyAllowance)} ביום יעזור לשמור על הסכום הפנוי עד סוף החודש.` : 'היתרה הנוכחית כבר שמורה להתחייבויות ולרשת הביטחון. כדאי לעבור על התנועות הקרובות.'}</p></div><button className="v2-insight-link" onClick={() => onNavigateToTab(overspent ? 'budget' : uncategorized ? 'transactions' : 'budget')}><div><strong>{overspent ? `חריגה בתקציב ${overspent[0]}` : uncategorized ? `${uncategorized} תנועות מחכות לסיווג` : 'לתת לכל שקל כיוון'}</strong><p>{overspent ? 'אפשר לעדכן את התכנון להמשך החודש' : uncategorized ? 'סיווג קצר ייתן תמונה מדויקת יותר' : 'התקציב עוזר להפוך כוונה להרגל'}</p></div><ArrowLeft size={18} /></button></aside>
+      <aside className="v2-insights"><div className="v2-insight-title"><Sparkles size={18} /><span>תובנות אישיות · מקומיות</span></div><div className="v2-insight-main"><span className="v2-insight-art">{flow.lowestProjectedBalance < 0 ? <CircleAlert size={26} /> : <Check size={28} />}</span><h2>{localInsights[0].title}</h2><p>{localInsights[0].detail}</p></div>{localInsights.slice(1).map(insight => <button key={insight.title} className="v2-insight-link" onClick={() => onNavigateToTab(insight.action)}><div><strong>{insight.title}</strong><p>{insight.detail}</p></div><ArrowLeft size={18} /></button>)}<button className="v2-insight-link" onClick={() => onNavigateToTab(localInsights[0].action)}><div><strong>לפעולה</strong><p>הנתונים נשארים אצלך במכשיר — אין API ואין העברת מידע.</p></div><ArrowLeft size={18} /></button></aside>
     </div>
     {flow.warnings.length > 0 && <details className="v2-data-warnings"><summary><Info size={15} />{flow.warnings.length} פרטים שכדאי להשלים לדיוק התחזית</summary><ul>{flow.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
     <div className="v2-bottom-grid">

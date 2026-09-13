@@ -1,13 +1,11 @@
 import React, { useId, useState } from 'react';
-import { IntegrationsStatus } from './IntegrationsStatus';
 import { LOCAL_USER_ID } from '../auth/localSession';
 import { motion } from 'motion/react';
 import { UserProfile, BudgetPlanItem, UserAccount, StandingOrder } from '../types';
 import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
-import { generateGeminiContentClient } from '../utils/apiFallback';
 import { fmtILS } from '../utils/formatters';
 import { Card, SectionTitle, Button, ProgressBar, showToast, showToastError, useConfirm } from './ui';
-import { LogOut, Download, Upload, CheckCircle2, Sparkles, Eye, Plus, Trash2, Edit2, X } from 'lucide-react';
+import { LogOut, Download, Upload, CheckCircle2, Plus, Trash2, Edit2, X } from 'lucide-react';
 
 const CAT_OPTIONS = Object.entries(CATEGORIES).filter(([k]) => k !== 'הכנסה').map(([k, v]) => ({ key: k, color: v.color, emoji: v.emoji }));
 
@@ -51,25 +49,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [p, setP] = useState<UserProfile>({ ...profile });
   const [bPlan, setBPlan] = useState<BudgetPlanItem[]>(budgetPlan.length ? [...budgetPlan] : DEFAULT_BUDGET_PLAN);
   const [savedMsg, setSavedMsg] = useState(false);
-  const [geminiKeyInput, setGeminiKeyInput] = useState(() => localStorage.getItem('fil_gemini_api_key') || '');
-  const [showKey, setShowKey] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [testingKey, setTestingKey] = useState(false);
   const [soForm, setSoForm] = useState<Omit<StandingOrder, 'id'> | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const confirm = useConfirm();
 
-  const handleSaveGeminiKey = (e: React.FormEvent) => { e.preventDefault(); const t = geminiKeyInput.trim(); if (t) localStorage.setItem('fil_gemini_api_key', t); else localStorage.removeItem('fil_gemini_api_key'); showToast('המפתח נשמר ✓', 'success'); };
-
-  const handleTestGeminiKey = async () => {
-    setTestingKey(true); setTestResult(null);
-    const key = geminiKeyInput.trim() || localStorage.getItem('fil_gemini_api_key') || '';
-    try {
-      const text = await generateGeminiContentClient(key, [{ role: 'user', parts: [{ text: 'תגיב במילה אחת: OK' }] }]);
-      setTestResult(text?.toLowerCase().includes('ok') ? { success: true, message: 'מפתח תקין ✓' } : { success: false, message: 'תשובה לא תקינה' });
-    } catch (err: any) { setTestResult({ success: false, message: err.message || 'שגיאה' }); }
-    finally { setTestingKey(false); }
-  };
 
   const totalPct = bPlan.reduce((s, i) => s + i.pct, 0);
   const isBudgetValid = totalPct === 100;
@@ -130,24 +113,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       {savedMsg && <div className="bg-[#00C48C]/10 border border-[#00C48C]/20 text-income p-3 rounded-2xl text-xs font-bold flex items-center justify-between"><span>השינויים נשמרו!</span><CheckCircle2 className="w-4 h-4" /></div>}
 
-      {/* Gemini API Key */}
-      <IntegrationsStatus />
+      <Card className="border border-income/25 bg-[#f6fbf5] text-right"><h2 className="font-bold text-ink">תובנות אישיות ללא API</h2><p className="mt-2 text-sm leading-6 text-muted">התזרים, התקציב והתובנות מחושבים מקומית לפי הנתונים שהזנת. אין מפתח API, אין שיחות ל־AI חיצוני ואין העברת נתונים לצורך התובנות.</p></Card>
       {account.id === LOCAL_USER_ID && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">מצב מקומי: הנתונים נשמרים רק בדפדפן הזה, בלי סנכרון ובלי הגנת סיסמה. מומלץ להוריד גיבוי באופן קבוע דרך ״גיבוי ושחזור״ למטה.</p>}
-      <p className="text-xs text-muted">מפתח השרת משמש אוטומטית. המפתח האישי למטה הוא אפשרות תאימות בלבד ונשמר בדפדפן.</p>
-      <form onSubmit={handleSaveGeminiKey}>
-        <SectionTitle title="מפתח Gemini API" action={<span className={`text-[10px] font-bold px-2 py-1 rounded-full ${geminiKeyInput.trim() ? 'bg-[#00C48C]/15 text-income' : 'bg-[#F2C94C]/15 text-[#F2C94C]'}`}><Sparkles className="w-3 h-3 inline" /> {geminiKeyInput.trim() ? 'מוגדר ✓' : 'לא הוגדר'}</span>} />
-        <Card className="space-y-3">
-          <div className="relative">
-            <input type={showKey ? 'text' : 'password'} value={geminiKeyInput} onChange={e => setGeminiKeyInput(e.target.value)} placeholder="AIzaSy..." className={INPUT_NUM + ' pl-10 text-left font-mono'} />
-            <button type="button" onClick={() => setShowKey(!showKey)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"><Eye className="w-4 h-4" /></button>
-          </div>
-          {testResult && <div className={`p-3 rounded-xl text-xs font-bold ${testResult.success ? 'bg-[#00C48C]/10 text-income' : 'bg-[#FF647C]/10 text-expense'}`}>{testResult.message}</div>}
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={handleTestGeminiKey} disabled={testingKey} className="h-10 flex-1 text-xs">{testingKey ? 'בודק...' : 'בדוק 🧪'}</Button>
-            <Button type="submit" className="h-10 flex-1 text-xs">שמור מפתח ✓</Button>
-          </div>
-        </Card>
-      </form>
 
       {/* Profile Form */}
       <form onSubmit={handleProfileSave}>
