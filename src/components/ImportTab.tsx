@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Transaction } from '../types';
 import { readFileAsText } from '../utils/bankParsers';
 import { parseLocalStatement } from '../utils/localStatementParser';
+import { importStatementWithGemini } from '../utils/geminiStatementImport';
 import { categorize, CAT_RULES, getCustomRules, CATEGORIES, CategoryKey } from '../utils/categories';
 import { fmtILS, fmtDate } from '../utils/formatters';
 import { generateGeminiContentClient } from '../utils/apiFallback';
@@ -51,12 +52,13 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
     try {
       const content = await readFileAsText(file);
-      const localTxs = parseLocalStatement(content);
-      if (!localTxs.length) {
-        setErrorMsg('לא זוהו תנועות בקובץ. יש לייצא CSV/Excel עם תאריך, תיאור וסכום, או להוסיף תנועה ידנית.');
+      const apiKey = localStorage.getItem('fil_gemini_api_key') || '';
+      const transactions = apiKey ? await importStatementWithGemini(content, apiKey) : parseLocalStatement(content);
+      if (!transactions.length) {
+        setErrorMsg(apiKey ? 'Gemini לא מצא עסקאות תקינות בקובץ. נסה לייצא את פירוט העסקאות מחדש.' : 'לא זוהו תנועות בקובץ. אפשר להגדיר Gemini API בהגדרות לניתוח פורמטים נוספים.');
         return;
       }
-      setPreviewTxs(localTxs);
+      setPreviewTxs(transactions);
     } catch (err: any) {
       setErrorMsg(err.message || 'שגיאה בקריאת הקובץ. נסה לייצא מחדש CSV או Excel מדף התנועות של הבנק.');
     } finally {
