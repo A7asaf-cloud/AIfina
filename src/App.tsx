@@ -11,6 +11,7 @@ import { TransactionsTab } from './components/TransactionsTab';
 import { BudgetTab } from './components/BudgetTab';
 import { InvestmentsTab } from './components/InvestmentsTab';
 import { SettingsTab } from './components/SettingsTab';
+import { FinancialAssistantTab } from './components/FinancialAssistantTab';
 import { BottomNav } from './components/BottomNav';
 import { ToastHost, ConfirmProvider } from './components/ui';
 
@@ -349,6 +350,10 @@ export default function App() {
             onUpdateInvestments={handleUpdateInvestments}
             onUpdateSnapshots={handleUpdateSnapshots}
           />
+        )}
+
+        {activeTab === 'assistant' && (
+          <FinancialAssistantTab profile={appData.profile} transactions={appData.transactions} onNavigateToTab={setActiveTab} />
         )}
 
         {activeTab === 'settings' && (
