@@ -25,8 +25,21 @@ const normalizeAmount = (value: unknown): number | null => {
 };
 
 async function callGemini(apiKey: string, body: Record<string, unknown>): Promise<any> {
+  let availableModels: string[] = [];
+  try {
+    const listResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': apiKey.trim() } });
+    if (listResponse.ok) {
+      const data = await listResponse.json();
+      availableModels = (Array.isArray(data?.models) ? data.models : [])
+        .filter((model: any) => Array.isArray(model?.supportedGenerationMethods) && model.supportedGenerationMethods.includes('generateContent'))
+        .map((model: any) => String(model.name || '').replace(/^models\//, ''))
+        .filter(Boolean)
+        .sort((a: string, b: string) => Number(b.includes('flash')) - Number(a.includes('flash')));
+    }
+  } catch { /* The known model list below remains a safe fallback. */ }
+  const models = [...new Set([...availableModels, ...MODELS])];
   let lastStatus = 0;
-  for (const model of MODELS) {
+  for (const model of models) {
     // A transient 503 is retried once, then the next compatible model is tried.
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {

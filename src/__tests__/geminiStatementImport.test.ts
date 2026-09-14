@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { importStatementWithGemini, parseGeminiTransactions } from '../utils/geminiStatementImport';
 
+const modelsResponse = () => new Response(JSON.stringify({ models: [{ name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] }, { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }] }), { status: 200 });
+const transactionResponse = (amount = -20) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: `[{"date":"2026-09-12","description":"פז","amount":${amount},"cat":"תחבורה"}]` }] } }] }), { status: 200 });
+
 describe('Gemini statement import', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -22,7 +25,7 @@ describe('Gemini statement import', () => {
   });
 
   it('sends the file to Gemini and returns validated transactions', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"date":"2026-09-12","description":"פז","amount":-250,"cat":"תחבורה"}]' }] } }] }), { status: 200 }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => String(url).endsWith('/models') ? modelsResponse() : transactionResponse(-250));
     const result = await importStatementWithGemini('תאריך,תיאור,סכום\\n12/09/2026,פז,-250', 'test-key');
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('generativelanguage.googleapis.com'), expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ 'x-goog-api-key': 'test-key' }) }));
     expect(result).toHaveLength(1);
@@ -31,23 +34,25 @@ describe('Gemini statement import', () => {
 
   it('retries a temporary 503 and falls back to another model', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(modelsResponse())
       .mockResolvedValueOnce(new Response('', { status: 503 }))
       .mockResolvedValueOnce(new Response('', { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"date":"2026-09-12","description":"פז","amount":-20,"cat":"תחבורה"}]' }] } }] }), { status: 200 }));
+      .mockResolvedValueOnce(transactionResponse());
     const result = await importStatementWithGemini('קובץ עסקה', 'test-key');
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[2][0]).toContain('gemini-2.5-flash');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[3][0]).toContain('gemini-2.5-flash');
     expect(result).toHaveLength(1);
   });
 
   it('falls back to another model when the first one returns 404', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(modelsResponse())
       .mockResolvedValueOnce(new Response('', { status: 404 }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"date":"2026-09-12","description":"פז","amount":-20,"cat":"תחבורה"}]' }] } }] }), { status: 200 }));
+      .mockResolvedValueOnce(transactionResponse());
     const result = await importStatementWithGemini('קובץ עסקה', 'test-key');
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[2][0]).toContain('gemini-2.5-flash');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[3][0]).toContain('gemini-2.5-flash');
     expect(result).toHaveLength(1);
   });
 });
