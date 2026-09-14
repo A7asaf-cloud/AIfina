@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseLocalStatement } from '../utils/localStatementParser';
 describe('local statement parser', () => {
+  it('treats an unsigned חיוב column as an expense', () => {
+    const result = parseLocalStatement('תאריך,תיאור,חיוב\n09/09/2026,סופרמרקט,120.50');
+    expect(result).toHaveLength(1);
+    expect(result[0].amount).toBe(-120.5);
+  });
   it('imports only rows under explicit transaction headers', () => {
     const result = parseLocalStatement('תאריך עסקה,שם בית עסק,סכום\n12/09/2026,רמי לוי,-125.50');
     expect(result).toHaveLength(1);

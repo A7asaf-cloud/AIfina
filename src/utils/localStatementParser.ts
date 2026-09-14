@@ -63,7 +63,16 @@ export function parseLocalStatement(content: string): Transaction[] {
     const debit = columns.debit! >= 0 ? parseAmount(cells[columns.debit!]) : null;
     const credit = columns.credit! >= 0 ? parseAmount(cells[columns.credit!]) : null;
     const listed = columns.amount! >= 0 ? parseAmount(cells[columns.amount!]) : null;
-    const signed = credit != null && credit !== 0 ? Math.abs(credit) : debit != null && debit !== 0 ? -Math.abs(debit) : listed;
+    // Card exports often have a single unsigned "חיוב" column; it is still an expense.
+    const amountHeader = columns.amount! >= 0 ? headers[columns.amount!] : '';
+    const listedIsDebit = /חיוב|חובה|debit/.test(amountHeader) && !/זיכוי|זכות|credit/.test(amountHeader);
+    const signed = credit != null && credit !== 0
+      ? Math.abs(credit)
+      : debit != null && debit !== 0
+        ? -Math.abs(debit)
+        : listed != null && listedIsDebit
+          ? -Math.abs(listed)
+          : listed;
     if (signed == null || signed === 0) return [];
     const details = categorize(description!);
     return [{ id: `${Date.now()}-${index}-${Math.random()}`, description: description!, amount: signed, date, cat: details.cat, color: details.color, emoji: details.emoji, account: 'ייבוא מקומי', status: 'posted' }];

@@ -24,6 +24,11 @@ describe('Gemini statement import', () => {
     ]);
   });
 
+  it('uses explicit direction when Gemini returns unsigned amounts', () => {
+    const result = parseGeminiTransactions([{ date: '2026-09-12', description: 'משכורת', amount: 12000, type: 'income' }, { date: '2026-09-12', description: 'קנייה', amount: 90, type: 'expense' }]);
+    expect(result.map(transaction => transaction.amount)).toEqual([12000, -90]);
+  });
+
   it('sends the file to Gemini and returns validated transactions', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => String(url).endsWith('/models') ? modelsResponse() : transactionResponse(-250));
     const result = await importStatementWithGemini('תאריך,תיאור,סכום\\n12/09/2026,פז,-250', 'test-key');
