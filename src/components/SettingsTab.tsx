@@ -157,7 +157,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <InputField label="יום משכורת" type="number" value={p.salaryDay} onChange={(v: number) => setP({ ...p, salaryDay: v })} min="1" max="31" />
-            <InputField label="יום חיוב אשראי" type="number" value={p.creditDay} onChange={(v: number) => setP({ ...p, creditDay: v })} min="1" max="31" />
+            <InputField label="יום ירידת חיוב האשראי" type="number" value={p.creditDay} onChange={(v: number) => setP({ ...p, creditDay: v })} min="1" max="31" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <InputField label="יום תחילת מחזור האשראי" type="number" value={p.creditCycleDay ?? p.creditDay} onChange={(v: number) => setP({ ...p, creditCycleDay: v })} min="1" max="31" />
+            <p className="self-end text-xs leading-5 text-muted pb-1">לדוגמה: 9 עד 9 – עסקאות מה־9 ועד ה־8 הבא ישויכו לחיוב הבא.</p>
           </div>
           <div className="border-t border-line pt-3 space-y-3">
             <p className="text-sm font-bold text-muted">הפרשות סוציאליות</p>

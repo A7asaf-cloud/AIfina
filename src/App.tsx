@@ -322,6 +322,7 @@ export default function App() {
         {activeTab === 'transactions' && (
           <TransactionsTab
             onUpdateTransaction={handleUpdateTransaction}
+            profile={appData.profile}
             transactions={appData.transactions}
             onAddTransaction={handleAddTransaction}
             onDeleteTransaction={handleDeleteTransaction}

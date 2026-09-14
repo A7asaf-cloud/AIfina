@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Transaction } from '../types';
+import { Transaction, UserProfile } from '../types';
+import { assignImportedCreditCycle } from '../utils/creditCycle';
 import { readFileAsText } from '../utils/bankParsers';
 import { parseLocalStatement } from '../utils/localStatementParser';
 import { importStatementWithGemini } from '../utils/geminiStatementImport';
@@ -23,16 +24,19 @@ import {
 interface ImportTabProps {
   onImportTransactions: (txs: Transaction[]) => void;
   onUpdateInvestment?: (data: any) => void;
+  profile: UserProfile;
 }
 
 export const ImportTab: React.FC<ImportTabProps> = ({
   onImportTransactions,
   onUpdateInvestment,
+  profile,
 }) => {
   const [method, setMethod] = useState<'choose' | 'excel' | 'ocr' | 'info' | 'scraper'>('choose');
   const [fileLoading, setFileLoading] = useState(false);
   const [previewTxs, setPreviewTxs] = useState<Transaction[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [statementType, setStatementType] = useState<'bank' | 'credit'>('bank');
 
   // OCR state
   const [ocrImage, setOcrImage] = useState<string | null>(null);
@@ -58,7 +62,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         setErrorMsg(apiKey ? 'Gemini לא מצא עסקאות תקינות בקובץ. נסה לייצא את פירוט העסקאות מחדש.' : 'לא זוהו תנועות בקובץ. אפשר להגדיר Gemini API בהגדרות לניתוח פורמטים נוספים.');
         return;
       }
-      setPreviewTxs(transactions);
+      setPreviewTxs(statementType === 'credit' ? assignImportedCreditCycle(transactions, profile) : transactions);
     } catch (err: any) {
       setErrorMsg(err.message || 'שגיאה בקריאת הקובץ. נסה לייצא מחדש CSV או Excel מדף התנועות של הבנק.');
     } finally {
@@ -404,6 +408,11 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
           {previewTxs.length === 0 ? (
             <div className="space-y-4 text-center py-6">
+              <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                <button type="button" onClick={() => setStatementType('bank')} className={'rounded-xl border px-3 py-2 ' + (statementType === 'bank' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 text-slate-400')}>דף חשבון בנק</button>
+                <button type="button" onClick={() => setStatementType('credit')} className={'rounded-xl border px-3 py-2 ' + (statementType === 'credit' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 text-slate-400')}>פירוט חיובי אשראי</button>
+              </div>
+              {statementType === 'credit' && <p className="text-xs text-emerald-300">העסקאות ישויכו אוטומטית לתאריך החיוב הקרוב לפי המחזור שהגדרת.</p>}
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-slate-700 hover:border-emerald-500/50 bg-slate-950 p-8 rounded-2xl cursor-pointer transition-all space-y-3"

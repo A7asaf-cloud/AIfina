@@ -18,6 +18,7 @@ export interface UserProfile {
   grossSalary: number;
   salaryDay: number;
   creditDay: number;
+  creditCycleDay?: number;
   bankBalance: number;
   creditDebt: number;
   rent: number;

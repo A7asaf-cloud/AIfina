@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, ArrowLeft, ChevronDown, CalendarDays, Plus, Wallet, ShieldCheck, Sparkles, TrendingUp, Info, Check, CircleAlert, Pencil, BrainCircuit, LockKeyhole, ChevronRight } from 'lucide-react';
 import { BudgetPlanItem, StandingOrder, StockHolding, Transaction, UserProfile } from '../types';
 import { calcBudget, CATEGORIES, CategoryKey } from '../utils/categories';
@@ -26,8 +26,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, bud
   const [showCalculation, setShowCalculation] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [showAdvisor, setShowAdvisor] = useState(false);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
-  const now = new Date();
+  const advisorRef = useRef<HTMLElement>(null);
+  const now = useMemo(() => {
+    const base = new Date();
+    if (monthOffset === 0) return base;
+    const date = new Date(base.getFullYear(), base.getMonth() + monthOffset, 1, 12);
+    if (monthOffset < 0) date.setDate(new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate());
+    return date;
+  }, [monthOffset]);
   const today = localDateKey(now);
   const month = today.slice(0, 7);
   const flow = useMemo(() => calculateCashflow(profile, transactions, standingOrders, now), [profile, transactions, standingOrders, today]);
@@ -52,6 +60,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, bud
   const overspent = categories.find(([cat, amount]) => { const target = budget.find(item => item.key === cat)?.amount || 0; return target > 0 && amount > target; });
   const localInsights = useMemo(() => createLocalInsights(flow, transactions, budget, month), [flow, transactions, budget, month]);
   const scrollToUpcoming = () => document.getElementById('v2-upcoming')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  useEffect(() => {
+    if (showAdvisor) advisorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [showAdvisor]);
 
   const editUpcoming = (item: CashflowItem) => {
     const existing = transactions.find(tx => tx.id === item.id);
@@ -75,7 +86,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, bud
   return <div className="v2-dashboard" dir="rtl">
     <header className="v2-page-header">
       <div><div className="v2-eyebrow">מרחב אישי · {profile.name || 'הכסף שלך'}</div><h1>התזרים שלי<span className="v2-title-dot">.</span></h1><p>כל החודש מול העיניים. צעד אחד יותר ברור.</p></div>
-      <div className="v2-header-actions"><span className="v2-month"><CalendarDays size={16} />{monthLabelHe(now.getFullYear(), now.getMonth())}</span><button className="v2-advisor-button" onClick={() => setShowAdvisor(!showAdvisor)} aria-expanded={showAdvisor}><BrainCircuit size={17} />יועץ אישי</button><button className="v2-button" onClick={() => setModal('posted')}><Plus size={17} />הוספת תנועה</button></div>
+      <div className="v2-header-actions"><span className="v2-month"><button type="button" className="v2-month-nav" aria-label="חודש קודם" onClick={() => { setMonthOffset(value => value - 1); setSelectedPoint(null); }}><ChevronRight size={16} /></button><CalendarDays size={16} />{monthLabelHe(now.getFullYear(), now.getMonth())}<button type="button" className="v2-month-nav" aria-label="חודש הבא" onClick={() => { setMonthOffset(value => value + 1); setSelectedPoint(null); }}><ArrowLeft size={16} /></button></span><button className="v2-advisor-button" onClick={() => setShowAdvisor(value => !value)} aria-expanded={showAdvisor} aria-controls="advisor-panel"><BrainCircuit size={17} />יועץ אישי</button><button className="v2-button" onClick={() => setModal('posted')}><Plus size={17} />הוספת תנועה</button></div>
     </header>
     {isDemo && <div className="v2-demo-notice"><span><Sparkles size={15} />סביבת הדגמה אינטראקטיבית</span><span>נתונים לדוגמה · אפשר להתנסות בהוספת תנועות</span></div>}
     <div className="v2-top-grid">
@@ -103,7 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, transactions, bud
       </section>
       <aside className="v2-insights"><div className="v2-insight-title"><Sparkles size={18} /><span>תובנות אישיות · מקומיות</span></div><div className="v2-insight-main"><span className="v2-insight-art">{flow.lowestProjectedBalance < 0 ? <CircleAlert size={26} /> : <Check size={28} />}</span><h2>{localInsights[0].title}</h2><p>{localInsights[0].detail}</p></div>{localInsights.slice(1).map(insight => <button key={insight.title} className="v2-insight-link" onClick={() => onNavigateToTab(insight.action)}><div><strong>{insight.title}</strong><p>{insight.detail}</p></div><ArrowLeft size={18} /></button>)}<button className="v2-insight-link" onClick={() => onNavigateToTab(localInsights[0].action)}><div><strong>לפעולה</strong><p>הנתונים נשארים אצלך במכשיר — אין API ואין העברת מידע.</p></div><ArrowLeft size={18} /></button></aside>
     </div>
-    {showAdvisor && <section className="v2-advisor" aria-labelledby="advisor-title"><div className="v2-advisor-head"><div className="v2-advisor-mark"><BrainCircuit size={24} /></div><div><span>AI פיננסי מקומי</span><h2 id="advisor-title">היועץ האישי שלך</h2><p>קורא רק את הנתונים שכבר נמצאים אצלך באפליקציה. לא נשלח מידע החוצה.</p></div><button onClick={() => setShowAdvisor(false)} aria-label="סגירת היועץ">×</button></div><div className="v2-advisor-health"><div><span>מצב החודש</span><strong className={flow.lowestProjectedBalance < 0 ? 'danger' : ''}>{flow.lowestProjectedBalance < 0 ? 'דורש תשומת לב' : flow.safeToSpend > 0 ? 'בשליטה' : 'זהירות'}</strong></div><div><span>פנוי להוצאה</span><strong><Money value={flow.safeToSpend} /></strong></div><div><span>פעולות מומלצות</span><strong>{localInsights.length}</strong></div></div><div className="v2-advisor-list">{localInsights.map((insight, index) => <button key={insight.title} className="v2-advisor-item" onClick={() => onNavigateToTab(insight.action)}><span className="v2-advisor-number">0{index + 1}</span><div><strong>{insight.title}</strong><p>{insight.detail}</p><span>לבדיקה <ChevronRight size={13} /></span></div></button>)}</div><div className="v2-advisor-privacy"><LockKeyhole size={15} /><span>ניתוח מקומי בלבד · ללא מפתח API · ללא העלאת עסקאות</span></div></section>}
+    {showAdvisor && <section ref={advisorRef} id="advisor-panel" className="v2-advisor" aria-labelledby="advisor-title"><div className="v2-advisor-head"><div className="v2-advisor-mark"><BrainCircuit size={24} /></div><div><span>AI פיננסי מקומי</span><h2 id="advisor-title">היועץ האישי שלך</h2><p>קורא רק את הנתונים שכבר נמצאים אצלך באפליקציה. לא נשלח מידע החוצה.</p></div><button onClick={() => setShowAdvisor(false)} aria-label="סגירת היועץ">×</button></div><div className="v2-advisor-health"><div><span>מצב החודש</span><strong className={flow.lowestProjectedBalance < 0 ? 'danger' : ''}>{flow.lowestProjectedBalance < 0 ? 'דורש תשומת לב' : flow.safeToSpend > 0 ? 'בשליטה' : 'זהירות'}</strong></div><div><span>פנוי להוצאה</span><strong><Money value={flow.safeToSpend} /></strong></div><div><span>פעולות מומלצות</span><strong>{localInsights.length}</strong></div></div><div className="v2-advisor-list">{localInsights.map((insight, index) => <button key={insight.title} className="v2-advisor-item" onClick={() => onNavigateToTab(insight.action)}><span className="v2-advisor-number">0{index + 1}</span><div><strong>{insight.title}</strong><p>{insight.detail}</p><span>לבדיקה <ChevronRight size={13} /></span></div></button>)}</div><div className="v2-advisor-privacy"><LockKeyhole size={15} /><span>ניתוח מקומי בלבד · ללא מפתח API · ללא העלאת עסקאות</span></div></section>}
     {flow.warnings.length > 0 && <details className="v2-data-warnings"><summary><Info size={15} />{flow.warnings.length} פרטים שכדאי להשלים לדיוק התחזית</summary><ul>{flow.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
     <div className="v2-bottom-grid">
       <section className="v2-panel" id="v2-upcoming"><div className="v2-section-heading"><div><h2>בקרוב בחשבון</h2><p>{flow.upcoming.length} תנועות צפויות עד סוף החודש</p></div><button className="v2-text-button" onClick={() => setModal('planned')}><Plus size={14} />תכנון תנועה</button></div><div className="v2-upcoming-list">{upcoming.length ? upcoming.map(item => <div className="v2-upcoming-row" key={String(item.id)}><span className={`v2-transaction-icon ${item.amount > 0 ? 'is-income' : ''}`}>{item.emoji}</span><div className="v2-transaction-description"><strong>{item.description}</strong><span>{fmtDate(item.date)} <i>·</i> {item.overdue ? 'ממתינה לאישור ביצוע' : sourceLabel[item.source]}</span></div><Money value={item.amount} className={item.amount > 0 ? 'v2-positive' : ''} />{onUpdateTransaction && <button className="v2-edit-transaction" aria-label={`עריכת ${item.description}`} onClick={() => editUpcoming(item)}><Pencil size={13} /></button>}</div>) : <div className="v2-empty"><CalendarDays size={28} /><strong>המשך החודש פנוי מתכנונים</strong><p>אפשר להוסיף הכנסות והוצאות צפויות כדי לחדד את התמונה.</p></div>}</div>{flow.upcoming.length > 4 && <button className="v2-all-button" onClick={() => setShowAllUpcoming(!showAllUpcoming)}>{showAllUpcoming ? 'הצגת פחות תנועות' : `לכל ${flow.upcoming.length} התנועות`}<ChevronDown size={15} className={showAllUpcoming ? 'v2-rotated' : ''} /></button>}</section>

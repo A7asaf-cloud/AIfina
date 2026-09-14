@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Transaction, InvestmentState } from '../types';
+import { Transaction, InvestmentState, UserProfile } from '../types';
 import { ALL_CATS } from '../utils/categories';
 import { fmtILS, fmtDate, dayLabelHe } from '../utils/formatters';
 import { AddTransactionModal } from './AddTransactionModal';
@@ -16,6 +16,7 @@ interface TransactionsTabProps {
   onImportTransactions: (txs: Transaction[]) => void;
   onUpdateInvestment: (partial: Partial<InvestmentState>) => void;
   onUpdateTransaction?: (tx: Transaction) => void;
+  profile: UserProfile;
 }
 
 const todayLocal = () => {
@@ -27,7 +28,7 @@ const statusLabel = { posted: 'בוצעה', planned: 'מתוכננת', pending: 
 
 export const TransactionsTab: React.FC<TransactionsTabProps> = ({
   transactions, onAddTransaction, onDeleteTransaction, onUpdateCategory,
-  onImportTransactions, onUpdateInvestment, onUpdateTransaction,
+  onImportTransactions, onUpdateInvestment, onUpdateTransaction, profile,
 }) => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
@@ -186,7 +187,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
             <h3 className="text-lg font-bold text-ink">ייבוא עסקאות</h3>
             <button onClick={() => setShowImport(false)} className="w-8 h-8 rounded-full bg-surface flex items-center justify-center text-muted hover:text-ink cursor-pointer"><X className="w-4 h-4" /></button>
           </div>
-          <ImportTab onImportTransactions={onImportTransactions} onUpdateInvestment={onUpdateInvestment} />
+          <ImportTab onImportTransactions={onImportTransactions} onUpdateInvestment={onUpdateInvestment} profile={profile} />
         </ModalShell>
       )}
     </div>
