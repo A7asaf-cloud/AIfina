@@ -71,9 +71,9 @@ export function calculateCashflow(
   const inMonth = (date: string) => date.slice(0, 7) === month;
   const actual = active.filter(t => inMonth(t.date) && t.date <= today && posted(t) && t.kind !== 'credit-settlement');
   const sumActual = (predicate: (t: Transaction) => boolean) => money(actual.filter(predicate).reduce((s, t) => s + t.amount, 0));
-  const actualIncome = sumActual(t => t.amount > 0);
-  const actualFixedExpenses = Math.abs(sumActual(t => t.amount < 0 && fixed(t)));
-  const actualVariableExpenses = Math.abs(sumActual(t => t.amount < 0 && !fixed(t)));
+  let actualIncome = sumActual(t => t.amount > 0);
+  let actualFixedExpenses = Math.abs(sumActual(t => t.amount < 0 && fixed(t)));
+  let actualVariableExpenses = Math.abs(sumActual(t => t.amount < 0 && !fixed(t)));
   const upcoming: CashflowItem[] = [];
   const settlements = new Set(active.filter(t => t.kind === 'credit-settlement').map(t => t.settlementId || String(t.id)));
   let unknownCredit = false;
@@ -96,20 +96,33 @@ export function calculateCashflow(
   for (const order of standingOrders) {
     if (!order.isActive || !Number.isFinite(order.amount) || occurrenceExists(order.id)) continue;
     const date = dateForDay(order.dayOfMonth);
+    // A recurring item whose calendar date has arrived is treated as completed
+    // unless the user added a specific transaction that says otherwise.
+    if (date <= today) {
+      if (order.amount > 0) actualIncome = money(actualIncome + order.amount);
+      else actualFixedExpenses = money(actualFixedExpenses + Math.abs(order.amount));
+      continue;
+    }
     upcoming.push({ id: 'standing-' + order.id + '-' + month, description: order.description, amount: money(order.amount),
       date, cat: order.cat, emoji: order.emoji, source: 'standing-order', status: 'planned', overdue: date < today, expenseType: 'fixed' });
   }
   const salaryExists = valid.some(t => inMonth(t.date) && t.amount > 0 && (t.recurringId === 'salary' || salaryLike(t.description)));
   if (!salaryExists && !standingOrders.some(o => o.isActive && o.amount > 0 && salaryLike(o.description)) && profile.netSalary > 0) {
     const date = dateForDay(profile.salaryDay);
+    if (date <= today) actualIncome = money(actualIncome + profile.netSalary);
+    else {
     upcoming.push({ id: 'salary-' + month, description: 'משכורת צפויה', amount: money(profile.netSalary), date,
       cat: 'הכנסה', emoji: '💰', source: 'salary', status: 'planned', overdue: date < today });
+    }
   }
   const rentExists = valid.some(t => inMonth(t.date) && t.amount < 0 && (t.recurringId === 'rent' || rentLike(t.description)));
   if (profile.rent > 0 && !rentExists && !standingOrders.some(o => o.isActive && rentLike(o.description))) {
     const date = dateForDay(profile.rentDay);
+    if (date <= today) actualFixedExpenses = money(actualFixedExpenses + profile.rent);
+    else {
     upcoming.push({ id: 'rent-' + month, description: 'שכר דירה צפוי', amount: -money(profile.rent), date,
       cat: 'דיור', emoji: '🏠', source: 'rent', status: 'planned', overdue: date < today, expenseType: 'fixed' });
+    }
   }
   const creditDebt = Math.max(0, money(profile.creditDebt));
   const creditDate = profile.creditDebtDueDate && validDate(profile.creditDebtDueDate) ? profile.creditDebtDueDate : dateForDay(profile.creditDay);
@@ -122,11 +135,11 @@ export function calculateCashflow(
     const knownPurchases = upcoming.filter(i => i.date === date && active.some(t => t.id === i.id && t.paymentMethod === 'credit' && t.kind !== 'credit-settlement'))
       .reduce((s, i) => s - Math.min(0, i.amount), 0);
     const remainingCreditDebt = Math.max(0, money(creditDebt - knownPurchases));
-    if (date <= monthEnd && remainingCreditDebt > 0) upcoming.push({ id: 'credit-' + date, description: 'יתרת חיוב אשראי שהוזן', amount: -remainingCreditDebt, date,
-      cat: 'אשראי', emoji: '💳', source: 'credit', status: 'planned', overdue: date < today, expenseType: 'fixed' });
+    if (date <= today) actualFixedExpenses = money(actualFixedExpenses + remainingCreditDebt);
+    else if (date <= monthEnd && remainingCreditDebt > 0) upcoming.push({ id: 'credit-' + date, description: 'יתרת חיוב אשראי שהוזן', amount: -remainingCreditDebt, date,
+      cat: 'אשראי', emoji: '💳', source: 'credit', status: 'planned', overdue: false, expenseType: 'fixed' });
     else if (date > monthEnd) extraCreditReserve = creditDebt;
     warnings.push('חוב האשראי מבוסס על הסכום שהוזן; יש לוודא אילו רכישות כלולות בו.');
-    if (!profile.creditDebtDueDate && date < today) warnings.push('מועד חיוב האשראי עבר. החוב נשמר בצפי עד לאישור ששולם.');
   }
   if (unknownCredit) warnings.push('רכישות אשראי ללא מועד חיוב כלולות בהוצאות אך לא כתשלומי בנק נפרדים. יש לעדכן את חיוב האשראי.');
   upcoming.sort((a, b) => a.date.localeCompare(b.date) || String(a.id).localeCompare(String(b.id)));

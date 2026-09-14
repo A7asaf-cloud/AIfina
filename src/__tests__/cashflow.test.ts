@@ -21,6 +21,20 @@ describe('calculateCashflow', () => {
     expect(result.projectedEndBalance).toBe(17000);
     expect(result.upcoming).toHaveLength(3);
   });
+  it('counts scheduled salary and card billing as completed once their calendar date has passed', () => {
+    const result = calculateCashflow({ ...profile, salaryDay: 9, netSalary: 12000, creditDebt: 1800, creditDay: 10 }, [], [], sept(14));
+    expect(result.actualIncome).toBe(12000);
+    expect(result.actualFixedExpenses).toBe(1800);
+    expect(result.expectedIncome).toBe(0);
+    expect(result.expectedFixedExpenses).toBe(0);
+    expect(result.upcoming.some(item => item.source === 'salary' || item.source === 'credit')).toBe(false);
+  });
+  it('keeps salary and card billing in the forecast before their calendar date', () => {
+    const result = calculateCashflow({ ...profile, salaryDay: 20, netSalary: 12000, creditDebt: 1800, creditDay: 18 }, [], [], sept(14));
+    expect(result.actualIncome).toBe(0);
+    expect(result.expectedIncome).toBe(12000);
+    expect(result.expectedFixedExpenses).toBe(1800);
+  });
   it('includes the last calendar day and uses local date keys', () => {
     const result = calculateCashflow({ ...profile, netSalary: 0 }, [tx({ date: '2026-09-30', amount: -700 })], [], sept(30));
     expect(result.actualVariableExpenses).toBe(700);
@@ -32,15 +46,16 @@ describe('calculateCashflow', () => {
     const result = calculateCashflow({ ...profile, netSalary: 0 }, [], [order({ dayOfMonth: 31 })], new Date(year, 1, 20, 12));
     expect(result.upcoming[0].date).toBe(year + '-02-' + lastDay);
   });
-  it('keeps overdue and today plans unposted and carries last-month overdue plans', () => {
+  it('keeps explicit overdue plans unposted while calendar-based standing orders are completed', () => {
     const result = calculateCashflow({ ...profile, netSalary: 0 }, [
       tx({ status: 'planned', date: '2026-08-28' }),
       tx({ id: 2, status: 'pending', date: '2026-09-09', amount: -200 }),
     ], [order({ dayOfMonth: 8 })], sept(9));
     expect(result.actualVariableExpenses).toBe(0);
-    expect(result.overdue).toHaveLength(2);
-    expect(result.dailyForecast[0].expenses).toBe(4300);
-    expect(result.projectedEndBalance).toBe(5700);
+    expect(result.actualFixedExpenses).toBe(4000);
+    expect(result.overdue).toHaveLength(1);
+    expect(result.dailyForecast[0].expenses).toBe(300);
+    expect(result.projectedEndBalance).toBe(9700);
   });
   it('does not confuse incidental income with salary or duplicate linked recurring items', () => {
     const result = calculateCashflow(profile, [
