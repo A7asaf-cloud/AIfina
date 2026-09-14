@@ -60,7 +60,9 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
     return groups as Record<string, Transaction[]>;
   }, [filtered]);
 
-  const postedTransactions = filtered.filter(t => transactionStatus(t) === 'posted' && t.kind !== 'transfer' && t.kind !== 'credit-settlement');
+  const currentMonth = todayLocal().slice(0, 7);
+  // Keep historical imports visible in the list, but never mix them into this month's headline.
+  const postedTransactions = filtered.filter(t => t.date.slice(0, 7) === currentMonth && transactionStatus(t) === 'posted' && t.kind !== 'transfer' && t.kind !== 'credit-settlement');
   const summaryIncome = postedTransactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const summaryExpense = Math.abs(postedTransactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
 
@@ -100,7 +102,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
       {/* Summary Bar */}
       <Card>
-        <p className="text-xs text-muted mb-3">עסקאות שבוצעו בתוצאות הסינון · ללא העברות פנימיות וחיובי אשראי מרוכזים</p>
+        <p className="text-xs text-muted mb-3">עסקאות שבוצעו החודש בתוצאות הסינון · ללא העברות פנימיות וחיובי אשראי מרוכזים</p>
         <div className="flex justify-between text-center">
           <div><p className="text-xs text-muted">הכנסות</p><p dir="ltr" className="text-sm font-bold text-income font-num">{fmtILS(summaryIncome)}</p></div>
           <div className="border-x border-line px-4"><p className="text-xs text-muted">הוצאות</p><p dir="ltr" className="text-sm font-bold text-expense font-num">{fmtILS(summaryExpense)}</p></div>

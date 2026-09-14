@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Bot, Send, ShieldCheck, Wrench, KeyRound } from 'lucide-react';
 import { Transaction, UserProfile } from '../types';
-import { generateGeminiContentClient } from '../utils/apiFallback';
+import { chatWithGemini } from '../utils/geminiStatementImport';
 import { Button, Card, Spinner } from './ui';
 
 type Message = { role: 'user' | 'model'; text: string };
@@ -23,7 +23,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     try {
       const system = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי, ואל תבצע שינוי ללא אישור מפורש. כשיש חוסר ודאות ציין אותו. נתוני המשתמש: ' + context;
       const contents = [{ role: 'user', parts: [{ text: system }] }, ...next.map(message => ({ role: message.role, parts: [{ text: message.text }] }))];
-      const answer = await generateGeminiContentClient(localStorage.getItem('fil_gemini_api_key') || '', contents);
+      const answer = await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', contents);
       setMessages(current => [...current, { role: 'model', text: answer }]);
     } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לקבל תשובה כרגע. נסה שוב.' }]); }
     finally { setLoading(false); }

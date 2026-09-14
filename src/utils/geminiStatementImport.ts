@@ -56,6 +56,14 @@ async function callGemini(apiKey: string, body: Record<string, unknown>): Promis
   throw new Error(`Gemini החזיר קוד ${lastStatus}. בדוק את המפתח, ההרשאות והמכסה.`);
 }
 
+/** Direct browser call used by the personal assistant on static deployments. */
+export async function chatWithGemini(apiKey: string, contents: Array<{ role: string; parts: Array<{ text: string }> }>): Promise<string> {
+  const data = await callGemini(apiKey, { contents });
+  const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
+  if (!text.trim()) throw new Error('Gemini החזיר תשובה ריקה. נסה שוב.');
+  return text;
+}
+
 export async function testGeminiConnection(apiKey: string): Promise<void> {
   await callGemini(apiKey, { contents: [{ role: 'user', parts: [{ text: 'Reply with OK only.' }] }] });
 }

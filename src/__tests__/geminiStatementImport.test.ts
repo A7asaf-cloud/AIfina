@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { importStatementWithGemini, parseGeminiTransactions } from '../utils/geminiStatementImport';
+import { chatWithGemini, importStatementWithGemini, parseGeminiTransactions } from '../utils/geminiStatementImport';
 
 const modelsResponse = () => new Response(JSON.stringify({ models: [{ name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] }, { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }] }), { status: 200 });
 const transactionResponse = (amount = -20) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: `[{"date":"2026-09-12","description":"פז","amount":${amount},"cat":"תחבורה"}]` }] } }] }), { status: 200 });
@@ -35,6 +35,11 @@ describe('Gemini statement import', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('generativelanguage.googleapis.com'), expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ 'x-goog-api-key': 'test-key' }) }));
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ description: 'פז', amount: -250, cat: 'תחבורה' });
+  });
+
+  it('returns a direct Gemini chat response for static deployments', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => String(url).endsWith('/models') ? modelsResponse() : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'הכול תקין' }] } }] }), { status: 200 }));
+    await expect(chatWithGemini('test-key', [{ role: 'user', parts: [{ text: 'בדיקה' }] }])).resolves.toBe('הכול תקין');
   });
 
   it('retries a temporary 503 and falls back to another model', async () => {
