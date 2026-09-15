@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Bot, Send, ShieldCheck, Wrench, KeyRound } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Bot, Send, ShieldCheck, Wrench, KeyRound, ImagePlus } from 'lucide-react';
 import { Transaction, UserProfile } from '../types';
 import { chatWithGemini } from '../utils/geminiStatementImport';
 import { CATEGORIES, CategoryKey } from '../utils/categories';
@@ -23,8 +23,10 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const hasKey = Boolean(localStorage.getItem('fil_gemini_api_key'));
   const context = useMemo(() => JSON.stringify({ profile: { netSalary: profile.netSalary, bankBalance: profile.bankBalance, creditDebt: profile.creditDebt, safetyBuffer: profile.safetyBuffer, creditDay: profile.creditDay, creditCycleDay: profile.creditCycleDay }, transactions: transactions.slice(0, 120).map(({ date, description, amount, cat, status, paymentMethod, cashflowDate }) => ({ date, description, amount, cat, status, paymentMethod, cashflowDate })) }), [profile, transactions]);
+  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. אתה רשאי להציע פעולה, אך היא תבוצע רק אחרי אישור המשתמש בכפתור. החזר אך ורק JSON תקין במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
   const ask = async (rawQuestion?: string) => {
     const text = (rawQuestion || question).trim();
     if (!text || loading) return;
@@ -32,11 +34,27 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     const next = [...messages, { role: 'user' as const, text }];
     setMessages(next); setQuestion(''); setLoading(true);
     try {
-      const system = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. אתה רשאי להציע פעולה, אך היא תבוצע רק אחרי אישור המשתמש בכפתור. החזר אך ורק JSON תקין במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
-      const contents = [{ role: 'user', parts: [{ text: system }] }, ...next.map(message => ({ role: message.role, parts: [{ text: message.text }] }))];
+      const contents = [{ role: 'user', parts: [{ text: systemPrompt }] }, ...next.map(message => ({ role: message.role, parts: [{ text: message.text }] }))];
       const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', contents));
       setMessages(current => [...current, { role: 'model', text: reply.answer, proposal: reply.proposal }]);
     } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לקבל תשובה כרגע. נסה שוב.' }]); }
+    finally { setLoading(false); }
+  };
+  const analyzeImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || loading) return;
+    event.target.value = '';
+    if (!hasKey) { onNavigateToTab('settings'); return; }
+    setMessages(current => [...current, { role: 'user', text: 'ניתוח תמונה: ' + file.name }]);
+    setLoading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(new Error('לא ניתן לקרוא את התמונה.')); reader.readAsDataURL(file); });
+      const data = dataUrl.split(',')[1];
+      if (!data) throw new Error('התמונה לא נקראה בצורה תקינה.');
+      const imagePrompt = systemPrompt + ' התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. סווג אותה במפורש כאחד: הוצאה, הכנסה/זיכוי, מניות, קרן השתלמות, פנסיה, או לא ניתן לזהות. חלץ רק פרטים שרואים בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בתיק מניות, קרן השתלמות או פנסיה כתוב את השווי, התשואה והנכסים שזוהו בתוך answer; proposal נשאר null.';
+      const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
+      setMessages(current => [...current, { role: 'model', text: reply.answer, proposal: reply.proposal }]);
+    } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לנתח את התמונה.' }]); }
     finally { setLoading(false); }
   };
   const confirmProposal = (proposal: Proposal) => {
@@ -57,7 +75,8 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       {messages.length === 0 && <div className="rounded-xl bg-surface p-4"><strong className="text-ink">אפשר להתחיל כאן</strong><div className="mt-3 flex flex-wrap gap-2">{quickQuestions.map(item => <button key={item} onClick={() => ask(item)} className="rounded-full border border-line bg-card px-3 py-2 text-sm text-ink hover:border-primary">{item}</button>)}</div></div>}
       {messages.map((message, index) => <div key={index} className={'max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-wrap ' + (message.role === 'user' ? 'mr-auto bg-primary text-white' : 'bg-surface text-ink')}><strong className="mb-1 block text-xs opacity-70">{message.role === 'user' ? 'אתה' : 'AIfina AI'}</strong>{message.text}{message.proposal && <div className="mt-3 rounded-xl border border-primary/20 bg-card p-3 text-ink"><strong className="block text-xs">פעולה שממתינה לאישור</strong><p className="my-1 text-xs">{message.proposal.type === 'add_transaction' ? (message.proposal.description || 'תנועה חדשה') + ' · ' + message.proposal.amount.toLocaleString('he-IL') + ' ₪' : 'תקציב הוצאות משתנות: ' + message.proposal.amount.toLocaleString('he-IL') + ' ₪'}</p><Button className="mt-2 h-9" onClick={() => confirmProposal(message.proposal!)}>אישור וביצוע</Button></div>}</div>)}
       {loading && <div className="flex items-center gap-2 text-sm text-muted"><Spinner size="sm" />חושב על הנתונים שלך…</div>}
-      <form className="flex gap-2 border-t border-line pt-4" onSubmit={event => { event.preventDefault(); ask(); }}><input value={question} onChange={event => setQuestion(event.target.value)} placeholder="למשל: כמה נשאר לי להוצאות עד סוף החודש?" className="min-w-0 flex-1 rounded-xl border border-line bg-card px-4 text-sm text-ink outline-none focus:border-primary" /><Button type="submit" disabled={!question.trim() || loading}><Send size={17} />שלח</Button></form>
+      <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={analyzeImage} className="hidden" />
+      <form className="flex gap-2 border-t border-line pt-4" onSubmit={event => { event.preventDefault(); ask(); }}><button type="button" onClick={() => imageInputRef.current?.click()} disabled={loading} aria-label="העלאת תמונה לניתוח" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line text-muted hover:border-primary hover:text-primary disabled:opacity-50"><ImagePlus size={20} /></button><input value={question} onChange={event => setQuestion(event.target.value)} placeholder="למשל: כמה נשאר לי להוצאות עד סוף החודש?" className="min-w-0 flex-1 rounded-xl border border-line bg-card px-4 text-sm text-ink outline-none focus:border-primary" /><Button type="submit" disabled={!question.trim() || loading}><Send size={17} />שלח</Button></form>
     </Card>
     <Card className="border-primary/15 bg-primary/5"><div className="flex gap-3"><ShieldCheck className="shrink-0 text-primary" /><p className="text-sm leading-6 text-muted"><strong className="text-ink">שליטה אצלך:</strong> העוזר יכול להכין הוספת תנועה או שינוי תקציב, ומבצע רק לאחר לחיצה על “אישור וביצוע”.</p></div></Card>
     <Card><div className="flex gap-3"><Wrench className="shrink-0 text-muted" /><div><strong className="text-ink">סוכן פיתוח</strong><p className="mt-1 text-sm leading-6 text-muted">לשינוי קוד אמיתי הוא ייצור Pull Request לבדיקה, לאחר חיבור מאובטח לחשבון GitHub.</p></div></div></Card>
