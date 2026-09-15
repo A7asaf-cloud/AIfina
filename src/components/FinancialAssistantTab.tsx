@@ -2,13 +2,24 @@ import React, { useMemo, useState } from 'react';
 import { Bot, Send, ShieldCheck, Wrench, KeyRound } from 'lucide-react';
 import { Transaction, UserProfile } from '../types';
 import { chatWithGemini } from '../utils/geminiStatementImport';
+import { CATEGORIES, CategoryKey } from '../utils/categories';
 import { Button, Card, Spinner } from './ui';
 
-type Message = { role: 'user' | 'model'; text: string };
-interface Props { profile: UserProfile; transactions: Transaction[]; onNavigateToTab: (tab: string) => void; }
+type Proposal = { type: 'add_transaction' | 'update_variable_budget'; description?: string; amount: number; date?: string; cat?: string };
+type Message = { role: 'user' | 'model'; text: string; proposal?: Proposal };
+interface Props { profile: UserProfile; transactions: Transaction[]; onNavigateToTab: (tab: string) => void; onAddTransaction: (transaction: Transaction) => void; onUpdateProfile: (profile: UserProfile) => void; }
 const quickQuestions = ['על מה הוצאתי הכי הרבה החודש?', 'איך אפשר לחסוך השבוע?', 'מה צפוי עד סוף החודש?'];
 
-export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, onNavigateToTab }) => {
+const today = () => { const date = new Date(); return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); };
+const readReply = (text: string): { answer: string; proposal?: Proposal } => {
+  try {
+    const parsed = JSON.parse(text.trim());
+    const action = parsed?.proposal;
+    const valid = action && (action.type === 'add_transaction' || action.type === 'update_variable_budget') && Number.isFinite(Number(action.amount)) && Number(action.amount) > 0;
+    return { answer: typeof parsed?.answer === 'string' ? parsed.answer : text, proposal: valid ? { ...action, amount: Number(action.amount) } : undefined };
+  } catch { return { answer: text }; }
+};
+export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, onNavigateToTab, onAddTransaction, onUpdateProfile }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,23 +32,34 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     const next = [...messages, { role: 'user' as const, text }];
     setMessages(next); setQuestion(''); setLoading(true);
     try {
-      const system = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי, ואל תבצע שינוי ללא אישור מפורש. כשיש חוסר ודאות ציין אותו. נתוני המשתמש: ' + context;
+      const system = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. אתה רשאי להציע פעולה, אך היא תבוצע רק אחרי אישור המשתמש בכפתור. החזר אך ורק JSON תקין במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
       const contents = [{ role: 'user', parts: [{ text: system }] }, ...next.map(message => ({ role: message.role, parts: [{ text: message.text }] }))];
-      const answer = await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', contents);
-      setMessages(current => [...current, { role: 'model', text: answer }]);
+      const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', contents));
+      setMessages(current => [...current, { role: 'model', text: reply.answer, proposal: reply.proposal }]);
     } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לקבל תשובה כרגע. נסה שוב.' }]); }
     finally { setLoading(false); }
+  };
+  const confirmProposal = (proposal: Proposal) => {
+    if (proposal.type === 'update_variable_budget') {
+      onUpdateProfile({ ...profile, monthlyVariableBudget: proposal.amount });
+      setMessages(current => [...current, { role: 'model', text: 'התקציב החודשי להוצאות משתנות עודכן ל־' + proposal.amount.toLocaleString('he-IL') + ' ₪.' }]);
+      return;
+    }
+    const category = CATEGORIES[proposal.cat as CategoryKey] || CATEGORIES['שונות'];
+    const income = proposal.cat === 'הכנסה';
+    onAddTransaction({ id: 'assistant-' + Date.now(), description: proposal.description || (income ? 'הכנסה חדשה' : 'הוצאה חדשה'), amount: income ? proposal.amount : -proposal.amount, date: proposal.date || today(), cat: income ? 'הכנסה' : (proposal.cat || 'שונות'), color: category.color, emoji: category.emoji, account: 'נוסף דרך עוזר AI', status: 'posted', kind: income ? 'income' : 'expense', expenseType: income ? undefined : 'variable', paymentMethod: 'bank', balanceIncluded: false });
+    setMessages(current => [...current, { role: 'model', text: 'בוצע ונשמר בתנועות.' }]);
   };
   return <main dir="rtl" className="mx-auto max-w-4xl space-y-5 px-4 py-7 md:px-8">
     <header><div className="flex items-center gap-2 text-primary"><Bot size={22} /><span className="text-sm font-bold">AIfina AI</span></div><h1 className="mt-2 text-3xl font-extrabold text-ink">העוזר הפיננסי שלך</h1><p className="mt-2 text-sm text-muted">שאל על הוצאות, תזרים, תקציב והרגלים. הוא עונה רק על בסיס הנתונים שלך.</p></header>
     {!hasKey && <Card className="border-amber-200 bg-amber-50"><div className="flex gap-3"><KeyRound className="shrink-0 text-amber-700" /><div><strong className="text-ink">צריך לחבר את Gemini פעם אחת</strong><p className="mt-1 text-sm text-muted">המפתח נשמר רק במכשיר שלך. בלי מפתח העוזר לא שולח נתונים לשום מקום.</p><Button className="mt-3" onClick={() => onNavigateToTab('settings')}>להגדרת Gemini</Button></div></div></Card>}
     <Card className="space-y-4">
       {messages.length === 0 && <div className="rounded-xl bg-surface p-4"><strong className="text-ink">אפשר להתחיל כאן</strong><div className="mt-3 flex flex-wrap gap-2">{quickQuestions.map(item => <button key={item} onClick={() => ask(item)} className="rounded-full border border-line bg-card px-3 py-2 text-sm text-ink hover:border-primary">{item}</button>)}</div></div>}
-      {messages.map((message, index) => <div key={index} className={'max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-wrap ' + (message.role === 'user' ? 'mr-auto bg-primary text-white' : 'bg-surface text-ink')}><strong className="mb-1 block text-xs opacity-70">{message.role === 'user' ? 'אתה' : 'AIfina AI'}</strong>{message.text}</div>)}
+      {messages.map((message, index) => <div key={index} className={'max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-wrap ' + (message.role === 'user' ? 'mr-auto bg-primary text-white' : 'bg-surface text-ink')}><strong className="mb-1 block text-xs opacity-70">{message.role === 'user' ? 'אתה' : 'AIfina AI'}</strong>{message.text}{message.proposal && <div className="mt-3 rounded-xl border border-primary/20 bg-card p-3 text-ink"><strong className="block text-xs">פעולה שממתינה לאישור</strong><p className="my-1 text-xs">{message.proposal.type === 'add_transaction' ? (message.proposal.description || 'תנועה חדשה') + ' · ' + message.proposal.amount.toLocaleString('he-IL') + ' ₪' : 'תקציב הוצאות משתנות: ' + message.proposal.amount.toLocaleString('he-IL') + ' ₪'}</p><Button className="mt-2 h-9" onClick={() => confirmProposal(message.proposal!)}>אישור וביצוע</Button></div>}</div>)}
       {loading && <div className="flex items-center gap-2 text-sm text-muted"><Spinner size="sm" />חושב על הנתונים שלך…</div>}
       <form className="flex gap-2 border-t border-line pt-4" onSubmit={event => { event.preventDefault(); ask(); }}><input value={question} onChange={event => setQuestion(event.target.value)} placeholder="למשל: כמה נשאר לי להוצאות עד סוף החודש?" className="min-w-0 flex-1 rounded-xl border border-line bg-card px-4 text-sm text-ink outline-none focus:border-primary" /><Button type="submit" disabled={!question.trim() || loading}><Send size={17} />שלח</Button></form>
     </Card>
-    <Card className="border-primary/15 bg-primary/5"><div className="flex gap-3"><ShieldCheck className="shrink-0 text-primary" /><p className="text-sm leading-6 text-muted"><strong className="text-ink">שליטה אצלך:</strong> העוזר מסביר ומציע. הוא לא משנה עסקאות, תקציב או הגדרות בלי אישור מפורש.</p></div></Card>
+    <Card className="border-primary/15 bg-primary/5"><div className="flex gap-3"><ShieldCheck className="shrink-0 text-primary" /><p className="text-sm leading-6 text-muted"><strong className="text-ink">שליטה אצלך:</strong> העוזר יכול להכין הוספת תנועה או שינוי תקציב, ומבצע רק לאחר לחיצה על “אישור וביצוע”.</p></div></Card>
     <Card><div className="flex gap-3"><Wrench className="shrink-0 text-muted" /><div><strong className="text-ink">סוכן פיתוח</strong><p className="mt-1 text-sm leading-6 text-muted">לשינוי קוד אמיתי הוא ייצור Pull Request לבדיקה, לאחר חיבור מאובטח לחשבון GitHub.</p></div></div></Card>
   </main>;
 };
