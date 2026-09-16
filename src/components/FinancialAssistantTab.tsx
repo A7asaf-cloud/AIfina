@@ -13,7 +13,9 @@ const quickQuestions = ['על מה הוצאתי הכי הרבה החודש?', '�
 const today = () => { const date = new Date(); return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); };
 const readReply = (text: string): { answer: string; proposal?: Proposal } => {
   try {
-    const parsed = JSON.parse(text.trim());
+    const fence = String.fromCharCode(96).repeat(3);
+    const cleaned = text.trim().replace(fence + 'json', '').replace(fence, '').trim();
+    const parsed = JSON.parse(cleaned);
     const action = parsed?.proposal;
     const valid = action && ['add_transaction', 'update_variable_budget', 'update_keren', 'update_pension', 'update_stocks'].includes(action.type) && Number.isFinite(Number(action.amount)) && Number(action.amount) > 0;
     return { answer: typeof parsed?.answer === 'string' ? parsed.answer : text, proposal: valid ? { ...action, amount: Number(action.amount) } : undefined };
@@ -26,7 +28,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const hasKey = Boolean(localStorage.getItem('fil_gemini_api_key'));
   const context = useMemo(() => JSON.stringify({ profile: { netSalary: profile.netSalary, bankBalance: profile.bankBalance, creditDebt: profile.creditDebt, safetyBuffer: profile.safetyBuffer, creditDay: profile.creditDay, creditCycleDay: profile.creditCycleDay }, transactions: transactions.slice(0, 120).map(({ date, description, amount, cat, status, paymentMethod, cashflowDate }) => ({ date, description, amount, cat, status, paymentMethod, cashflowDate })) }), [profile, transactions]);
-  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, ועדכון תקציב הוצאות משתנות. כשהוא מבקש פעולה כזאת במפורש, היא תבוצע אוטומטית. החזר אך ורק JSON תקין במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
+  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, עדכון תקציב הוצאות משתנות, ועדכון תיק מניות, קרן השתלמות או פנסיה אך ורק כאשר הנתונים חולצו מתמונה שהמשתמש העלה. הפעולות המורשות מבוצעות אוטומטית — אל תגיד שאין לך הרשאה לעדכן אותן. החזר אך ורק JSON תקין, ללא markdown וללא גדרות קוד, במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
   const ask = async (rawQuestion?: string) => {
     const text = (rawQuestion || question).trim();
     if (!text || loading) return;
