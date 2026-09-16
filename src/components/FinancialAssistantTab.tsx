@@ -1,13 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Bot, Send, ShieldCheck, Wrench, KeyRound, ImagePlus } from 'lucide-react';
-import { Transaction, UserProfile } from '../types';
+import { InvestmentState, StockHolding, Transaction, UserProfile } from '../types';
 import { chatWithGemini } from '../utils/geminiStatementImport';
 import { CATEGORIES, CategoryKey } from '../utils/categories';
 import { Button, Card, Spinner } from './ui';
 
-type Proposal = { type: 'add_transaction' | 'update_variable_budget'; description?: string; amount: number; date?: string; cat?: string };
+type Proposal = { type: 'add_transaction' | 'update_variable_budget' | 'update_keren' | 'update_pension' | 'update_stocks'; description?: string; amount: number; date?: string; cat?: string; ytd?: number; holdings?: Array<Partial<StockHolding>> };
 type Message = { role: 'user' | 'model'; text: string };
-interface Props { profile: UserProfile; transactions: Transaction[]; onNavigateToTab: (tab: string) => void; onAddTransaction: (transaction: Transaction) => void; onUpdateProfile: (profile: UserProfile) => void; }
+interface Props { profile: UserProfile; transactions: Transaction[]; investments: InvestmentState; onNavigateToTab: (tab: string) => void; onAddTransaction: (transaction: Transaction) => void; onUpdateProfile: (profile: UserProfile) => void; onUpdateInvestment: (investment: Partial<InvestmentState>) => void; }
 const quickQuestions = ['על מה הוצאתי הכי הרבה החודש?', 'איך אפשר לחסוך השבוע?', 'מה צפוי עד סוף החודש?'];
 
 const today = () => { const date = new Date(); return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); };
@@ -15,11 +15,11 @@ const readReply = (text: string): { answer: string; proposal?: Proposal } => {
   try {
     const parsed = JSON.parse(text.trim());
     const action = parsed?.proposal;
-    const valid = action && (action.type === 'add_transaction' || action.type === 'update_variable_budget') && Number.isFinite(Number(action.amount)) && Number(action.amount) > 0;
+    const valid = action && ['add_transaction', 'update_variable_budget', 'update_keren', 'update_pension', 'update_stocks'].includes(action.type) && Number.isFinite(Number(action.amount)) && Number(action.amount) > 0;
     return { answer: typeof parsed?.answer === 'string' ? parsed.answer : text, proposal: valid ? { ...action, amount: Number(action.amount) } : undefined };
   } catch { return { answer: text }; }
 };
-export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, onNavigateToTab, onAddTransaction, onUpdateProfile }) => {
+export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, investments, onNavigateToTab, onAddTransaction, onUpdateProfile, onUpdateInvestment }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,7 +52,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(new Error('לא ניתן לקרוא את התמונה.')); reader.readAsDataURL(file); });
       const data = dataUrl.split(',')[1];
       if (!data) throw new Error('התמונה לא נקראה בצורה תקינה.');
-      const imagePrompt = systemPrompt + ' התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. סווג אותה במפורש כאחד: הוצאה, הכנסה/זיכוי, מניות, קרן השתלמות, פנסיה, או לא ניתן לזהות. חלץ רק פרטים שרואים בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בתיק מניות, קרן השתלמות או פנסיה כתוב את השווי, התשואה והנכסים שזוהו בתוך answer; proposal נשאר null.';
+      const imagePrompt = systemPrompt + ' התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. סווג אותה במפורש כאחד: הוצאה, הכנסה/זיכוי, מניות, קרן השתלמות, פנסיה, או לא ניתן לזהות. חלץ רק פרטים שרואים בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בתיק מניות הצע {"type":"update_stocks","amount":מספר המניות שזוהו,"holdings":[{"symbol":"...","name":"...","shares":מספר,"avgCost":מספר,"currentPrice":מספר}]}. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
       const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
       const result = reply.proposal ? applyProposal(reply.proposal) : '';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
@@ -60,6 +60,20 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     finally { setLoading(false); }
   };
   const applyProposal = (proposal: Proposal) => {
+    if (proposal.type === 'update_keren') {
+      onUpdateInvestment({ kerenValue: proposal.amount, kerenYTD: Number.isFinite(Number(proposal.ytd)) ? Number(proposal.ytd) : investments.kerenYTD });
+      return '\n\n✓ שווי קרן ההשתלמות עודכן.';
+    }
+    if (proposal.type === 'update_pension') {
+      onUpdateInvestment({ pensionValue: proposal.amount, pensionYTD: Number.isFinite(Number(proposal.ytd)) ? Number(proposal.ytd) : investments.pensionYTD });
+      return '\n\n✓ שווי הפנסיה עודכן.';
+    }
+    if (proposal.type === 'update_stocks') {
+      const holdings = (proposal.holdings || []).filter(item => item.symbol && Number(item.shares) > 0).map((item, index) => ({ id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares: Number(item.shares), avgCost: Number(item.avgCost) || Number(item.currentPrice) || 0, currentPrice: Number(item.currentPrice) || undefined, color: '#6366F1' }));
+      if (!holdings.length) return '\n\nלא נשמרו מניות כי לא זוהו מספיק פרטים בתמונה.';
+      onUpdateInvestment({ portfolioHoldings: holdings });
+      return '\n\n✓ תיק המניות עודכן ב־' + holdings.length + ' נכסים שזוהו.';
+    }
     if (proposal.type === 'update_variable_budget') {
       onUpdateProfile({ ...profile, monthlyVariableBudget: proposal.amount });
       return '\n\n✓ התקציב החודשי להוצאות משתנות עודכן ל־' + proposal.amount.toLocaleString('he-IL') + ' ₪.';
