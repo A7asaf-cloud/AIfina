@@ -12,6 +12,7 @@ import { BudgetTab } from './components/BudgetTab';
 import { InvestmentsTab } from './components/InvestmentsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { FinancialAssistantTab } from './components/FinancialAssistantTab';
+import { ConnectionsTab } from './components/ConnectionsTab';
 import { BottomNav } from './components/BottomNav';
 import { ToastHost, ConfirmProvider } from './components/ui';
 
@@ -354,6 +355,10 @@ export default function App() {
 
         {activeTab === 'assistant' && (
           <FinancialAssistantTab profile={appData.profile} transactions={appData.transactions} investments={appData.investments} memoryKey={activeUser?.id || 'local'} onNavigateToTab={setActiveTab} onAddTransaction={handleAddTransaction} onUpdateProfile={handleUpdateProfile} onUpdateInvestment={handleUpdateInvestments} />
+        )}
+
+        {activeTab === 'connections' && (
+          <ConnectionsTab profile={appData.profile} transactions={appData.transactions} onNavigateToTab={setActiveTab} />
         )}
 
         {activeTab === 'settings' && (
