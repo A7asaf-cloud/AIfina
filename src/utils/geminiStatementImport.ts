@@ -58,7 +58,7 @@ async function callGemini(apiKey: string, body: Record<string, unknown>): Promis
 
 /** Direct browser call used by the personal assistant on static deployments. */
 export async function chatWithGemini(apiKey: string, contents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { data: string; mimeType: string } }> }>): Promise<string> {
-  const data = await callGemini(apiKey, { contents });
+  const data = await callGemini(apiKey, { contents, generationConfig: { responseMimeType: 'application/json' } });
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
   if (!text.trim()) throw new Error('Gemini החזיר תשובה ריקה. נסה שוב.');
   return text;
