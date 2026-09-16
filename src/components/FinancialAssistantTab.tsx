@@ -3,7 +3,7 @@ import { Bot, Send, ShieldCheck, KeyRound, ImagePlus, Sparkles, Trash2, MessageC
 import { InvestmentState, StockHolding, Transaction, UserProfile } from '../types';
 import { chatWithGemini } from '../utils/geminiStatementImport';
 import { categorize, CATEGORIES, CategoryKey } from '../utils/categories';
-import { normalizePortfolioProposal } from '../utils/portfolioProposal';
+import { moneyNumber, normalizePortfolioProposal, portfolioNumber } from '../utils/portfolioProposal';
 import { Button, Card, Spinner } from './ui';
 import '../ai-assistant.css';
 
@@ -93,12 +93,14 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     }
     if (proposal.type === 'update_stocks') {
       const extracted = normalizePortfolioProposal(proposal);
-      const importedHoldings = extracted.holdings.filter(item => item.symbol && Number(item.shares) > 0).map((item, index) => {
-        const shares = Number(item.shares);
-        const totalValue = Number(item.totalValue ?? item.value);
-        const derivedPrice = Number.isFinite(totalValue) && totalValue >= 0 ? totalValue / shares : undefined;
-        const currentPrice = Number(item.currentPrice) || derivedPrice;
-        return { id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares, avgCost: Number(item.avgCost) || currentPrice || 0, currentPrice, currency: item.currency === 'ILS' ? 'ILS' as const : 'USD' as const, color: '#6366F1' };
+      const importedHoldings = extracted.holdings.flatMap((item, index) => {
+        const shares = portfolioNumber(item.shares);
+        if (!item.symbol || !shares || shares <= 0) return [];
+        const totalValue = moneyNumber(item.totalValue ?? item.value);
+        const derivedPrice = totalValue !== undefined && totalValue >= 0 ? totalValue / shares : undefined;
+        const currentPrice = moneyNumber(item.currentPrice) ?? derivedPrice;
+        const avgCost = moneyNumber(item.avgCost) ?? currentPrice ?? 0;
+        return [{ id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares, avgCost, currentPrice, currency: item.currency === 'ILS' ? 'ILS' as const : 'USD' as const, color: '#6366F1' }];
       });
       const holdings = importedHoldings.reduce<StockHolding[]>((merged, incoming) => {
         const existingIndex = merged.findIndex(item => item.symbol === incoming.symbol && (item.currency || 'USD') === incoming.currency);

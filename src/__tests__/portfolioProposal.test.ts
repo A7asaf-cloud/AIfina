@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePortfolioProposal } from '../utils/portfolioProposal';
+import { normalizePortfolioProposal, portfolioNumber } from '../utils/portfolioProposal';
 
 describe('portfolio proposal normalization', () => {
   it('keeps explicit cash separate from stock holdings', () => {
@@ -22,6 +22,11 @@ describe('portfolio proposal normalization', () => {
   it('keeps quantity and holding value as distinct fields', () => {
     const result = normalizePortfolioProposal({ holdings: [{ symbol: 'קרן בדיקה', shares: 11208, totalValue: 12503.64 }] });
     expect(result.holdings[0]).toMatchObject({ shares: 11208, totalValue: 12503.64 });
+  });
+
+  it('parses OCR-formatted quantities without losing thousands separators', () => {
+    expect(portfolioNumber('11,208 יח׳')).toBe(11208);
+    expect(portfolioNumber('1,973')).toBe(1973);
   });
 
   it('does not overwrite existing cash when the image did not provide a cash balance', () => {
