@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Send, ShieldCheck, KeyRound, ImagePlus, Sparkles, Trash2, MessageCircle } from 'lucide-react';
 import { InvestmentState, StockHolding, Transaction, UserProfile } from '../types';
 import { chatWithGemini } from '../utils/geminiStatementImport';
-import { CATEGORIES, CategoryKey } from '../utils/categories';
+import { categorize, CATEGORIES, CategoryKey } from '../utils/categories';
 import { Button, Card, Spinner } from './ui';
 import '../ai-assistant.css';
 
@@ -22,6 +22,18 @@ const readReply = (text: string): { answer: string; proposal?: Proposal } => {
     return { answer: typeof parsed?.answer === 'string' ? parsed.answer : text, proposal: valid ? { ...action, amount: Number(action.amount) } : undefined };
   } catch { return { answer: text }; }
 };
+const numberFromText = (text: string) => Number((text.match(/(?:₪|שח|שקל(?:ים)?)?\s*(\d[\d,]*(?:\.\d+)?)/)?.[1] || '').replace(/,/g, ''));
+const requestedAction = (text: string) => /(הוסף|תוסיף|הכנס|הכניס|עדכן|תעדכן|שנה|תקציב)/.test(text);
+const localProposal = (text: string): Proposal | undefined => {
+  const amount = numberFromText(text);
+  if (!Number.isFinite(amount) || amount <= 0) return undefined;
+  if (/תקציב/.test(text) && /(עדכן|תעדכן|שנה|קבע)/.test(text)) return { type: 'update_variable_budget', amount };
+  const income = /הכנסה|משכורת|שכר/.test(text);
+  const expense = /הוצאה|קנייה|קניה|שלמתי|שילמתי/.test(text);
+  if (!income && !expense) return undefined;
+  const description = text.replace(/(?:תוסיף|הוסף|הכנס|הכניס|לי|הוצאה|הכנסה|של|בסך|₪|שח|שקל(?:ים)?|\d[\d,]*(?:\.\d+)?|היום)/g, ' ').replace(/\s+/g, ' ').trim();
+  return { type: 'add_transaction', amount, description: description || (income ? 'הכנסה חדשה' : 'הוצאה חדשה'), cat: income ? 'הכנסה' : categorize(description).cat };
+};
 export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, investments, memoryKey, onNavigateToTab, onAddTransaction, onUpdateProfile, onUpdateInvestment }) => {
   const storageKey = 'aifina_ai_conversation_' + memoryKey;
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -32,7 +44,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const hasKey = Boolean(localStorage.getItem('fil_gemini_api_key'));
   const context = useMemo(() => JSON.stringify({ profile: { netSalary: profile.netSalary, bankBalance: profile.bankBalance, creditDebt: profile.creditDebt, safetyBuffer: profile.safetyBuffer, creditDay: profile.creditDay, creditCycleDay: profile.creditCycleDay }, transactions: transactions.slice(0, 120).map(({ date, description, amount, cat, status, paymentMethod, cashflowDate }) => ({ date, description, amount, cat, status, paymentMethod, cashflowDate })) }), [profile, transactions]);
-  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, עדכון תקציב הוצאות משתנות, ועדכון תיק מניות, קרן השתלמות או פנסיה אך ורק כאשר הנתונים חולצו מתמונה שהמשתמש העלה. הפעולות המורשות מבוצעות אוטומטית — אל תגיד שאין לך הרשאה לעדכן אותן. החזר אך ורק JSON תקין, ללא markdown וללא גדרות קוד, במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
+  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, עדכון תקציב הוצאות משתנות, ועדכון תיק מניות, קרן השתלמות או פנסיה אך ורק כאשר הנתונים חולצו מתמונה שהמשתמש העלה. הפעולות המורשות מבוצעות אוטומטית — אל תגיד שאין לך הרשאה לעדכן אותן. חשוב: לעולם אל תכתוב שהפעולה בוצעה, נשמרה או עודכנה בתוך answer. רק האפליקציה מדווחת על ביצוע לאחר ששמרה אותו. החזר אך ורק JSON תקין, ללא markdown וללא גדרות קוד, במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(messages.slice(-40))); }, [messages, storageKey]);
   const ask = async (rawQuestion?: string) => {
     const text = (rawQuestion || question).trim();
@@ -43,7 +55,8 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     try {
       const contents = [{ role: 'user', parts: [{ text: systemPrompt }] }, ...next.map(message => ({ role: message.role, parts: [{ text: message.text }] }))];
       const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', contents));
-      const result = reply.proposal ? applyProposal(reply.proposal) : '';
+      const proposal = reply.proposal || localProposal(text);
+      const result = proposal ? applyProposal(proposal) : requestedAction(text) ? '\n\n⚠ לא בוצע שינוי: חסרים פרטים כמו סכום או סוג פעולה.' : '';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
     } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לקבל תשובה כרגע. נסה שוב.' }]); }
     finally { setLoading(false); }
@@ -61,7 +74,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       if (!data) throw new Error('התמונה לא נקראה בצורה תקינה.');
       const imagePrompt = systemPrompt + ' התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. סווג אותה במפורש כאחד: הוצאה, הכנסה/זיכוי, מניות, קרן השתלמות, פנסיה, או לא ניתן לזהות. חלץ רק פרטים שרואים בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בתיק מניות הצע {"type":"update_stocks","amount":מספר המניות שזוהו,"holdings":[{"symbol":"...","name":"...","shares":מספר,"avgCost":מספר,"currentPrice":מספר}]}. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
       const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
-      const result = reply.proposal ? applyProposal(reply.proposal) : '';
+      const result = reply.proposal ? applyProposal(reply.proposal) : '\n\nℹ️ התמונה נותחה, אך לא נשמר שינוי כי לא זוהו נתונים מספיקים בוודאות.';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
     } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לנתח את התמונה.' }]); }
     finally { setLoading(false); }
