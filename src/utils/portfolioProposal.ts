@@ -3,7 +3,7 @@ import { StockHolding } from '../types';
 export type PortfolioProposal = {
   cash?: unknown;
   cashCurrency?: unknown;
-  holdings?: Array<Partial<StockHolding> & Record<string, unknown>>;
+  holdings?: Array<Partial<StockHolding> & { totalValue?: unknown; value?: unknown }>;
 };
 
 export type PortfolioUpdate = {

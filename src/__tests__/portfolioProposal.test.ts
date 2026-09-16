@@ -19,6 +19,11 @@ describe('portfolio proposal normalization', () => {
     expect(result.holdings).toEqual([{ symbol: 'MSFT', shares: 2 }]);
   });
 
+  it('keeps quantity and holding value as distinct fields', () => {
+    const result = normalizePortfolioProposal({ holdings: [{ symbol: 'קרן בדיקה', shares: 11208, totalValue: 12503.64 }] });
+    expect(result.holdings[0]).toMatchObject({ shares: 11208, totalValue: 12503.64 });
+  });
+
   it('does not overwrite existing cash when the image did not provide a cash balance', () => {
     const result = normalizePortfolioProposal({ holdings: [{ symbol: 'NVDA', shares: 1 }] });
     expect(result).not.toHaveProperty('cash');
