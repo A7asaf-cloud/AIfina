@@ -454,7 +454,8 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
   const [mmYield, setMmYield] = useState('');
 
   const holdings = investments.portfolioHoldings || [];
-  const cashUSD = investments.portfolioCash || 0;
+  const cashUSD = investments.portfolioCashByCurrency?.USD ?? investments.portfolioCash ?? 0;
+  const cashILS = investments.portfolioCashByCurrency?.ILS ?? 0;
 
   const totalStockCostBasisUSD = holdings.reduce(
     (sum, h) => sum + h.shares * h.avgCost,
@@ -465,8 +466,10 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
     0
   );
 
+  const totalStockCostBasisILS = holdings.reduce((sum, h) => sum + h.shares * h.avgCost * (h.currency === 'ILS' ? 1 : usdRate), 0);
+  const totalStockValILS = holdings.reduce((sum, h) => sum + h.shares * (h.currentPrice || h.avgCost || 0) * (h.currency === 'ILS' ? 1 : usdRate), 0);
   const totalPortUSD = totalStockValUSD + cashUSD;
-  const totalPortILS = totalPortUSD * usdRate;
+  const totalPortILS = totalStockValILS + cashUSD * usdRate + cashILS;
 
   const gross = profile.grossSalary || 0;
   const kerenMonthlyEst = (gross * (profile.kerenEmp + profile.kerenEr)) / 100;
@@ -721,10 +724,10 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
               <div className="min-w-0">
                 <span className="text-xs font-semibold text-muted">📊 תיק מניות</span>
                 <h2 className="text-2xl sm:text-3xl font-black text-ink font-num mt-1 break-all">
-                  {fmtUSD(totalPortUSD)}
+                  {fmtILS(totalPortILS)}
                 </h2>
                 <div className="text-[11px] text-muted font-num mt-0.5">
-                  {fmtILS(totalPortILS)} · ₪{usdRate.toFixed(2)}/$
+                  {fmtUSD(totalPortUSD)} + {fmtILS(cashILS)} מזומן ₪ · ₪{usdRate.toFixed(2)}/$
                   {lastRefreshedTime && (
                     <span className="text-income font-semibold mr-1">🟢 {lastRefreshedTime}</span>
                   )}
@@ -751,15 +754,15 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
             <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-line text-xs">
               <div className="bg-surface p-2 rounded-xl border border-line">
                 <div className="text-muted text-[10px]">עלות</div>
-                <div className="font-bold text-ink font-num mt-0.5 text-[11px] break-all">{fmtUSD(totalStockCostBasisUSD)}</div>
+                <div className="font-bold text-ink font-num mt-0.5 text-[11px] break-all">{fmtILS(totalStockCostBasisILS)}</div>
               </div>
               <div className="bg-surface p-2 rounded-xl border border-line">
                 <div className="text-muted text-[10px]">שווי</div>
-                <div className="font-bold text-income font-num mt-0.5 text-[11px] break-all">{fmtUSD(totalStockValUSD)}</div>
+                <div className="font-bold text-income font-num mt-0.5 text-[11px] break-all">{fmtILS(totalStockValILS)}</div>
               </div>
               <div className="bg-surface p-2 rounded-xl border border-line">
                 <div className="text-muted text-[10px]">מזומן</div>
-                <div className="font-bold text-ink font-num mt-0.5 text-[11px] break-all">{fmtUSD(cashUSD)}</div>
+                <div className="font-bold text-ink font-num mt-0.5 text-[11px] break-all">{fmtUSD(cashUSD)}<br />{fmtILS(cashILS)}</div>
               </div>
             </div>
           </div>
@@ -778,6 +781,8 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
                   const livePrice = h.currentPrice || h.avgCost || 0;
                   const valUSD = h.shares * livePrice;
                   const gainUSD = (livePrice - h.avgCost) * h.shares;
+                  const currency = h.currency === 'ILS' ? 'ILS' : 'USD';
+                  const money = (value: number) => currency === 'ILS' ? fmtILS(value) : fmtUSD(value);
                   const gainPct = h.avgCost ? ((livePrice - h.avgCost) / h.avgCost) * 100 : 0;
                   const isPositive = gainUSD >= 0;
 
@@ -796,9 +801,9 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
                           </div>
                         </div>
                         <div className="max-w-[48%] text-left flex-shrink-0">
-                          <div className="text-base font-bold text-ink font-num">{fmtUSD(valUSD)}</div>
+                          <div className="text-base font-bold text-ink font-num">{money(valUSD)}</div>
                           <div className={`text-xs font-bold font-num mt-0.5 break-words ${isPositive ? 'text-income' : 'text-expense'}`}>
-                            {isPositive ? '+' : ''}{fmtUSD(gainUSD)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
+                            {isPositive ? '+' : ''}{money(gainUSD)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
                           </div>
                         </div>
                       </div>

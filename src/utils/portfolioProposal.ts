@@ -2,15 +2,18 @@ import { StockHolding } from '../types';
 
 export type PortfolioProposal = {
   cash?: unknown;
+  cashCurrency?: unknown;
   holdings?: Array<Partial<StockHolding> & Record<string, unknown>>;
 };
 
 export type PortfolioUpdate = {
   holdings: Array<Partial<StockHolding>>;
   cash?: number;
+  cashCurrency?: 'ILS' | 'USD';
 };
 
 const cashLabel = (value: unknown) => /^(?:cash|cash balance|available cash|מזומן|יתרת מזומן)$/i.test(String(value || '').trim());
+const currencyOf = (value: unknown): 'ILS' | 'USD' => /^(?:ils|₪|nis|שקל|שח)$/i.test(String(value || '').trim()) ? 'ILS' : 'USD';
 
 export const moneyNumber = (value: unknown): number | undefined => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
@@ -41,5 +44,5 @@ export const normalizePortfolioProposal = (proposal: PortfolioProposal): Portfol
     holdings.push(item);
   });
 
-  return { holdings, ...(cash !== undefined && cash >= 0 ? { cash } : {}) };
+  return { holdings, ...(cash !== undefined && cash >= 0 ? { cash, cashCurrency: currencyOf(proposal.cashCurrency) } : {}) };
 };

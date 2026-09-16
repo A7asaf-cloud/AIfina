@@ -7,7 +7,7 @@ import { normalizePortfolioProposal } from '../utils/portfolioProposal';
 import { Button, Card, Spinner } from './ui';
 import '../ai-assistant.css';
 
-type Proposal = { type: 'add_transaction' | 'update_variable_budget' | 'update_keren' | 'update_pension' | 'update_stocks'; description?: string; amount: number; date?: string; cat?: string; ytd?: number; cash?: number; holdings?: Array<Partial<StockHolding>> };
+type Proposal = { type: 'add_transaction' | 'update_variable_budget' | 'update_keren' | 'update_pension' | 'update_stocks'; description?: string; amount: number; date?: string; cat?: string; ytd?: number; cash?: number; cashCurrency?: 'ILS' | 'USD'; holdings?: Array<Partial<StockHolding>> };
 type Message = { role: 'user' | 'model'; text: string };
 interface Props { profile: UserProfile; transactions: Transaction[]; investments: InvestmentState; memoryKey: string; onNavigateToTab: (tab: string) => void; onAddTransaction: (transaction: Transaction) => void; onUpdateProfile: (profile: UserProfile) => void; onUpdateInvestment: (investment: Partial<InvestmentState>) => void; }
 const quickQuestions = ['על מה הוצאתי הכי הרבה החודש?', 'איך אפשר לחסוך השבוע?', 'מה צפוי עד סוף החודש?'];
@@ -75,7 +75,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(new Error('לא ניתן לקרוא את התמונה.')); reader.readAsDataURL(file); });
       const data = dataUrl.split(',')[1];
       if (!data) throw new Error('התמונה לא נקראה בצורה תקינה.');
-      const imagePrompt = systemPrompt + ' סוג המסמך שנבחר על ידי המשתמש: ' + imageMode + '. התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. אם נבחר stocks, התייחס לתמונה כתיק השקעות גם אם הכותרת לא ברורה. חלץ רק פרטים שרואים בתמונה, אך אל תענה שאינך יכול לצפות בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}. בתיק מניות חובה להחזיר update_stocks אם זוהתה לפחות מניה אחת או יתרת מזומן: {"type":"update_stocks","amount":מספר המניות שזוהו או 1 אם זוהה רק מזומן,"cash":יתרת המזומן בתיק כמספר רק אם היא מופיעה, "holdings":[{"symbol":"...","name":"...","shares":מספר יחידות,"avgCost":מחיר קנייה ממוצע אם מופיע,"currentPrice":מחיר נוכחי אם מופיע}]}. חפש במיוחד את התוויות: מזומן, יתרת מזומן, Cash, Cash balance, Available cash. מזומן אינו מניה: אל תכניס אותו ל-holdings, שמור אותו רק ב-cash. אין מזומן בתמונה? אל תכלול את השדה cash כלל, כדי לא למחוק את יתרת המזומן הקיימת. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
+      const imagePrompt = systemPrompt + ' סוג המסמך שנבחר על ידי המשתמש: ' + imageMode + '. התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. אם נבחר stocks, התייחס לתמונה כתיק השקעות גם אם הכותרת לא ברורה. חלץ רק פרטים שרואים בתמונה, אך אל תענה שאינך יכול לצפות בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}. בתיק מניות חובה להחזיר update_stocks אם זוהתה לפחות מניה אחת או יתרת מזומן: {"type":"update_stocks","amount":מספר המניות שזוהו או 1 אם זוהה רק מזומן,"cash":יתרת המזומן בתיק כמספר רק אם היא מופיעה,"cashCurrency":"ILS או USD לפי סמל המטבע שמופיע ליד שווי המזומן","holdings":[{"symbol":"קוד נייר אם הוא מופיע, אחרת שם ייחודי","name":"...","shares":מספר יחידות,"avgCost":מחיר קנייה ממוצע אם מופיע,"currentPrice":מחיר נוכחי אם מופיע,"currency":"ILS או USD לפי סמל המטבע שמופיע ליד מחיר או שווי"}]}. חשוב: קבע מטבע רק לפי סימן/עמודת מטבע מפורשים (₪ = ILS, $ = USD), ולא לפי שם הנייר. מזומן אינו מניה: אל תכניס אותו ל-holdings, שמור אותו רק ב-cash. אין מזומן בתמונה? אל תכלול את השדה cash כלל, כדי לא למחוק את יתרת המזומן הקיימת. אין לדרוס ניירות קיימים שלא מופיעים בתמונה; התמונה היא עדכון חלקי בלבד. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
       const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
       const result = reply.proposal ? applyProposal(reply.proposal) : '\n\nℹ️ התמונה נותחה, אך לא נשמר שינוי כי לא זוהו נתונים מספיקים בוודאות.';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
@@ -93,12 +93,20 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     }
     if (proposal.type === 'update_stocks') {
       const extracted = normalizePortfolioProposal(proposal);
-      const holdings = extracted.holdings.filter(item => item.symbol && Number(item.shares) > 0).map((item, index) => ({ id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares: Number(item.shares), avgCost: Number(item.avgCost) || Number(item.currentPrice) || 0, currentPrice: Number(item.currentPrice) || undefined, color: '#6366F1' }));
+      const importedHoldings = extracted.holdings.filter(item => item.symbol && Number(item.shares) > 0).map((item, index) => ({ id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares: Number(item.shares), avgCost: Number(item.avgCost) || Number(item.currentPrice) || 0, currentPrice: Number(item.currentPrice) || undefined, currency: item.currency === 'ILS' ? 'ILS' as const : 'USD' as const, color: '#6366F1' }));
+      const holdings = importedHoldings.reduce<StockHolding[]>((merged, incoming) => {
+        const existingIndex = merged.findIndex(item => item.symbol === incoming.symbol && (item.currency || 'USD') === incoming.currency);
+        if (existingIndex < 0) return [...merged, incoming];
+        const next = [...merged]; next[existingIndex] = { ...next[existingIndex], ...incoming, id: next[existingIndex].id, color: next[existingIndex].color };
+        return next;
+      }, investments.portfolioHoldings || []);
       const cash = extracted.cash;
       const hasCash = cash !== undefined;
       if (!holdings.length && !hasCash) return '\n\nלא נשמרו מניות כי לא זוהו מספיק פרטים בתמונה.';
-      onUpdateInvestment({ ...(holdings.length ? { portfolioHoldings: holdings } : {}), ...(hasCash ? { portfolioCash: cash } : {}) });
-      return '\n\n✓ תיק המניות עודכן' + (holdings.length ? ' ב־' + holdings.length + ' נכסים' : '') + (hasCash ? (holdings.length ? ' · ' : ' · ') + 'מזומן נפרד: ' + cash.toLocaleString('he-IL') + ' ₪' : '') + '.';
+      const cashCurrency = extracted.cashCurrency || 'USD';
+      const nextCashBalances = hasCash ? { ...(investments.portfolioCashByCurrency || {}), [cashCurrency]: cash } : undefined;
+      onUpdateInvestment({ ...(importedHoldings.length ? { portfolioHoldings: holdings } : {}), ...(nextCashBalances ? { portfolioCashByCurrency: nextCashBalances } : {}), ...(hasCash && cashCurrency === 'USD' ? { portfolioCash: cash } : {}) });
+      return '\n\n✓ תיק המניות עודכן' + (importedHoldings.length ? ' ב־' + importedHoldings.length + ' נכסים חדשים או מעודכנים' : '') + (hasCash ? ' · מזומן נפרד: ' + cash.toLocaleString('he-IL') + ' ' + (cashCurrency === 'ILS' ? '₪' : '$') : '') + '.';
     }
     if (proposal.type === 'update_variable_budget') {
       onUpdateProfile({ ...profile, monthlyVariableBudget: proposal.amount });

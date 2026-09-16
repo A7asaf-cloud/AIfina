@@ -97,6 +97,8 @@ export interface StockHolding {
   color: string;
   currentPrice?: number;
   changePercent?: number;
+  /** Currency of the quoted price; older holdings are treated as USD. */
+  currency?: 'ILS' | 'USD';
 }
 
 export interface StockHistoryItem {
@@ -138,6 +140,8 @@ export interface InvestmentState {
   moneyMarket: MoneyMarketFund[];
   portfolioHoldings: StockHolding[];
   portfolioCash: number;
+  /** Separate balances for imported portfolio snapshots. portfolioCash remains the legacy USD balance. */
+  portfolioCashByCurrency?: Partial<Record<'ILS' | 'USD', number>>;
   portfolioHistory: StockHistoryItem[];
 }
 
