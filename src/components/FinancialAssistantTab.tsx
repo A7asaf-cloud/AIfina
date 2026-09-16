@@ -3,6 +3,7 @@ import { Bot, Send, ShieldCheck, KeyRound, ImagePlus, Sparkles, Trash2, MessageC
 import { InvestmentState, StockHolding, Transaction, UserProfile } from '../types';
 import { chatWithGemini } from '../utils/geminiStatementImport';
 import { categorize, CATEGORIES, CategoryKey } from '../utils/categories';
+import { normalizePortfolioProposal } from '../utils/portfolioProposal';
 import { Button, Card, Spinner } from './ui';
 import '../ai-assistant.css';
 
@@ -18,7 +19,8 @@ const readReply = (text: string): { answer: string; proposal?: Proposal } => {
     const cleaned = text.trim().replace(fence + 'json', '').replace(fence, '').trim();
     const parsed = JSON.parse(cleaned);
     const action = parsed?.proposal;
-    const valid = action && ['add_transaction', 'update_variable_budget', 'update_keren', 'update_pension', 'update_stocks'].includes(action.type) && Number.isFinite(Number(action.amount)) && Number(action.amount) > 0;
+    const stockUpdate = action?.type === 'update_stocks' && (Array.isArray(action.holdings) || Number.isFinite(Number(action.cash)));
+    const valid = action && ['add_transaction', 'update_variable_budget', 'update_keren', 'update_pension', 'update_stocks'].includes(action.type) && (stockUpdate || (Number.isFinite(Number(action.amount)) && Number(action.amount) > 0));
     return { answer: typeof parsed?.answer === 'string' ? parsed.answer : text, proposal: valid ? { ...action, amount: Number(action.amount) } : undefined };
   } catch { return { answer: text }; }
 };
@@ -73,7 +75,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(new Error('לא ניתן לקרוא את התמונה.')); reader.readAsDataURL(file); });
       const data = dataUrl.split(',')[1];
       if (!data) throw new Error('התמונה לא נקראה בצורה תקינה.');
-      const imagePrompt = systemPrompt + ' סוג המסמך שנבחר על ידי המשתמש: ' + imageMode + '. התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. אם נבחר stocks, התייחס לתמונה כתיק השקעות גם אם הכותרת לא ברורה. חלץ רק פרטים שרואים בתמונה, אך אל תענה שאינך יכול לצפות בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}. בתיק מניות חובה להחזיר update_stocks אם זוהתה לפחות מניה אחת או יתרת מזומן: {"type":"update_stocks","amount":מספר המניות שזוהו או 1 אם זוהה רק מזומן,"cash":יתרת המזומן בתיק כמספר, 0 אם לא מופיעה, "holdings":[{"symbol":"...","name":"...","shares":מספר יחידות,"avgCost":מחיר קנייה ממוצע אם מופיע,"currentPrice":מחיר נוכחי אם מופיע}]}. חפש במיוחד את התוויות: מזומן, יתרת מזומן, Cash, Cash balance, Available cash. מזומן אינו מניה: אל תכניס אותו ל-holdings, שמור אותו רק ב-cash. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
+      const imagePrompt = systemPrompt + ' סוג המסמך שנבחר על ידי המשתמש: ' + imageMode + '. התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. אם נבחר stocks, התייחס לתמונה כתיק השקעות גם אם הכותרת לא ברורה. חלץ רק פרטים שרואים בתמונה, אך אל תענה שאינך יכול לצפות בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}. בתיק מניות חובה להחזיר update_stocks אם זוהתה לפחות מניה אחת או יתרת מזומן: {"type":"update_stocks","amount":מספר המניות שזוהו או 1 אם זוהה רק מזומן,"cash":יתרת המזומן בתיק כמספר רק אם היא מופיעה, "holdings":[{"symbol":"...","name":"...","shares":מספר יחידות,"avgCost":מחיר קנייה ממוצע אם מופיע,"currentPrice":מחיר נוכחי אם מופיע}]}. חפש במיוחד את התוויות: מזומן, יתרת מזומן, Cash, Cash balance, Available cash. מזומן אינו מניה: אל תכניס אותו ל-holdings, שמור אותו רק ב-cash. אין מזומן בתמונה? אל תכלול את השדה cash כלל, כדי לא למחוק את יתרת המזומן הקיימת. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
       const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
       const result = reply.proposal ? applyProposal(reply.proposal) : '\n\nℹ️ התמונה נותחה, אך לא נשמר שינוי כי לא זוהו נתונים מספיקים בוודאות.';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
@@ -90,9 +92,10 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       return '\n\n✓ שווי הפנסיה עודכן.';
     }
     if (proposal.type === 'update_stocks') {
-      const holdings = (proposal.holdings || []).filter(item => item.symbol && Number(item.shares) > 0).map((item, index) => ({ id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares: Number(item.shares), avgCost: Number(item.avgCost) || Number(item.currentPrice) || 0, currentPrice: Number(item.currentPrice) || undefined, color: '#6366F1' }));
-      const cash = Number(proposal.cash);
-      const hasCash = Number.isFinite(cash) && cash >= 0;
+      const extracted = normalizePortfolioProposal(proposal);
+      const holdings = extracted.holdings.filter(item => item.symbol && Number(item.shares) > 0).map((item, index) => ({ id: 'assistant-stock-' + Date.now() + '-' + index, symbol: String(item.symbol).toUpperCase(), name: item.name || item.symbol || 'מניה שזוהתה', shares: Number(item.shares), avgCost: Number(item.avgCost) || Number(item.currentPrice) || 0, currentPrice: Number(item.currentPrice) || undefined, color: '#6366F1' }));
+      const cash = extracted.cash;
+      const hasCash = cash !== undefined;
       if (!holdings.length && !hasCash) return '\n\nלא נשמרו מניות כי לא זוהו מספיק פרטים בתמונה.';
       onUpdateInvestment({ ...(holdings.length ? { portfolioHoldings: holdings } : {}), ...(hasCash ? { portfolioCash: cash } : {}) });
       return '\n\n✓ תיק המניות עודכן' + (holdings.length ? ' ב־' + holdings.length + ' נכסים' : '') + (hasCash ? (holdings.length ? ' · ' : ' · ') + 'מזומן נפרד: ' + cash.toLocaleString('he-IL') + ' ₪' : '') + '.';
