@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Sparkles, ArrowRight, ShieldCheck, Mail } from 'lucide-react';
 import { useAuth, AuthUser } from './AuthContext';
 import OTPScreen from './OTPScreen';
+import aifinaWordmark from '../assets/aifina-wordmark.png';
 
 export default function AuthPage() {
   const { applySession, startLocal } = useAuth();
@@ -54,10 +55,7 @@ export default function AuthPage() {
 
       <div className="w-full max-w-md z-10 my-auto">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-income to-income text-white shadow-lg shadow-income/20 mb-4">
-            <span className="text-3xl">💎</span>
-          </div>
-          <h1 className="text-3xl font-black text-ink tracking-tight">AIfina</h1>
+          <img src={aifinaWordmark} alt="AIfina" className="mx-auto mb-4 h-14 w-auto object-contain" />
           <p className="text-muted text-sm mt-1">הכסף שלך, בתמונה ברורה</p>
         </div>
 
