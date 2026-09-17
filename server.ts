@@ -7,6 +7,12 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { authRouter } from './server/authRouter';
+import {
+  googleAuthRouter,
+  isGoogleAuthConfigured,
+  loadGoogleAuthConfig,
+  MemorySessionStore,
+} from './server/google-oauth-module';
 import { scraperProxy } from './server/scraperProxy';
 import { decodeAccessToken } from './server/authUtils';
 import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
@@ -167,6 +173,15 @@ async function startServer() {
   app.use(cookieParser());
 
   // ── Auth routes ──────────────────────────────────────────────────────────────
+  // Google OAuth is intentionally cookie/session based. It is registered first so
+  // the legacy email/demo auth routes remain available without handling Google.
+  if (isGoogleAuthConfigured()) {
+    app.use('/auth', googleAuthRouter(loadGoogleAuthConfig(), new MemorySessionStore()));
+  }
+  app.get('/auth/google/status', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ configured: isGoogleAuthConfigured() });
+  });
   app.use('/auth', authRouter);
   app.get('/api/integrations/status', integrationAuth, integrationStatus);
 

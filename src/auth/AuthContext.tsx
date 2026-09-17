@@ -9,6 +9,13 @@ export interface AuthUser {
   isVerified: boolean;
 }
 
+type GoogleSessionUser = {
+  googleSubject: string;
+  email: string;
+  name?: string;
+  picture?: string;
+};
+
 interface AuthContextType {
   startLocal: () => void;
   user: AuthUser | null;
@@ -74,6 +81,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.json();
   }, []);
 
+  const loadGoogleSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/auth/session', { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) return false;
+      const { user: googleUser } = await res.json() as { user: GoogleSessionUser | null };
+      if (!googleUser) return false;
+      const userData: AuthUser = {
+        id: googleUser.googleSubject,
+        email: googleUser.email,
+        name: googleUser.name || googleUser.email.split('@')[0],
+        avatarUrl: googleUser.picture || '',
+        isVerified: true,
+      };
+      setMemToken(null);
+      setAccessToken(null);
+      setUser(userData);
+      setCachedUser(userData);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Silently refresh token — never redirect unless backend says 401
   const silentRefresh = useCallback(async (): Promise<boolean> => {
     // If we have a stored token, validate it first before trying refresh
@@ -131,7 +161,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .catch(clearSession)
         .finally(() => setIsLoading(false));
     } else {
-      silentRefresh().finally(() => setIsLoading(false));
+      loadGoogleSession()
+        .then(foundSession => foundSession || silentRefresh())
+        .finally(() => setIsLoading(false));
     }
   }, []); // eslint-disable-line
 
