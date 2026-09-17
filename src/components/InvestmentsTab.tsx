@@ -471,6 +471,11 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
   const totalPortUSD = totalStockValUSD + cashUSD;
   const totalPortILS = totalStockValILS + cashUSD * usdRate + cashILS;
 
+  const handleResetPortfolio = () => {
+    if (!window.confirm('לאפס את תיק המניות בלבד? הפעולה תמחק מניות, מזומן והיסטוריית פעולות בתיק. קרן השתלמות ופנסיה לא יימחקו.')) return;
+    onUpdateInvestments({ portfolioHoldings: [], portfolioCash: 0, portfolioCashByCurrency: {}, portfolioHistory: [] });
+  };
+
   const gross = profile.grossSalary || 0;
   const kerenMonthlyEst = (gross * (profile.kerenEmp + profile.kerenEr)) / 100;
   const pensionMonthlyEst = (gross * (profile.pensionEmp + profile.pensionEr)) / 100;
@@ -747,6 +752,10 @@ export const InvestmentsTab: FC<InvestmentsTabProps> = ({
                 <button onClick={() => setShowBuyModal(true)}
                   className="px-2.5 py-1.5 bg-primary hover:bg-primary/90 text-white text-xs font-extrabold rounded-xl shadow-md cursor-pointer">
                   🟢 קנה
+                </button>
+                <button onClick={handleResetPortfolio}
+                  className="px-2.5 py-1.5 bg-expense/10 hover:bg-expense/20 text-expense text-xs font-bold rounded-xl border border-expense/30 cursor-pointer">
+                  איפוס תיק
                 </button>
               </div>
             </div>
