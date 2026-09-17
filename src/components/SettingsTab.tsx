@@ -6,7 +6,7 @@ import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
 import { fmtILS } from '../utils/formatters';
 import { testGeminiConnection } from '../utils/geminiStatementImport';
 import { Card, SectionTitle, Button, ProgressBar, showToast, showToastError, useConfirm } from './ui';
-import { LogOut, Download, Upload, CheckCircle2, Plus, Trash2, Edit2, X } from 'lucide-react';
+import { LogOut, Download, Upload, CheckCircle2, Plus, Trash2, Edit2, X, Moon, Sun } from 'lucide-react';
 
 const CAT_OPTIONS = Object.entries(CATEGORIES).filter(([k]) => k !== 'הכנסה').map(([k, v]) => ({ key: k, color: v.color, emoji: v.emoji }));
 
@@ -24,6 +24,8 @@ interface SettingsTabProps {
   onLogout: () => void;
   onResetData: () => void;
   onImportBackupData: (data: any) => void;
+  darkMode: boolean;
+  onDarkModeChange: (value: boolean) => void;
 }
 
 const emptyOrder = (): Omit<StandingOrder, 'id'> => ({
@@ -45,7 +47,7 @@ const InputField: React.FC<{ label: string; value: any; onChange: (v: any) => vo
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   profile, budgetPlan, account, appData, standingOrders,
   onUpdateProfile, onUpdateBudget, onAddStandingOrder, onUpdateStandingOrder,
-  onDeleteStandingOrder, onLogout, onResetData, onImportBackupData,
+  onDeleteStandingOrder, onLogout, onResetData, onImportBackupData, darkMode, onDarkModeChange,
 }) => {
   const [p, setP] = useState<UserProfile>({ ...profile });
   const [bPlan, setBPlan] = useState<BudgetPlanItem[]>(budgetPlan.length ? [...budgetPlan] : DEFAULT_BUDGET_PLAN);
@@ -107,6 +109,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   return (
     <div className="space-y-6 pb-24 text-right animate-fade-in">
+      <Card className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary">{darkMode ? <Moon size={21} /> : <Sun size={21} />}</span>
+          <div><h2 className="font-bold text-ink">מראה האפליקציה</h2><p className="mt-1 text-xs text-muted">{darkMode ? 'מצב כהה פעיל' : 'מצב בהיר פעיל'}</p></div>
+        </div>
+        <button type="button" onClick={() => onDarkModeChange(!darkMode)} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary/90">{darkMode ? 'עבור לבהיר' : 'עבור לכהה'}</button>
+      </Card>
       {/* Profile Card */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="flex items-center justify-between gap-3">

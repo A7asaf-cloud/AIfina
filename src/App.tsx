@@ -25,10 +25,15 @@ export default function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [localSaveFailed, setLocalSaveFailed] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('aifina_theme') === 'dark' || (!localStorage.getItem('aifina_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches));
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowSplash(false), 1250);
+    const timer = window.setTimeout(() => setShowSplash(false), 2200);
     return () => window.clearTimeout(timer);
   }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+    localStorage.setItem('aifina_theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
   useEffect(() => {
     const onFailure = () => setLocalSaveFailed(true);
     window.addEventListener('aifina-local-save-failed', onFailure);
@@ -383,6 +388,8 @@ export default function App() {
             onUpdateStandingOrder={handleUpdateStandingOrder}
             onDeleteStandingOrder={handleDeleteStandingOrder}
             onImportBackupData={handleImportBackup}
+            darkMode={darkMode}
+            onDarkModeChange={setDarkMode}
           />
         )}
         </div>

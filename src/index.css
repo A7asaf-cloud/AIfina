@@ -84,6 +84,25 @@ input, select, textarea { font-size: 16px; }
   from { opacity: 0; transform: translateY(14px) scale(.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+html[data-theme='dark'] {
+  --color-surface: #101613;
+  --color-card: #18211d;
+  --color-income: #38cf9d;
+  --color-expense: #fb7185;
+  --color-primary: #7d9cff;
+  --color-secondary: #b78ae8;
+  --color-muted: #a9b8b0;
+  --color-ink: #eef5f0;
+  --color-line: #2a3931;
+  color-scheme: dark;
+}
+html[data-theme='dark'] body { background:#101613; }
+html[data-theme='dark'] .v2-navigation { background:#141d18; border-color:#2a3931; }
+html[data-theme='dark'] .v2-panel, html[data-theme='dark'] .v2-metric, html[data-theme='dark'] .v2-insights { background:#18211d; border-color:#2a3931; }
+html[data-theme='dark'] .v2-spend-card { background:linear-gradient(135deg,#243d31,#172a21); }
+html[data-theme='dark'] .v2-nav-message { background:#20372a; }
+html[data-theme='dark'] .v2-transaction-row, html[data-theme='dark'] .v2-upcoming-row { border-color:#2a3931; }
 @keyframes aifina-splash-pulse {
   0%, 100% { transform: scale(.75); opacity: .32; }
   50% { transform: scale(1.2); opacity: .75; }
