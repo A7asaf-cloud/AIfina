@@ -22,7 +22,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // server.ts
-var import_express3 = __toESM(require("express"), 1);
+var import_express4 = __toESM(require("express"), 1);
 
 // server/authUtils.ts
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
@@ -480,9 +480,176 @@ authRouter.post("/demo", (req, res) => {
   return res.json({ access_token: accessToken, user: formatUser(user) });
 });
 
-// server/scraperProxy.ts
+// server/google-oauth-module/config.ts
+function required(name) {
+  const value = process.env[name];
+  if (!value || value.startsWith("replace-with-")) throw new Error("Missing required environment variable: " + name);
+  return value;
+}
+function isGoogleAuthConfigured() {
+  const secret = process.env.SESSION_SECRET;
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI && secret && secret.length >= 32
+  );
+}
+function loadGoogleAuthConfig() {
+  const sessionSecret = required("SESSION_SECRET");
+  if (sessionSecret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters");
+  return {
+    clientId: required("GOOGLE_CLIENT_ID"),
+    clientSecret: required("GOOGLE_CLIENT_SECRET"),
+    redirectUri: required("GOOGLE_REDIRECT_URI"),
+    sessionSecret,
+    appOrigins: (process.env.APP_ORIGINS ?? new URL(required("GOOGLE_REDIRECT_URI")).origin).split(",").map((value) => value.trim()).filter(Boolean),
+    cookieSecure: process.env.COOKIE_SECURE === "true"
+  };
+}
+
+// server/google-oauth-module/crypto.ts
+var import_node_crypto = require("node:crypto");
+var randomUrlSafe = (bytes = 32) => (0, import_node_crypto.randomBytes)(bytes).toString("base64url");
+var sha256UrlSafe = (value) => (0, import_node_crypto.createHash)("sha256").update(value).digest("base64url");
+function safeEqual(a, b) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && (0, import_node_crypto.timingSafeEqual)(left, right);
+}
+
+// server/google-oauth-module/session-store.ts
+var MemorySessionStore = class {
+  constructor() {
+    this.pending = /* @__PURE__ */ new Map();
+    this.sessions = /* @__PURE__ */ new Map();
+  }
+  createPending(value) {
+    const id = randomUrlSafe();
+    this.pending.set(id, value);
+    return id;
+  }
+  consumePending(id) {
+    const value = this.pending.get(id);
+    this.pending.delete(id);
+    return value;
+  }
+  createSession(value) {
+    const id = randomUrlSafe();
+    this.sessions.set(id, value);
+    return id;
+  }
+  getSession(id) {
+    return this.sessions.get(id);
+  }
+  deleteSession(id) {
+    this.sessions.delete(id);
+  }
+};
+
+// server/google-oauth-module/google-auth.ts
+var import_google_auth_library = require("google-auth-library");
+var GoogleAuthService = class {
+  constructor(config, store, client = new import_google_auth_library.OAuth2Client(config.clientId, config.clientSecret, config.redirectUri)) {
+    this.config = config;
+    this.store = store;
+    this.client = client;
+  }
+  begin(returnTo) {
+    const state = randomUrlSafe();
+    const nonce = randomUrlSafe();
+    const codeVerifier = randomUrlSafe(64);
+    const pending = { state, nonce, codeVerifier, createdAt: Date.now(), returnTo };
+    const pendingId = this.store.createPending(pending);
+    return {
+      pendingId,
+      url: this.client.generateAuthUrl({
+        access_type: "offline",
+        response_type: "code",
+        scope: ["openid", "email", "profile"],
+        state,
+        nonce,
+        code_challenge: sha256UrlSafe(codeVerifier),
+        code_challenge_method: import_google_auth_library.CodeChallengeMethod.S256,
+        prompt: "select_account"
+      })
+    };
+  }
+  async complete(pendingId, state, code) {
+    if (!pendingId || !state || !code) throw new Error("Invalid OAuth callback");
+    const pending = this.store.consumePending(pendingId);
+    if (!pending || Date.now() - pending.createdAt > 10 * 6e4 || !safeEqual(pending.state, state)) {
+      throw new Error("OAuth state validation failed");
+    }
+    const tokens = await this.client.getToken({ code, codeVerifier: pending.codeVerifier });
+    if (!tokens.tokens.id_token) throw new Error("Google did not return an ID token");
+    const payload = (await this.client.verifyIdToken({ idToken: tokens.tokens.id_token, audience: this.config.clientId })).getPayload();
+    if (!payload || payload.nonce !== pending.nonce || payload.email_verified !== true || typeof payload.sub !== "string" || typeof payload.email !== "string") {
+      throw new Error("Google identity token validation failed");
+    }
+    const user = {
+      googleSubject: payload.sub,
+      email: payload.email,
+      name: typeof payload.name === "string" ? payload.name : void 0,
+      picture: typeof payload.picture === "string" ? payload.picture : void 0,
+      createdAt: Date.now()
+    };
+    return { sessionId: this.store.createSession(user), user, returnTo: pending.returnTo };
+  }
+};
+
+// server/google-oauth-module/routes.ts
 var import_express2 = require("express");
-var router = (0, import_express2.Router)();
+var cookieOptions = (secure) => ({ httpOnly: true, secure, sameSite: "lax", path: "/" });
+var cookieNames = (secure) => ({
+  pending: secure ? "__Host-google_oauth_pending" : "google_oauth_pending",
+  session: secure ? "__Host-app_session" : "app_session"
+});
+function cookie(req, name) {
+  return req.headers.cookie?.split(";").map((value) => value.trim()).find((value) => value.startsWith(name + "="))?.slice(name.length + 1);
+}
+function safeReturnTo(value) {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+}
+function googleAuthRouter(config, store, auth = new GoogleAuthService(config, store)) {
+  const router2 = (0, import_express2.Router)();
+  const names = cookieNames(config.cookieSecure);
+  router2.get("/google/start", (req, res) => {
+    const { pendingId, url } = auth.begin(safeReturnTo(req.query.returnTo));
+    res.cookie(names.pending, pendingId, { ...cookieOptions(config.cookieSecure), maxAge: 10 * 6e4 });
+    res.redirect(url);
+  });
+  router2.get("/google/callback", async (req, res) => {
+    try {
+      if (typeof req.query.error === "string") throw new Error("Google authorization was declined");
+      const result = await auth.complete(
+        cookie(req, names.pending),
+        typeof req.query.state === "string" ? req.query.state : void 0,
+        typeof req.query.code === "string" ? req.query.code : void 0
+      );
+      res.clearCookie(names.pending, cookieOptions(config.cookieSecure));
+      res.cookie(names.session, result.sessionId, { ...cookieOptions(config.cookieSecure), maxAge: 7 * 24 * 60 * 6e4 });
+      res.redirect(result.returnTo);
+    } catch {
+      res.clearCookie(names.pending, cookieOptions(config.cookieSecure));
+      res.redirect("/login?error=google_sign_in_failed");
+    }
+  });
+  router2.get("/session", (req, res) => {
+    const current = store.getSession(cookie(req, names.session) ?? "");
+    res.json({ user: current ?? null });
+  });
+  router2.post("/logout", (req, res) => {
+    const origin = req.get("origin");
+    if (origin && !config.appOrigins.includes(origin)) return res.sendStatus(403);
+    const id = cookie(req, names.session);
+    if (id) store.deleteSession(id);
+    res.clearCookie(names.session, cookieOptions(config.cookieSecure));
+    return res.sendStatus(204);
+  });
+  return router2;
+}
+
+// server/scraperProxy.ts
+var import_express3 = require("express");
+var router = (0, import_express3.Router)();
 var SCRAPER_URL = process.env.SCRAPER_URL ?? "http://localhost:3001";
 var SCRAPER_INTERNAL_KEY = process.env.SCRAPER_INTERNAL_KEY ?? "";
 router.all("*", async (req, res) => {
@@ -1096,10 +1263,17 @@ function writeUserDataOnServer(userId, data) {
   import_fs2.default.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
 }
 async function startServer() {
-  const app = (0, import_express3.default)();
+  const app = (0, import_express4.default)();
   const PORT = 3e3;
-  app.use(import_express3.default.json({ limit: "20mb" }));
+  app.use(import_express4.default.json({ limit: "20mb" }));
   app.use((0, import_cookie_parser.default)());
+  if (isGoogleAuthConfigured()) {
+    app.use("/auth", googleAuthRouter(loadGoogleAuthConfig(), new MemorySessionStore()));
+  }
+  app.get("/auth/google/status", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ configured: isGoogleAuthConfigured() });
+  });
   app.use("/auth", authRouter);
   app.get("/api/integrations/status", integrationAuth, integrationStatus);
   app.use("/api/scraper", router);
@@ -1859,7 +2033,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     app.use(vite.middlewares);
   } else {
     const distPath = import_path2.default.join(process.cwd(), "dist");
-    app.use(import_express3.default.static(distPath));
+    app.use(import_express4.default.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(import_path2.default.join(distPath, "index.html"));
     });
