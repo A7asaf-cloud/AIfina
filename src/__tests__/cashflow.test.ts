@@ -55,7 +55,13 @@ describe('calculateCashflow', () => {
     expect(result.actualFixedExpenses).toBe(4000);
     expect(result.overdue).toHaveLength(1);
     expect(result.dailyForecast[0].expenses).toBe(300);
-    expect(result.projectedEndBalance).toBe(9700);
+    expect(result.projectedEndBalance).toBe(5700);
+  });
+  it('deducts a passed standing order only when the saved balance predates it', () => {
+    const beforeBilling = calculateCashflow({ ...profile, netSalary: 0, balanceAsOf: '2026-09-14' }, [], [order({ amount: -500, dayOfMonth: 15 })], sept(17));
+    const afterBilling = calculateCashflow({ ...profile, netSalary: 0, balanceAsOf: '2026-09-16' }, [], [order({ amount: -500, dayOfMonth: 15 })], sept(17));
+    expect(beforeBilling.currentBalance).toBe(9500);
+    expect(afterBilling.currentBalance).toBe(10000);
   });
   it('does not confuse incidental income with salary or duplicate linked recurring items', () => {
     const result = calculateCashflow(profile, [

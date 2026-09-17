@@ -75,6 +75,7 @@ export function calculateCashflow(
   let actualFixedExpenses = Math.abs(sumActual(t => t.amount < 0 && fixed(t)));
   let actualVariableExpenses = Math.abs(sumActual(t => t.amount < 0 && !fixed(t)));
   const upcoming: CashflowItem[] = [];
+  let unreflectedStandingOrders = 0;
   const settlements = new Set(active.filter(t => t.kind === 'credit-settlement').map(t => t.settlementId || String(t.id)));
   let unknownCredit = false;
   for (const t of active) {
@@ -101,6 +102,10 @@ export function calculateCashflow(
     if (date <= today) {
       if (order.amount > 0) actualIncome = money(actualIncome + order.amount);
       else actualFixedExpenses = money(actualFixedExpenses + Math.abs(order.amount));
+      // A balance saved before the billing day cannot include this generated
+      // occurrence. Apply it to the forecast once; a newer balance already does.
+      const balanceDate = profile.balanceAsOf?.slice(0, 10);
+      if (!balanceDate || balanceDate < date) unreflectedStandingOrders = money(unreflectedStandingOrders + order.amount);
       continue;
     }
     upcoming.push({ id: 'standing-' + order.id + '-' + month, description: order.description, amount: money(order.amount),
@@ -165,7 +170,7 @@ export function calculateCashflow(
     // update the balance, except when its linked settlement represents it.
     return Boolean(t.cashflowDate) && !(t.settlementId && settlements.has(t.settlementId));
   });
-  const currentBalance = money(profile.bankBalance + unreflectedPosted.reduce((s, t) => s + t.amount, 0));
+  const currentBalance = money(profile.bankBalance + unreflectedStandingOrders + unreflectedPosted.reduce((s, t) => s + t.amount, 0));
   let balance = currentBalance;
   let lowestProjectedBalance = currentBalance;
   let lowestBalanceDate = today;
