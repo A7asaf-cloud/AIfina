@@ -4,10 +4,11 @@ import { InvestmentState, StockHolding, Transaction, UserProfile } from '../type
 import { chatWithGemini } from '../utils/geminiStatementImport';
 import { categorize, CATEGORIES, CategoryKey } from '../utils/categories';
 import { moneyNumber, normalizePortfolioProposal, portfolioNumber } from '../utils/portfolioProposal';
+import { buyPortfolioHolding, depositPortfolioCash, PortfolioCurrency } from '../utils/portfolioActions';
 import { Button, Card, Spinner } from './ui';
 import '../ai-assistant.css';
 
-type Proposal = { type: 'add_transaction' | 'update_variable_budget' | 'update_keren' | 'update_pension' | 'update_stocks'; description?: string; amount: number; date?: string; cat?: string; ytd?: number; cash?: number; cashCurrency?: 'ILS' | 'USD'; holdings?: Array<Partial<StockHolding> & { totalValue?: number; value?: number }> };
+type Proposal = { type: 'add_transaction' | 'update_variable_budget' | 'update_keren' | 'update_pension' | 'update_stocks' | 'portfolio_deposit' | 'portfolio_buy'; description?: string; amount: number; date?: string; cat?: string; ytd?: number; cash?: number; cashCurrency?: 'ILS' | 'USD'; currency?: PortfolioCurrency; symbol?: string; name?: string; shares?: number; price?: number; holdings?: Array<Partial<StockHolding> & { totalValue?: number; value?: number }> };
 type Message = { role: 'user' | 'model'; text: string };
 interface Props { profile: UserProfile; transactions: Transaction[]; investments: InvestmentState; memoryKey: string; onNavigateToTab: (tab: string) => void; onAddTransaction: (transaction: Transaction) => void; onUpdateProfile: (profile: UserProfile) => void; onUpdateInvestment: (investment: Partial<InvestmentState>) => void; }
 const quickQuestions = ['על מה הוצאתי הכי הרבה החודש?', 'איך אפשר לחסוך השבוע?', 'מה צפוי עד סוף החודש?'];
@@ -20,7 +21,8 @@ const readReply = (text: string): { answer: string; proposal?: Proposal } => {
     const parsed = JSON.parse(cleaned);
     const action = parsed?.proposal;
     const stockUpdate = action?.type === 'update_stocks' && (Array.isArray(action.holdings) || Number.isFinite(Number(action.cash)));
-    const valid = action && ['add_transaction', 'update_variable_budget', 'update_keren', 'update_pension', 'update_stocks'].includes(action.type) && (stockUpdate || (Number.isFinite(Number(action.amount)) && Number(action.amount) > 0));
+    const buy = action?.type === 'portfolio_buy' && Boolean(action.symbol) && Number(action.shares) > 0 && Number(action.price) > 0;
+    const valid = action && ['add_transaction', 'update_variable_budget', 'update_keren', 'update_pension', 'update_stocks', 'portfolio_deposit', 'portfolio_buy'].includes(action.type) && (stockUpdate || buy || (Number.isFinite(Number(action.amount)) && Number(action.amount) > 0));
     return { answer: typeof parsed?.answer === 'string' ? parsed.answer : text, proposal: valid ? { ...action, amount: Number(action.amount) } : undefined };
   } catch { return { answer: text }; }
 };
@@ -47,7 +49,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const hasKey = Boolean(localStorage.getItem('fil_gemini_api_key'));
   const context = useMemo(() => JSON.stringify({ profile: { netSalary: profile.netSalary, bankBalance: profile.bankBalance, creditDebt: profile.creditDebt, safetyBuffer: profile.safetyBuffer, creditDay: profile.creditDay, creditCycleDay: profile.creditCycleDay }, transactions: transactions.slice(0, 120).map(({ date, description, amount, cat, status, paymentMethod, cashflowDate }) => ({ date, description, amount, cat, status, paymentMethod, cashflowDate })) }), [profile, transactions]);
-  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, עדכון תקציב הוצאות משתנות, ועדכון תיק מניות, קרן השתלמות או פנסיה אך ורק כאשר הנתונים חולצו מתמונה שהמשתמש העלה. הפעולות המורשות מבוצעות אוטומטית — אל תגיד שאין לך הרשאה לעדכן אותן. חשוב: לעולם אל תכתוב שהפעולה בוצעה, נשמרה או עודכנה בתוך answer. רק האפליקציה מדווחת על ביצוע לאחר ששמרה אותו. החזר אך ורק JSON תקין, ללא markdown וללא גדרות קוד, במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
+  const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, עדכון תקציב הוצאות משתנות, הפקדת מזומן לתיק השקעות, קניית נייר מהמזומן הפנוי, ועדכון תיק מניות, קרן השתלמות או פנסיה מתמונה. הפעולות המורשות מבוצעות אוטומטית — אל תגיד שאין לך הרשאה לעדכן אותן. חשוב: לעולם אל תכתוב שהפעולה בוצעה, נשמרה או עודכנה בתוך answer. רק האפליקציה מדווחת על ביצוע לאחר ששמרה אותו. החזר אך ורק JSON תקין, ללא markdown וללא גדרות קוד, במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. אם מבקש להפקיד לתיק, proposal יהיה {"type":"portfolio_deposit","amount":מספר חיובי,"currency":"ILS או USD"}. אם מבקש לקנות נייר מהמזומן, proposal יהיה {"type":"portfolio_buy","symbol":"קוד/שם נייר","name":"שם אם מופיע","shares":כמות חיובית,"price":מחיר יחידה חיובי,"currency":"ILS או USD","amount":עלות כוללת}. אל תנחש נתוני קנייה חסרים. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(messages.slice(-40))); }, [messages, storageKey]);
   const ask = async (rawQuestion?: string) => {
     const text = (rawQuestion || question).trim();
@@ -83,6 +85,18 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     finally { setLoading(false); }
   };
   const applyProposal = (proposal: Proposal) => {
+    if (proposal.type === 'portfolio_deposit') {
+      const currency = proposal.currency === 'ILS' ? 'ILS' : 'USD';
+      onUpdateInvestment(depositPortfolioCash(investments, proposal.amount, currency));
+      return '\n\n✓ הופקדו ' + proposal.amount.toLocaleString('he-IL') + ' ' + (currency === 'ILS' ? '₪' : '$') + ' למזומן הפנוי בתיק.';
+    }
+    if (proposal.type === 'portfolio_buy') {
+      const currency = proposal.currency === 'ILS' ? 'ILS' : 'USD';
+      const result = buyPortfolioHolding(investments, { symbol: proposal.symbol || '', name: proposal.name, shares: Number(proposal.shares), price: Number(proposal.price), currency });
+      if (!result.update) return '\n\n⚠ הקנייה לא נוספה: ' + result.error;
+      onUpdateInvestment(result.update);
+      return '\n\n✓ נוספה קנייה של ' + Number(proposal.shares).toLocaleString('he-IL') + ' יח׳ ' + proposal.symbol + ' בעלות ' + (Number(proposal.shares) * Number(proposal.price)).toLocaleString('he-IL') + ' ' + (currency === 'ILS' ? '₪' : '$') + '; הסכום הופחת מהמזומן הפנוי.';
+    }
     if (proposal.type === 'update_keren') {
       onUpdateInvestment({ kerenValue: proposal.amount, kerenYTD: Number.isFinite(Number(proposal.ytd)) ? Number(proposal.ytd) : investments.kerenYTD });
       return '\n\n✓ שווי קרן ההשתלמות עודכן.';
