@@ -354,7 +354,7 @@ export default function App() {
         )}
 
         {activeTab === 'assistant' && (
-          <FinancialAssistantTab profile={appData.profile} transactions={appData.transactions} investments={appData.investments} memoryKey={activeUser?.id || 'local'} onNavigateToTab={setActiveTab} onAddTransaction={handleAddTransaction} onUpdateProfile={handleUpdateProfile} onUpdateInvestment={handleUpdateInvestments} />
+          <FinancialAssistantTab profile={appData.profile} transactions={appData.transactions} investments={appData.investments} standingOrders={appData.standingOrders || []} memoryKey={activeUser?.id || 'local'} onNavigateToTab={setActiveTab} onAddTransaction={handleAddTransaction} onUpdateProfile={handleUpdateProfile} onUpdateInvestment={handleUpdateInvestments} />
         )}
 
         {activeTab === 'connections' && (

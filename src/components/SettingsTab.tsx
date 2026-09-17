@@ -78,11 +78,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     } catch (error: any) { setApiStatus(error?.message || 'החיבור נכשל.'); }
   };
 
-  const gross = p.grossSalary || 0;
-  const kerenDed = p.hasKeren && gross > 0 ? Math.round(gross * (p.kerenEmp || 0) / 100) : 0;
-  const pensionDed = p.hasPension && gross > 0 ? Math.round(gross * (p.pensionEmp || 0) / 100) : 0;
-  const totalDed = kerenDed + pensionDed + (p.bituahLeumi || 0) + (p.masHachnasa || 0);
-  const impliedNet = gross > 0 ? gross - totalDed : 0;
 
   const exportBackupJSON = () => {
     const blob = new Blob([JSON.stringify({ ...appData, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
@@ -151,24 +146,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <InputField label="מועד חיוב האשראי" type="date" value={p.creditDebtDueDate || ''} onChange={(v: string) => setP({ ...p, creditDebtDueDate: v })} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <InputField label="שכר נטו (₪)" type="number" value={p.netSalary} onChange={(v: number) => setP({ ...p, netSalary: v })} />
-            <InputField label="שכר ברוטו (₪)" type="number" value={p.grossSalary} onChange={(v: number) => setP({ ...p, grossSalary: v })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <InputField label="יום משכורת" type="number" value={p.salaryDay} onChange={(v: number) => setP({ ...p, salaryDay: v })} min="1" max="31" />
-            <InputField label="יום ירידת חיוב האשראי" type="number" value={p.creditDay} onChange={(v: number) => setP({ ...p, creditDay: v })} min="1" max="31" />
+          <div className="border-t border-line pt-3 space-y-3">
+            <div><h2 className="font-bold">שכר</h2><p className="mt-1 text-xs text-muted">הנטו הוא הסכום שנכנס לתזרים. הברוטו משמש לחישוב ההפרשות בלבד.</p></div>
+            <div className="grid grid-cols-2 gap-3">
+              <InputField label="שכר נטו (₪)" type="number" value={p.netSalary} onChange={(v: number) => setP({ ...p, netSalary: v })} />
+              <InputField label="יום משכורת" type="number" value={p.salaryDay} onChange={(v: number) => setP({ ...p, salaryDay: v })} min="1" max="31" />
+              <InputField label="שכר ברוטו (₪)" type="number" value={p.grossSalary} onChange={(v: number) => setP({ ...p, grossSalary: v })} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <InputField label="יום תחילת מחזור האשראי" type="number" value={p.creditCycleDay ?? p.creditDay} onChange={(v: number) => setP({ ...p, creditCycleDay: v })} min="1" max="31" />
             <p className="self-end text-xs leading-5 text-muted pb-1">לדוגמה: 9 עד 9 – עסקאות מה־9 ועד ה־8 הבא ישויכו לחיוב הבא.</p>
-          </div>
-          <div className="border-t border-line pt-3 space-y-3">
-            <p className="text-sm font-bold text-muted">הפרשות סוציאליות</p>
-            <div className="grid grid-cols-2 gap-3">
-              <InputField label="ביטוח לאומי (₪)" type="number" value={p.bituahLeumi ?? ''} onChange={(v: number) => setP({ ...p, bituahLeumi: v })} />
-              <InputField label="מס הכנסה (₪)" type="number" value={p.masHachnasa ?? ''} onChange={(v: number) => setP({ ...p, masHachnasa: v })} />
-            </div>
           </div>
           <div className="border-t border-line pt-3 space-y-3">
             <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={p.hasKeren} onChange={e => setP(e.target.checked ? { ...p, hasKeren: true, kerenEmp: 2.5, kerenEr: 7.5 } : { ...p, hasKeren: false })} className="accent-primary w-4 h-4" /><span className="text-sm text-ink">קרן השתלמות 💎</span></label>
@@ -184,15 +172,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <InputField label="מעסיק (%)" type="number" value={p.pensionEr} onChange={(v: number) => setP({ ...p, pensionEr: v })} step="0.01" />
             </div>}
           </div>
-          {gross > 0 && (
-            <div className="bg-surface border border-line rounded-2xl p-4 space-y-2 text-sm">
-              <p className="font-bold text-ink mb-2">פירוט ניכויים</p>
-              <div className="flex justify-between text-muted"><span className="font-num">{fmtILS(gross)}</span><span>ברוטו</span></div>
-              {kerenDed > 0 && <div className="flex justify-between text-[#F2C94C]"><span className="font-num">−{fmtILS(kerenDed)}</span><span>קרן השתלמות</span></div>}
-              {pensionDed > 0 && <div className="flex justify-between text-secondary"><span className="font-num">−{fmtILS(pensionDed)}</span><span>פנסיה</span></div>}
-              <div className="border-t border-line pt-2 flex justify-between font-bold text-income"><span className="font-num">{fmtILS(impliedNet)}</span><span>נטו משוערך</span></div>
-            </div>
-          )}
           <Button type="submit" fullWidth>שמור פרופיל ✓</Button>
         </Card>
       </form>
