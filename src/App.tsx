@@ -15,6 +15,7 @@ import { FinancialAssistantTab } from './components/FinancialAssistantTab';
 import { ConnectionsTab } from './components/ConnectionsTab';
 import { BottomNav } from './components/BottomNav';
 import { ToastHost, ConfirmProvider } from './components/ui';
+import { SplashScreen } from './components/SplashScreen';
 
 export default function App() {
   const { user: authUser, accessToken, isLoading: authLoading, logout: authLogout, logoutAll: authLogoutAll } = useAuth();
@@ -23,6 +24,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [localSaveFailed, setLocalSaveFailed] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowSplash(false), 1250);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     const onFailure = () => setLocalSaveFailed(true);
     window.addEventListener('aifina-local-save-failed', onFailure);
@@ -264,6 +270,7 @@ export default function App() {
   // - If we have a cached user (from localStorage) → show app immediately, validate in background
   // - If no cache and still loading → brief spinner
   // - If loading done and no user → show login page
+  if (showSplash) return <SplashScreen />;
   if (authLoading && !authUser) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
