@@ -417,7 +417,13 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
 
   // Multi-model fallback helper for Gemini API calls
   async function generateGeminiContent(ai: GoogleGenAI, params: { contents: any; config?: any }) {
-    const modelsToTry = [configuredAiModel()];
+    // AI Studio keys can have access to a different model set than the local
+    // preview. Try the configured model first, then stable Flash fallbacks.
+    const modelsToTry = [...new Set([
+      configuredAiModel(),
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+    ])];
     let lastError: any = null;
 
     for (const modelName of modelsToTry) {
@@ -485,7 +491,8 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
       const response = await generateGeminiContent(ai, { contents });
       return res.json({ text: response.text || '' });
     } catch (e: any) {
-      return res.status(502).json({ error: 'AI provider unavailable' });
+      console.error('Gemini proxy failed:', e?.message || e);
+      return res.status(502).json({ error: 'שירות Gemini לא זמין עבור המודל או המפתח שהוגדרו. נסו שוב בעוד רגע.' });
     }
   });
 

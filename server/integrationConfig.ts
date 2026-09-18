@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import { decodeAccessToken } from './authUtils';
-export const configuredAiModel = () => process.env.GEMINI_MODEL?.trim() || 'gemini-3.7-flash';
+export const configuredAiModel = () => process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
 export const serverAiKey = () => {
   const value = process.env.GEMINI_API_KEY?.trim();
   return value && !value.startsWith('your_') ? value : undefined;
