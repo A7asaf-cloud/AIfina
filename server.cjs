@@ -1302,6 +1302,10 @@ async function startServer() {
       return res.status(401).json({ detail: "Token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
     }
   });
+  const requireAppAuth = (req, res, next) => {
+    if (req.userId) return next();
+    return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
+  };
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
@@ -1488,7 +1492,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     }
     throw lastError || new Error("\u05DB\u05DC \u05D3\u05D2\u05DE\u05D9 Gemini \u05E0\u05DB\u05E9\u05DC\u05D5 \u05D1\u05DE\u05E2\u05E0\u05D4");
   }
-  app.post("/api/test-ai", integrationAuth, async (req, res) => {
+  app.post("/api/test-ai", requireAppAuth, async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
       if (!apiKey) {
@@ -1520,7 +1524,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       });
     }
   });
-  app.post("/api/gemini/proxy", integrationAuth, async (req, res) => {
+  app.post("/api/gemini/proxy", requireAppAuth, async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
       if (!apiKey) return res.status(503).json({ error: "GEMINI_API_KEY \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8 \u05D1\u05E9\u05E8\u05EA" });
