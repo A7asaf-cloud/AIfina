@@ -55,7 +55,7 @@ export default function AuthPage() {
 
       <div className="w-full max-w-md z-10 my-auto">
         <div className="text-center mb-8">
-          <img src={aifinaWordmark} alt="AIfina" className="mx-auto mb-4 h-14 w-auto object-contain" />
+          <img src={aifinaWordmark} alt="AIfina" className="aifina-brand-logo mx-auto mb-4 h-14 w-auto object-contain" />
           <p className="text-muted text-sm mt-1">הכסף שלך, בתמונה ברורה</p>
         </div>
 

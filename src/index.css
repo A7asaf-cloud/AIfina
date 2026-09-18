@@ -180,6 +180,8 @@ html[data-theme='dark'] .ai-upload { background: #1c2b22; border-color: #365040;
 }
 .aifina-splash { position:fixed; inset:0; isolation:isolate; display:grid; place-items:center; overflow:hidden; background:radial-gradient(circle at 74% 14%,#e3f8d8 0,transparent 34%),radial-gradient(circle at 18% 88%,#f2fae9 0,transparent 38%),#f9fdf6; }
 .aifina-splash-content { position:relative; z-index:1; width:min(64vw,280px); text-align:center; animation:aifina-splash-in .38s cubic-bezier(.16,1,.3,1) both; }
+.aifina-brand-logo,
+.aifina-splash-logo { filter: invert(31%) sepia(18%) saturate(1300%) hue-rotate(96deg) brightness(86%) contrast(90%); }
 .aifina-splash-logo { display:block; width:100%; height:auto; }
 .aifina-splash-content p { margin:12px 0 16px; color:#4f7a43; font-size:13px; font-weight:700; letter-spacing:.01em; }
 .aifina-splash-loader { display:block; width:70px; height:3px; margin:auto; overflow:hidden; border-radius:999px; background:#dcefd2; }
