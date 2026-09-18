@@ -53,7 +53,7 @@ export default function App() {
 
   // Load user data whenever the authenticated user changes
   useEffect(() => {
-    if (!authUser || (!accessToken && authUser.id !== LOCAL_USER_ID)) { setAppData(null); setNeedsOnboarding(false); return; }
+    if (!authUser) { setAppData(null); setNeedsOnboarding(false); return; }
     StorageService.setActiveUserId(authUser.id);
     if (authUser.id === LOCAL_USER_ID) {
       const data = StorageService.getUserData(authUser.id);

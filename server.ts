@@ -18,6 +18,7 @@ import { decodeAccessToken } from './server/authUtils';
 import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
 
 dotenv.config();
+let googleSessionStore: MemorySessionStore | null = null;
 
 // File Database Setup for multi-device sync
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -176,7 +177,8 @@ async function startServer() {
   // Google OAuth is intentionally cookie/session based. It is registered first so
   // the legacy email/demo auth routes remain available without handling Google.
   if (isGoogleAuthConfigured()) {
-    app.use('/auth', googleAuthRouter(loadGoogleAuthConfig(), new MemorySessionStore()));
+    googleSessionStore = new MemorySessionStore();
+    app.use('/auth', googleAuthRouter(loadGoogleAuthConfig(), googleSessionStore));
   }
   app.get('/auth/google/status', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -190,6 +192,13 @@ async function startServer() {
 
   // ── JWT middleware (enabled when JWT_SECRET is set) ───────────────────────────
   app.use((req, res, next) => {
+    const googleCookie = process.env.COOKIE_SECURE === 'true' ? '__Host-app_session' : 'app_session';
+    const googleSession = googleSessionStore?.getSession(req.cookies?.[googleCookie] || '');
+    if (googleSession) {
+      (req as any).userId = googleSession.googleSubject;
+      (req as any).userEmail = googleSession.email;
+      return next();
+    }
     const secret = process.env.JWT_SECRET;
     if (!secret) return next();                              // auth disabled
     if (!req.path.startsWith('/api/')) return next();       // only guard /api/*
@@ -1025,7 +1034,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
     try {
       const userId = req.params.userId;
       const reqUserId = (req as any).userId;
-      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
+      if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
       const data = readUserDataOnServer(userId);
       if (!data) {
         return res.status(404).json({ error: 'לא נמצאו נתונים עבור משתמש זה' });
@@ -1043,7 +1052,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
         return res.status(400).json({ error: 'נתונים חסרים לשמירה' });
       }
       const reqUserId = (req as any).userId;
-      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
+      if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
       writeUserDataOnServer(userId, data);
       res.json({ success: true });
     } catch (e: any) {

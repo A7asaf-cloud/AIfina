@@ -94,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatarUrl: googleUser.picture || '',
         isVerified: true,
       };
-      setMemToken(null);
+      // StorageService uses this marker to keep sending the HttpOnly Google
+      // session cookie for cross-device data sync; it is never a bearer token.
+      setMemToken('__google_cookie_session__');
       setAccessToken(null);
       setUser(userData);
       setCachedUser(userData);

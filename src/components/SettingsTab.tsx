@@ -146,7 +146,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <div className="border-b border-line pb-4 space-y-3">
             <h2 className="font-bold">הנחות התזרים</h2>
             <p className="text-sm text-muted">היתרה היא תמונת מצב שהזנת. בעדכון יתרה ותאריך, תנועות שכבר בוצעו עד אותו יום ייחשבו כלולות בה.</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <InputField label="יתרה בחשבון (₪)" type="number" value={p.bankBalance} onChange={(v: number) => setP({ ...p, bankBalance: v })} />
               <InputField label="היתרה נכונה לתאריך" type="date" value={p.balanceAsOf || ''} onChange={(v: string) => setP({ ...p, balanceAsOf: v })} />
               <InputField label="כרית ביטחון (₪)" type="number" min="0" value={p.safetyBuffer ?? ''} onChange={(v: number) => setP({ ...p, safetyBuffer: v })} />
@@ -157,26 +157,26 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
           <div className="border-t border-line pt-3 space-y-3">
             <div><h2 className="font-bold">שכר</h2><p className="mt-1 text-xs text-muted">הנטו הוא הסכום שנכנס לתזרים. הברוטו משמש לחישוב ההפרשות בלבד.</p></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <InputField label="שכר נטו (₪)" type="number" value={p.netSalary} onChange={(v: number) => setP({ ...p, netSalary: v })} />
               <InputField label="יום משכורת" type="number" value={p.salaryDay} onChange={(v: number) => setP({ ...p, salaryDay: v })} min="1" max="31" />
               <InputField label="שכר ברוטו (₪)" type="number" value={p.grossSalary} onChange={(v: number) => setP({ ...p, grossSalary: v })} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <InputField label="יום תחילת מחזור האשראי" type="number" value={p.creditCycleDay ?? p.creditDay} onChange={(v: number) => setP({ ...p, creditCycleDay: v })} min="1" max="31" />
             <p className="self-end text-xs leading-5 text-muted pb-1">לדוגמה: 9 עד 9 – עסקאות מה־9 ועד ה־8 הבא ישויכו לחיוב הבא.</p>
           </div>
           <div className="border-t border-line pt-3 space-y-3">
             <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={p.hasKeren} onChange={e => setP(e.target.checked ? { ...p, hasKeren: true, kerenEmp: 2.5, kerenEr: 7.5 } : { ...p, hasKeren: false })} className="accent-primary w-4 h-4" /><span className="text-sm text-ink">קרן השתלמות 💎</span></label>
-            {p.hasKeren && <div className="grid grid-cols-2 gap-3">
+            {p.hasKeren && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <InputField label="עובד (%)" type="number" value={p.kerenEmp} onChange={(v: number) => setP({ ...p, kerenEmp: v })} step="0.1" />
               <InputField label="מעסיק (%)" type="number" value={p.kerenEr} onChange={(v: number) => setP({ ...p, kerenEr: v })} step="0.1" />
             </div>}
           </div>
           <div className="border-t border-line pt-3 space-y-3">
             <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={p.hasPension} onChange={e => setP(e.target.checked ? { ...p, hasPension: true, pensionEmp: 6, pensionEr: 14.83 } : { ...p, hasPension: false })} className="accent-primary w-4 h-4" /><span className="text-sm text-ink">פנסיה 🏦</span></label>
-            {p.hasPension && <div className="grid grid-cols-2 gap-3">
+            {p.hasPension && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <InputField label="עובד (%)" type="number" value={p.pensionEmp} onChange={(v: number) => setP({ ...p, pensionEmp: v })} step="0.1" />
               <InputField label="מעסיק (%)" type="number" value={p.pensionEr} onChange={(v: number) => setP({ ...p, pensionEr: v })} step="0.01" />
             </div>}

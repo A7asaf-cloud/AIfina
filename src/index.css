@@ -103,6 +103,73 @@ html[data-theme='dark'] .v2-panel, html[data-theme='dark'] .v2-metric, html[data
 html[data-theme='dark'] .v2-spend-card { background:linear-gradient(135deg,#243d31,#172a21); }
 html[data-theme='dark'] .v2-nav-message { background:#20372a; }
 html[data-theme='dark'] .v2-transaction-row, html[data-theme='dark'] .v2-upcoming-row { border-color:#2a3931; }
+
+/* Product-wide layout safeguards and dark interface */
+:root { --radius-card: 18px; --radius-control: 12px; --shadow-card: 0 8px 24px rgba(20, 35, 27, .06); }
+*, *::before, *::after { min-width: 0; }
+button, input, select, textarea { max-width: 100%; }
+input, select, textarea { min-height: 44px; border-radius: var(--radius-control) !important; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--color-muted) 75%, transparent); opacity: 1; }
+input:focus, select:focus, textarea:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent); }
+button { min-height: 40px; }
+.bg-card { box-shadow: var(--shadow-card); }
+
+html[data-theme='dark'] {
+  --color-surface: #0b1110;
+  --color-card: #141d1a;
+  --color-income: #48d6a5;
+  --color-expense: #ff8294;
+  --color-primary: #7c9cff;
+  --color-secondary: #c29bea;
+  --color-muted: #9eadA5;
+  --color-ink: #f1f6f2;
+  --color-line: #263630;
+  --shadow-card: 0 12px 30px rgba(0, 0, 0, .22);
+  color-scheme: dark;
+}
+html[data-theme='dark'] body { background: radial-gradient(circle at 80% 0, #192820 0, transparent 28rem), #0b1110; }
+html[data-theme='dark'] .aifina-shell { background: transparent; color: var(--color-ink); }
+html[data-theme='dark'] .v2-navigation { background: rgba(15, 23, 20, .94); border-color: #263630; box-shadow: -12px 0 30px rgba(0,0,0,.12); }
+html[data-theme='dark'] .v2-nav-item { color: #aebdb4; }
+html[data-theme='dark'] .v2-nav-item.is-active { background: #24382e; color: #c8f1d7; }
+html[data-theme='dark'] .v2-nav-item:hover:not(.is-active) { background: #1b2923; }
+html[data-theme='dark'] .v2-nav-message { background: #19271f; border-color: #2b4336; }
+html[data-theme='dark'] .v2-panel,
+html[data-theme='dark'] .v2-metric,
+html[data-theme='dark'] .v2-insights,
+html[data-theme='dark'] .v2-month { background: #141d1a; border-color: #263630; box-shadow: var(--shadow-card); }
+html[data-theme='dark'] .v2-spend-card { background: linear-gradient(135deg, #1d4235, #12261f 72%); }
+html[data-theme='dark'] .v2-balance-divider,
+html[data-theme='dark'] .v2-category,
+html[data-theme='dark'] .v2-transaction-row,
+html[data-theme='dark'] .v2-upcoming-row { border-color: #263630; }
+html[data-theme='dark'] .v2-icon-box,
+html[data-theme='dark'] .v2-mini-icon,
+html[data-theme='dark'] .v2-projection-icon,
+html[data-theme='dark'] .v2-month-nav { background: #203027; color: #9fd5ae; }
+html[data-theme='dark'] .v2-demo-notice { background: #1b2b22; border-color: #345142; color: #c1d7c6; }
+html[data-theme='dark'] .bg-amber-50 { background-color: #302815 !important; }
+html[data-theme='dark'] .text-amber-900 { color: #f8dea0 !important; }
+html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-\[\#f6fbf5\] { background-color: #141d1a !important; }
+html[data-theme='dark'] .border-slate-700 { border-color: #33443c !important; }
+html[data-theme='dark'] .ai-thread { background: linear-gradient(180deg, #111a16, #0d1511); }
+html[data-theme='dark'] .ai-chat-head,
+html[data-theme='dark'] .ai-composer { background: #141d1a; border-color: #263630; }
+html[data-theme='dark'] .ai-message.bot { background: #1a2720; color: #eef6ef; border-color: #304139; }
+html[data-theme='dark'] .ai-chip { background: #18231d; border-color: #31443a; color: #d5e4d8; }
+html[data-theme='dark'] .ai-upload { background: #1c2b22; border-color: #365040; color: #b9d9c1; }
+@media (max-width: 639px) {
+  :root { --radius-card: 16px; }
+  .aifina-main { padding-inline: 14px !important; }
+  .v2-page-header { align-items: flex-start; }
+  .v2-page-header h1 { font-size: clamp(24px, 7vw, 30px); }
+  .v2-header-actions, .v2-header-actions > * { max-width: 100%; }
+  .v2-navigation { overflow-x: auto; }
+  .v2-nav-items { min-width: max-content; }
+  .v2-nav-item { min-width: 66px; }
+  .fixed { max-width: calc(100vw - 1.5rem); }
+}
 @keyframes aifina-splash-pulse {
   0%, 100% { transform: scale(.75); opacity: .32; }
   50% { transform: scale(1.2); opacity: .75; }

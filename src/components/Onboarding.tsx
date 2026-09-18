@@ -14,7 +14,8 @@ export function Onboarding({ initialProfile, onDone }: OnboardingProps) {
   const TOTAL_STEPS = 5;
 
   // Strip email-derived names (contain @ or no spaces and look like usernames)
-  const initialName = initialProfile.name && !initialProfile.name.includes('@') && initialProfile.name.includes(' ')
+  const genericNames = new Set(['משתמש', 'משתמש חדש', 'חבר']);
+  const initialName = initialProfile.name && !initialProfile.name.includes('@') && initialProfile.name.includes(' ') && !genericNames.has(initialProfile.name.trim())
     ? initialProfile.name
     : '';
 
@@ -93,7 +94,7 @@ export function Onboarding({ initialProfile, onDone }: OnboardingProps) {
                   type="text"
                   value={d.name}
                   onChange={(e) => set('name', e.target.value)}
-                  placeholder="ישראל ישראלי"
+                  placeholder="לדוגמה: ישראל ישראלי"
                   autoFocus
                   className="w-full bg-surface border border-line focus:border-primary rounded-xl px-4 py-3 text-ink text-sm outline-none text-right"
                 />
@@ -122,7 +123,7 @@ export function Onboarding({ initialProfile, onDone }: OnboardingProps) {
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-xs font-semibold text-income mb-1 text-right">יום כניסת משכורת</label>
                     <input
                       type="number"
@@ -133,7 +134,7 @@ export function Onboarding({ initialProfile, onDone }: OnboardingProps) {
                       className="w-full bg-surface border border-line focus:border-primary rounded-xl px-4 py-3 text-ink text-sm outline-none text-right font-num"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-xs font-semibold text-expense mb-1 text-right">יום חיוב אשראי</label>
                     <input
                       type="number"

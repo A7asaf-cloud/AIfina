@@ -141,9 +141,9 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                 return (
                   <div key={tx.id} className={`flex flex-wrap items-center justify-between gap-y-2 py-3 px-4 border-b border-line last:border-0 ${txStatus === 'cancelled' ? 'opacity-60' : ''}`}>
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-xl shrink-0">{tx.emoji}</div>
+                      <div className="w-8 h-8 rounded-xl bg-surface flex items-center justify-center text-base shrink-0">{tx.emoji}</div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-ink truncate">{tx.description}</p>
+                        <p className="text-[13px] leading-5 font-semibold text-ink truncate">{tx.description}</p>
                         <span className={`inline-flex text-[10px] font-semibold rounded px-1.5 py-0.5 mt-1 ${isPlanned ? 'bg-primary/10 text-primary' : txStatus === 'cancelled' ? 'bg-surface text-muted' : 'bg-income/10 text-income'}`}>{statusLabel[txStatus]}</span>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-muted">{fmtDate(tx.date)}</span>
@@ -159,7 +159,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span dir="ltr" className={`text-sm font-semibold font-num ${isIncome ? 'text-income' : 'text-expense'}`}>{isIncome ? '+' : ''}{fmtILS(tx.amount)}</span>
-                      <button aria-label="מחק עסקה" onClick={() => onDeleteTransaction(tx.id)} title="מחק" className="p-1.5 text-muted hover:text-expense rounded-lg transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button aria-label="מחק עסקה" onClick={() => onDeleteTransaction(tx.id)} title="מחק" className="p-1.5 text-muted hover:text-expense rounded-lg transition-colors cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                     {onUpdateTransaction && txStatus !== 'cancelled' && <div className="w-full flex flex-wrap gap-2 pt-1">
                       <button onClick={() => setEditingTransaction(tx)} aria-label={`עריכת ${tx.description}`} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-surface cursor-pointer"><Pencil size={13} />עריכה</button>
