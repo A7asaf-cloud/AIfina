@@ -1131,6 +1131,7 @@ function getAllFunds(type) {
 
 // server.ts
 import_dotenv.default.config();
+var googleSessionStore = null;
 var DATA_DIR2 = import_path2.default.join(process.cwd(), "data");
 if (!import_fs2.default.existsSync(DATA_DIR2)) {
   import_fs2.default.mkdirSync(DATA_DIR2, { recursive: true });
@@ -1268,7 +1269,8 @@ async function startServer() {
   app.use(import_express4.default.json({ limit: "20mb" }));
   app.use((0, import_cookie_parser.default)());
   if (isGoogleAuthConfigured()) {
-    app.use("/auth", googleAuthRouter(loadGoogleAuthConfig(), new MemorySessionStore()));
+    googleSessionStore = new MemorySessionStore();
+    app.use("/auth", googleAuthRouter(loadGoogleAuthConfig(), googleSessionStore));
   }
   app.get("/auth/google/status", (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
@@ -1278,6 +1280,13 @@ async function startServer() {
   app.get("/api/integrations/status", integrationAuth, integrationStatus);
   app.use("/api/scraper", router);
   app.use((req, res, next) => {
+    const googleCookie = process.env.COOKIE_SECURE === "true" ? "__Host-app_session" : "app_session";
+    const googleSession = googleSessionStore?.getSession(req.cookies?.[googleCookie] || "");
+    if (googleSession) {
+      req.userId = googleSession.googleSubject;
+      req.userEmail = googleSession.email;
+      return next();
+    }
     const secret = process.env.JWT_SECRET;
     if (!secret) return next();
     if (!req.path.startsWith("/api/")) return next();
@@ -2001,7 +2010,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     try {
       const userId = req.params.userId;
       const reqUserId = req.userId;
-      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
+      if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
       const data = readUserDataOnServer(userId);
       if (!data) {
         return res.status(404).json({ error: "\u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0\u05D5 \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05E2\u05D1\u05D5\u05E8 \u05DE\u05E9\u05EA\u05DE\u05E9 \u05D6\u05D4" });
@@ -2018,7 +2027,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
         return res.status(400).json({ error: "\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05D7\u05E1\u05E8\u05D9\u05DD \u05DC\u05E9\u05DE\u05D9\u05E8\u05D4" });
       }
       const reqUserId = req.userId;
-      if (reqUserId && reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
+      if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
       writeUserDataOnServer(userId, data);
       res.json({ success: true });
     } catch (e) {
