@@ -487,14 +487,12 @@ function required(name) {
   return value;
 }
 function isGoogleAuthConfigured() {
-  const secret = process.env.SESSION_SECRET;
   return Boolean(
-    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI && secret && secret.length >= 32
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI
   );
 }
 function loadGoogleAuthConfig() {
-  const sessionSecret = required("SESSION_SECRET");
-  if (sessionSecret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters");
+  const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || "";
   return {
     clientId: required("GOOGLE_CLIENT_ID"),
     clientSecret: required("GOOGLE_CLIENT_SECRET"),
