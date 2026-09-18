@@ -27,7 +27,7 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('aifina_theme') === 'dark' || (!localStorage.getItem('aifina_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches));
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowSplash(false), 2200);
+    const timer = window.setTimeout(() => setShowSplash(false), 900);
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => {
