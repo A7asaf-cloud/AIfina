@@ -16,8 +16,7 @@ function required(name: string): string {
 export function isGoogleAuthConfigured(): boolean {
   return Boolean(
     process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET &&
-    process.env.GOOGLE_REDIRECT_URI,
+    process.env.GOOGLE_CLIENT_SECRET,
   );
 }
 
@@ -26,12 +25,16 @@ export function loadGoogleAuthConfig(): GoogleAuthConfig {
   // available for a future signed/session-store implementation, but must not
   // disable Google sign-in in an existing AI Studio deployment.
   const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || '';
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI ||
+    (process.env.NODE_ENV === 'production'
+      ? 'https://aifina.ai.studio/auth/google/callback'
+      : 'http://localhost:3000/auth/google/callback');
   return {
     clientId: required('GOOGLE_CLIENT_ID'),
     clientSecret: required('GOOGLE_CLIENT_SECRET'),
-    redirectUri: required('GOOGLE_REDIRECT_URI'),
+    redirectUri,
     sessionSecret,
-    appOrigins: (process.env.APP_ORIGINS ?? new URL(required('GOOGLE_REDIRECT_URI')).origin)
+    appOrigins: (process.env.APP_ORIGINS ?? new URL(redirectUri).origin)
       .split(',')
       .map(value => value.trim())
       .filter(Boolean),
