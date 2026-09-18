@@ -4,7 +4,6 @@ import { motion } from 'motion/react';
 import { UserProfile, BudgetPlanItem, UserAccount, StandingOrder } from '../types';
 import { DEFAULT_BUDGET_PLAN, CATEGORIES } from '../utils/categories';
 import { fmtILS } from '../utils/formatters';
-import { testGeminiConnection } from '../utils/geminiStatementImport';
 import { Card, SectionTitle, Button, ProgressBar, showToast, showToastError, useConfirm } from './ui';
 import { LogOut, Download, Upload, CheckCircle2, Plus, Trash2, Edit2, X, Moon, Sun } from 'lucide-react';
 
@@ -54,8 +53,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [savedMsg, setSavedMsg] = useState(false);
   const [soForm, setSoForm] = useState<Omit<StandingOrder, 'id'> | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('fil_gemini_api_key') || '');
-  const [apiStatus, setApiStatus] = useState<string | null>(null);
   const confirm = useConfirm();
 
 
@@ -65,20 +62,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const handleProfileSave = (e: React.FormEvent) => { e.preventDefault(); onUpdateProfile(p); setSavedMsg(true); showToast('הפרופיל נשמר ✓', 'success'); setTimeout(() => setSavedMsg(false), 2500); };
   const handleBudgetChange = (key: string, v: number) => setBPlan(bPlan.map(i => i.key === key ? { ...i, pct: Math.max(0, Math.min(100, v)) } : i));
   const handleBudgetSave = () => { if (!isBudgetValid) return; onUpdateBudget(bPlan); showToast('התקציב נשמר ✓', 'success'); };
-  const saveGeminiKey = () => {
-    const key = geminiKey.trim();
-    if (!key) { localStorage.removeItem('fil_gemini_api_key'); setApiStatus('המפתח הוסר מהמכשיר.'); return; }
-    localStorage.setItem('fil_gemini_api_key', key); setApiStatus('המפתח נשמר במכשיר הזה.');
-  };
-  const testGeminiKey = async () => {
-    if (!geminiKey.trim()) { setApiStatus('הזן מפתח לפני הבדיקה.'); return; }
-    setApiStatus('בודק חיבור…');
-    try {
-      await testGeminiConnection(geminiKey);
-      localStorage.setItem('fil_gemini_api_key', geminiKey.trim());
-      setApiStatus('החיבור ל־Gemini פעיל והמפתח נשמר לייבוא הקבצים.');
-    } catch (error: any) { setApiStatus(error?.message || 'החיבור נכשל.'); }
-  };
 
 
   const exportBackupJSON = () => {
@@ -135,7 +118,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {savedMsg && <div className="bg-[#00C48C]/10 border border-[#00C48C]/20 text-income p-3 rounded-2xl text-xs font-bold flex items-center justify-between"><span>השינויים נשמרו!</span><CheckCircle2 className="w-4 h-4" /></div>}
 
       <Card className="border border-income/25 bg-[#f6fbf5] text-right"><h2 className="font-bold text-ink">תובנות אישיות ללא API</h2><p className="mt-2 text-sm leading-6 text-muted">התזרים, התקציב והתובנות מחושבים מקומית לפי הנתונים שהזנת. אין מפתח API, אין שיחות ל־AI חיצוני ואין העברת נתונים לצורך התובנות.</p></Card>
-      <Card className="space-y-3 text-right"><div><h2 className="font-bold text-ink">Gemini API לניתוח קבצים</h2><p className="mt-1 text-sm leading-6 text-muted">אופציונלי. מאפשר לנתח קבצי עסקאות בפורמטים שהייבוא המקומי אינו מזהה. המפתח נשמר רק בדפדפן הזה ונשלח לשרת שלך בעת בקשה.</p></div><input type="password" autoComplete="off" value={geminiKey} onChange={event => { setGeminiKey(event.target.value); setApiStatus(null); }} placeholder="AIza…" className={INPUT} /><div className="flex gap-2"><Button type="button" onClick={saveGeminiKey} className="flex-1">שמור מפתח</Button><button type="button" onClick={testGeminiKey} className="rounded-xl border border-line px-4 text-sm font-bold text-ink">בדוק חיבור</button></div>{apiStatus && <p className="text-xs text-muted">{apiStatus}</p>}</Card>
+      <Card className="text-right"><h2 className="font-bold text-ink">AIfina AI</h2><p className="mt-1 text-sm leading-6 text-muted">העוזר, ניתוח התמונות וייבוא הקבצים מחוברים אוטומטית לשירות המאובטח של AIfina. אין צורך במפתח אישי והוא אינו נשמר במכשיר שלך.</p></Card>
       {account.id === LOCAL_USER_ID && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">מצב מקומי: הנתונים נשמרים רק בדפדפן הזה, בלי סנכרון ובלי הגנת סיסמה. מומלץ להוריד גיבוי באופן קבוע דרך ״גיבוי ושחזור״ למטה.</p>}
 
       {/* Profile Form */}
