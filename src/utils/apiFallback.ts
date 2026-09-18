@@ -5,7 +5,7 @@
 import { CONFIG } from '../config';
 import { getMemToken } from '../auth/AuthContext';
 
-export async function generateGeminiContentClient(apiKey: string, contents: any): Promise<string> {
+export async function generateGeminiContentClient(apiKey: string | undefined, contents: any): Promise<string> {
   const token = getMemToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;

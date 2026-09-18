@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Send, ShieldCheck, KeyRound, ImagePlus, Sparkles, Trash2, MessageCircle } from 'lucide-react';
+import { Bot, Send, ShieldCheck, ImagePlus, Sparkles, Trash2, MessageCircle } from 'lucide-react';
 import { InvestmentState, StandingOrder, StockHolding, Transaction, UserProfile } from '../types';
-import { chatWithGemini } from '../utils/geminiStatementImport';
+import { generateGeminiContentClient } from '../utils/apiFallback';
 import { categorize, CATEGORIES, CategoryKey } from '../utils/categories';
 import { moneyNumber, normalizePortfolioProposal, portfolioNumber } from '../utils/portfolioProposal';
 import { buyPortfolioHolding, depositPortfolioCash, PortfolioCurrency } from '../utils/portfolioActions';
@@ -47,19 +47,17 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
   const [loading, setLoading] = useState(false);
   const [imageMode, setImageMode] = useState<'auto' | 'stocks' | 'keren' | 'pension'>('auto');
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const hasKey = Boolean(localStorage.getItem('fil_gemini_api_key'));
   const context = useMemo(() => JSON.stringify({ profile: { netSalary: profile.netSalary, bankBalance: profile.bankBalance, balanceAsOf: profile.balanceAsOf, creditDebt: profile.creditDebt, safetyBuffer: profile.safetyBuffer, creditDay: profile.creditDay, creditCycleDay: profile.creditCycleDay }, standingOrders: standingOrders.map(({ description, amount, dayOfMonth, isActive, cat }) => ({ description, amount, dayOfMonth, isActive, cat })), transactions: transactions.slice(0, 120).map(({ date, description, amount, cat, status, paymentMethod, cashflowDate }) => ({ date, description, amount, cat, status, paymentMethod, cashflowDate })) }), [profile, standingOrders, transactions]);
   const systemPrompt = 'אתה העוזר הפיננסי של AIfina. ענה בעברית, בקצרה ובבהירות. הנתונים פרטיים ונשלחו רק כדי לענות לשאלה. אל תמציא נתונים, אל תיתן ייעוץ השקעות או משפטי. הוראות הקבע הן חלק מהתזרים שלך: כאשר תאריך הוראה פעילה הגיע, היא מופחתת בתחזית אם היתרה האחרונה שנשמרה קודמת למועד החיוב. לעולם אל תגיד שהוראות קבע אינן קשורות אליך או שאינך יכול לעזור בנושא; הסבר לפי ההוראות והיתרה שבנתונים. למשתמש יש הרשאה קבועה לפעולות מוגבלות: הוספת הכנסה או הוצאה מפורשת, עדכון תקציב הוצאות משתנות, הפקדת מזומן לתיק השקעות, קניית נייר מהמזומן הפנוי, ועדכון תיק מניות, קרן השתלמות או פנסיה מתמונה. הפעולות המורשות מבוצעות אוטומטית — אל תגיד שאין לך הרשאה לעדכן אותן. חשוב: לעולם אל תכתוב שהפעולה בוצעה, נשמרה או עודכנה בתוך answer. רק האפליקציה מדווחת על ביצוע לאחר ששמרה אותו. החזר אך ורק JSON תקין, ללא markdown וללא גדרות קוד, במבנה {"answer":"תשובה למשתמש","proposal":null}. אם המשתמש מבקש להוסיף הכנסה או הוצאה מפורשת, proposal יהיה {"type":"add_transaction","description":"...","amount":מספר חיובי,"date":"YYYY-MM-DD","cat":"אחת מהקטגוריות: הכנסה, מזון ושוק, דיור, תחבורה, חשבונות, בריאות, בידור, קניות, חיסכון, שונות"}. אם מבקש להפקיד לתיק, proposal יהיה {"type":"portfolio_deposit","amount":מספר חיובי,"currency":"ILS או USD"}. אם מבקש לקנות נייר מהמזומן, proposal יהיה {"type":"portfolio_buy","symbol":"קוד/שם נייר","name":"שם אם מופיע","shares":כמות חיובית,"price":מחיר יחידה חיובי,"currency":"ILS או USD","amount":עלות כוללת}. אל תנחש נתוני קנייה חסרים. עבור הכנסה הקטגוריה היא הכנסה; עבור הוצאה אל תכלול מינוס. אם המשתמש מבקש לקבוע תקציב הוצאות משתנות, proposal יהיה {"type":"update_variable_budget","amount":מספר חיובי}. בכל מקרה אחר proposal הוא null. נתוני המשתמש: ' + context;
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(messages.slice(-40))); }, [messages, storageKey]);
   const ask = async (rawQuestion?: string) => {
     const text = (rawQuestion || question).trim();
     if (!text || loading) return;
-    if (!hasKey) { onNavigateToTab('settings'); return; }
     const next = [...messages, { role: 'user' as const, text }];
     setMessages(next); setQuestion(''); setLoading(true);
     try {
       const contents = [{ role: 'user', parts: [{ text: systemPrompt }] }, ...next.map(message => ({ role: message.role, parts: [{ text: message.text }] }))];
-      const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', contents));
+      const reply = readReply(await generateGeminiContentClient(undefined, contents));
       const proposal = reply.proposal || localProposal(text);
       const result = proposal ? applyProposal(proposal) : requestedAction(text) ? '\n\n⚠ לא בוצע שינוי: חסרים פרטים כמו סכום או סוג פעולה.' : '';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
@@ -70,7 +68,6 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
     const file = event.target.files?.[0];
     if (!file || loading) return;
     event.target.value = '';
-    if (!hasKey) { onNavigateToTab('settings'); return; }
     setMessages(current => [...current, { role: 'user', text: 'ניתוח תמונה: ' + file.name }]);
     setLoading(true);
     try {
@@ -78,7 +75,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       const data = dataUrl.split(',')[1];
       if (!data) throw new Error('התמונה לא נקראה בצורה תקינה.');
       const imagePrompt = systemPrompt + ' סוג המסמך שנבחר על ידי המשתמש: ' + imageMode + '. התמונה המצורפת יכולה להיות קבלה, פירוט עסקה, דף חשבון, צילום תיק מניות, קרן השתלמות או פנסיה. אם נבחר stocks, התייחס לתמונה כתיק השקעות גם אם הכותרת לא ברורה. חלץ רק פרטים שרואים בתמונה, אך אל תענה שאינך יכול לצפות בתמונה. בקבלה או תנועה מזוהה, הצע add_transaction מתאים. בקרן השתלמות הצע {"type":"update_keren","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}; בפנסיה הצע {"type":"update_pension","amount":שווי חיובי,"ytd":תשואה באחוזים אם נראית}. בתיק מניות חובה להחזיר update_stocks אם זוהתה לפחות מניה אחת או יתרת מזומן: {"type":"update_stocks","amount":מספר המניות שזוהו או 1 אם זוהה רק מזומן,"cash":יתרת המזומן בתיק כמספר רק אם היא מופיעה,"cashCurrency":"ILS או USD לפי סמל המטבע שמופיע ליד שווי המזומן","holdings":[{"symbol":"קוד נייר אם הוא מופיע, אחרת שם ייחודי","name":"...","shares":"אך ורק המספר שמופיע ליד כמות/כמות יחידות","totalValue":"אך ורק המספר שמופיע ליד שווי אחזקה/שווי נוכחי","currentPrice":"אך ורק מחיר ליחידה או שער שמופיע במפורש","avgCost":"אך ורק מחיר קנייה ממוצע שמופיע במפורש","currency":"ILS או USD לפי סמל המטבע שמופיע ליד השווי"}]}. כלל קריטי: כמות, שווי אחזקה ומחיר ליחידה הם שלושה נתונים שונים. לעולם אל תשים שווי אחזקה ב-currentPrice או ב-shares. קרא כל מספר ספרה-ספרה ושמור את כל הספרות: 50,000 הוא 50000 ולא 5000; 51,206.73 הוא 51206.73. לפני החזרת JSON בצע בדיקה עצמית נוספת של כל כמות ושווי מול השורה בתמונה. אם יש שווי וכמות ואין מחיר יחידה, החזר totalValue בלבד — האפליקציה תחשב מחיר יחידה = שווי/כמות. חשוב: קבע מטבע רק לפי סימן/עמודת מטבע מפורשים (₪ = ILS, $ = USD), ולא לפי שם הנייר. מזומן אינו מניה: אל תכניס אותו ל-holdings, שמור אותו רק ב-cash. אין מזומן בתמונה? אל תכלול את השדה cash כלל, כדי לא למחוק את יתרת המזומן הקיימת. אין לדרוס ניירות קיימים שלא מופיעים בתמונה; התמונה היא עדכון חלקי בלבד. אם לא ניתן לקרוא בוודאות, proposal נשאר null.';
-      const reply = readReply(await chatWithGemini(localStorage.getItem('fil_gemini_api_key') || '', [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
+      const reply = readReply(await generateGeminiContentClient(undefined, [{ role: 'user', parts: [{ text: imagePrompt }, { inlineData: { data, mimeType: file.type || 'image/jpeg' } }] }]));
       const result = reply.proposal ? applyProposal(reply.proposal) : '\n\nℹ️ התמונה נותחה, אך לא נשמר שינוי כי לא זוהו נתונים מספיקים בוודאות.';
       setMessages(current => [...current, { role: 'model', text: reply.answer + result }]);
     } catch (error: any) { setMessages(current => [...current, { role: 'model', text: error?.message || 'לא הצלחתי לנתח את התמונה.' }]); }
@@ -141,7 +138,6 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
   };
   return <main dir="rtl" className="ai-page mx-auto space-y-5 px-4 py-7 md:px-8">
     <header className="ai-hero"><div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2 text-[#d7f281]"><Sparkles size={18} /><span className="text-sm font-bold">AIfina AI</span></div><h1 className="mt-2 text-3xl font-extrabold">העוזר הפיננסי שלך</h1><p className="mt-2 max-w-xl text-sm leading-6 text-emerald-50/80">שואל, מסכם ופועל לפי מה שסיכמתם — על בסיס הנתונים האישיים שלך.</p></div><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#d7f281] text-[#285545]"><Bot size={25} /></div></div></header>
-    {!hasKey && <Card className="border-amber-200 bg-amber-50"><div className="flex gap-3"><KeyRound className="shrink-0 text-amber-700" /><div><strong className="text-ink">צריך לחבר את Gemini פעם אחת</strong><p className="mt-1 text-sm text-muted">המפתח נשמר רק במכשיר שלך. בלי מפתח העוזר לא שולח נתונים לשום מקום.</p><Button className="mt-3" onClick={() => onNavigateToTab('settings')}>להגדרת Gemini</Button></div></div></Card>}
     <div className="ai-shell">
     <Card className="ai-chat">
       <div className="ai-chat-head"><div className="flex items-center gap-2 text-sm font-bold text-ink"><span className="ai-info-icon"><MessageCircle size={17} /></span>השיחה שלך</div>{messages.length > 0 && <button type="button" onClick={() => setMessages([])} className="flex items-center gap-1 text-xs font-semibold text-muted hover:text-expense"><Trash2 size={14} />נקה שיחה</button>}</div>

@@ -216,6 +216,14 @@ async function startServer() {
     }
   });
 
+  // AI endpoints accept either the normal access token or the Google session
+  // already resolved by the middleware above.  Do not use integrationAuth here:
+  // it only understands JWTs and would reject a valid Google cookie session.
+  const requireAppAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if ((req as any).userId) return next();
+    return res.status(401).json({ detail: 'לא מאומת' });
+  };
+
   // Health check endpoint
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -431,7 +439,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
   }
 
   // Test Gemini AI Key Endpoint
-  app.post('/api/test-ai', integrationAuth, async (req, res) => {
+  app.post('/api/test-ai', requireAppAuth, async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
       if (!apiKey) {
@@ -467,7 +475,7 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
   });
 
   // Generic Gemini proxy — uses server GEMINI_API_KEY, no client key needed
-  app.post('/api/gemini/proxy', integrationAuth, async (req, res) => {
+  app.post('/api/gemini/proxy', requireAppAuth, async (req, res) => {
     try {
       const apiKey = getGeminiApiKey(req);
       if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY לא מוגדר בשרת' });

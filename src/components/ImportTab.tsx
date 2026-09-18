@@ -56,10 +56,9 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
     try {
       const content = await readFileAsText(file);
-      const apiKey = localStorage.getItem('fil_gemini_api_key') || '';
-      const transactions = apiKey ? await importStatementWithGemini(content, apiKey) : parseLocalStatement(content);
+      const transactions = await importStatementWithGemini(content);
       if (!transactions.length) {
-        setErrorMsg(apiKey ? 'Gemini לא מצא עסקאות תקינות בקובץ. נסה לייצא את פירוט העסקאות מחדש.' : 'לא זוהו תנועות בקובץ. אפשר להגדיר Gemini API בהגדרות לניתוח פורמטים נוספים.');
+        setErrorMsg('לא זוהו עסקאות תקינות בקובץ. נסה לייצא את פירוט העסקאות מחדש.');
         return;
       }
       setPreviewTxs(statementType === 'credit' ? assignImportedCreditCycle(transactions, profile) : transactions);
@@ -125,7 +124,6 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 
       try {
         const compressedBase64 = await compressImage(originalBase64);
-        const customKey = localStorage.getItem('fil_gemini_api_key') || '';
         const cleanBase64 = compressedBase64.includes(',') ? compressedBase64.split(',').pop() : compressedBase64;
         
         let localPromptText = `אתה אלגוריתם לחילוץ וסיווג עסקאות פיננסיות מתמונות.
@@ -156,9 +154,8 @@ export const ImportTab: React.FC<ImportTabProps> = ({
 {"value":number, "ytd":number}`;
         }
 
-        const handleClientOcr = async (key: string) => {
-          if (!key) throw new Error('מפתח GEMINI_API_KEY חסר. הגדר אותו תחילה בהגדרות.');
-          const text = await generateGeminiContentClient(key, [
+        const handleClientOcr = async () => {
+          const text = await generateGeminiContentClient(undefined, [
             {
               role: 'user',
               parts: [
@@ -189,7 +186,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         };
 
         let resultData: any;
-        const clientOcrResult = await handleClientOcr(customKey);
+        const clientOcrResult = await handleClientOcr();
         resultData = { success: true, result: clientOcrResult };
 
         const data = resultData;
