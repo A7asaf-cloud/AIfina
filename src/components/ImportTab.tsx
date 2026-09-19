@@ -155,7 +155,7 @@ export const ImportTab: React.FC<ImportTabProps> = ({
         }
 
         const handleClientOcr = async () => {
-          const text = await generateGeminiContentClient(undefined, [
+          const text = await generateGeminiContentClient([
             {
               role: 'user',
               parts: [

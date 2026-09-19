@@ -5,7 +5,6 @@ const config: CapacitorConfig = {
   appId: 'ai.aifina.app',
   appName: 'AIfina',
   webDir: 'dist',
-  bundledWebRuntime: false,
   android: { allowMixedContent: false },
   ios: { contentInset: 'always' },
   plugins: {

@@ -10,4 +10,4 @@ This is an implementation inventory, not a privacy policy.
 - Local data: local-mode accounts and cached app data use browser storage.
 - No analytics SDK was found in the audited React app.
 
-Current blocker: Google-session and user JSON persistence use memory/filesystem storage, not a durable per-user database. Add durable storage, deletion and retention behavior before store release.
+Persistence: users, OAuth sessions, OTP hashes and the per-user financial-data document are stored in PostgreSQL. Session IDs are httpOnly cookies; Gemini and OAuth secrets are server environment variables and are not part of the web/mobile bundle. Account deletion deletes the user and related financial/session/OTP records through database foreign-key cascades.

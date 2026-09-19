@@ -1,5 +1,5 @@
 export { isGoogleAuthConfigured, loadGoogleAuthConfig } from './config.js';
-export { MemorySessionStore } from './session-store.js';
+export { MemorySessionStore, PostgresSessionStore } from './session-store.js';
 export { GoogleAuthService } from './google-auth.js';
 export { googleAuthRouter } from './routes.js';
 export type { GoogleAuthConfig } from './config.js';

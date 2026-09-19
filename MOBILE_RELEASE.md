@@ -6,6 +6,6 @@ Build: copy .env.mobile.example to .env.mobile, set VITE_AIFINA_API_URL to the H
 
 Never put Gemini, OAuth client secrets, JWT, SMTP, or database credentials in .env.mobile. Vite variables are public.
 
-Mobile Google login requires distinct Android and iOS OAuth clients, configured in Google Cloud with the Android package/signing certificate and iOS bundle ID. Web OAuth remains at https://aifina.ai.studio/auth/google/callback.
+Mobile Google login requires distinct Android and iOS OAuth clients, configured in Google Cloud with the Android package/signing certificate and iOS bundle ID. Web OAuth remains at https://aifina.ai.studio/auth/google/callback. The native app always talks to the HTTPS backend; Google client secrets, Gemini keys and database credentials remain server-only.
 
 Increase Android versionCode and iOS build number for every store upload. Signing credentials remain owner-only.

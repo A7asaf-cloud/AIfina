@@ -20,8 +20,8 @@ export function googleAuthRouter(config: GoogleAuthConfig, store: SessionStore, 
   const router = createRouter();
   const names = cookieNames(config.cookieSecure);
 
-  router.get('/google/start', (req, res) => {
-    const { pendingId, url } = auth.begin(safeReturnTo(req.query.returnTo));
+  router.get('/google/start', async (req, res) => {
+    const { pendingId, url } = await auth.begin(safeReturnTo(req.query.returnTo));
     res.cookie(names.pending, pendingId, { ...cookieOptions(config.cookieSecure), maxAge: 10 * 60_000 });
     res.redirect(url);
   });
@@ -41,15 +41,15 @@ export function googleAuthRouter(config: GoogleAuthConfig, store: SessionStore, 
       res.redirect('/login?error=google_sign_in_failed');
     }
   });
-  router.get('/session', (req, res) => {
-    const current = store.getSession(cookie(req, names.session) ?? '');
+  router.get('/session', async (req, res) => {
+    const current = await store.getSession(cookie(req, names.session) ?? '');
     res.json({ user: current ?? null });
   });
-  router.post('/logout', (req, res) => {
+  router.post('/logout', async (req, res) => {
     const origin = req.get('origin');
     if (origin && !config.appOrigins.includes(origin)) return res.sendStatus(403);
     const id = cookie(req, names.session);
-    if (id) store.deleteSession(id);
+    if (id) await store.deleteSession(id);
     res.clearCookie(names.session, cookieOptions(config.cookieSecure));
     return res.sendStatus(204);
   });

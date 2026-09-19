@@ -8,4 +8,4 @@
 - On macOS/Xcode select the Apple team, configure signing and archive iOS.
 - Publish support and privacy-policy URLs.
 - Perform physical-device tests for login, Google login, uploads, keyboard, deep links and persistence.
-- Replace temporary file/memory user storage with a durable database before releasing.
+- Provision a managed PostgreSQL database (Cloud SQL for PostgreSQL is the recommended Google-hosted option) and set its production DATABASE_URL and DATABASE_SSL=true in the server runtime. This is required before deployment; no credential belongs in Git or AI Studio client settings.
