@@ -191,7 +191,9 @@ async function startServer() {
   app.get('/api/integrations/status', integrationAuth, integrationStatus);
 
   // ── Finance-scraper proxy (forwards /api/scraper/* → localhost:3001/api/*) ──
-  app.use('/api/scraper', scraperProxy);
+  // The legacy SQLite scraper is an optional, separately deployed integration.
+  // It is deliberately disabled by default so it cannot affect core persistence.
+  if (process.env.ENABLE_FINANCE_SCRAPER === 'true') app.use('/api/scraper', scraperProxy);
 
   // ── JWT middleware (enabled when JWT_SECRET is set) ───────────────────────────
   app.use(async (req, res, next) => {
@@ -405,18 +407,8 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
     });
   });
 
-  // Helper to extract Gemini API key from headers, body, or environment
-  function getGeminiApiKey(req: express.Request): string | undefined {
-    if (serverAiKey()) return serverAiKey();
-    let key = (req.headers['x-gemini-key'] as string) || (req.headers['x-gemini-api-key'] as string) || req.body?.geminiApiKey;
-    if (key && typeof key === 'string') {
-      key = key.trim();
-    }
-    if (key && key !== 'undefined' && key !== 'null' && key.length > 5) {
-      return key;
-    }
-    return serverAiKey();
-  }
+  // AI credentials are server-only. Client supplied keys are intentionally ignored.
+  function getGeminiApiKey(_req?: express.Request): string | undefined { return serverAiKey(); }
 
   // Multi-model fallback helper for Gemini API calls
   async function generateGeminiContent(ai: GoogleGenAI, params: { contents: any; config?: any }) {
