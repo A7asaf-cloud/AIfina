@@ -17,7 +17,8 @@ import { scraperProxy } from './server/scraperProxy';
 import { decodeAccessToken } from './server/authUtils';
 import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
 import { initializeDatabase } from './server/database';
-import { deleteUserAccount, loadUserData, saveUserData } from './server/userDataStore';
+import { deleteUserAccount, loadUserData, RevisionConflictError, saveUserData } from './server/userDataStore';
+import { findAuthUserById } from './server/authFileStore';
 
 dotenv.config();
 let googleSessionStore: PostgresSessionStore | null = null;
@@ -213,6 +214,7 @@ async function startServer() {
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ detail: 'לא מאומת' });
     try {
       const payload = decodeAccessToken(auth.slice(7));
+      if (!await findAuthUserById(payload.sub)) return res.status(401).json({ detail: 'משתמש לא נמצא' });
       (req as any).userId    = payload.sub;
       (req as any).userEmail = payload.email;
       next();
@@ -1003,11 +1005,11 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
       const userId = req.params.userId;
       const reqUserId = (req as any).userId;
       if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
-      const data = await loadUserData(userId);
-      if (!data) {
+      const record = await loadUserData(userId);
+      if (!record) {
         return res.status(404).json({ error: 'לא נמצאו נתונים עבור משתמש זה' });
       }
-      res.json(data);
+      res.json(record);
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'שגיאה בטעינת נתונים' });
     }
@@ -1015,15 +1017,17 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
 
   app.post('/api/user/save', async (req, res) => {
     try {
-      const { userId, data } = req.body;
+      const { userId, data, expectedRevision } = req.body;
       if (!userId || !data) {
         return res.status(400).json({ error: 'נתונים חסרים לשמירה' });
       }
       const reqUserId = (req as any).userId;
       if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
-      await saveUserData(userId, data);
-      res.json({ success: true });
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 0) return res.status(400).json({ error: 'נדרשת גרסת נתונים תקינה' });
+      const revision = await saveUserData(userId, data, expectedRevision);
+      res.json({ success: true, revision });
     } catch (e: any) {
+      if (e instanceof RevisionConflictError) return res.status(409).json({ error: 'הנתונים השתנו במכשיר אחר. רעננו ונסו שוב.' });
       res.status(500).json({ error: e.message || 'שגיאה בשמירת נתונים' });
     }
   });
