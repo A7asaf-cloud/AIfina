@@ -68,7 +68,7 @@ describe('Google OAuth module', () => {
 
   it('clears the session with POST /auth/logout', async () => {
     const store = new MemorySessionStore();
-    const sessionId = store.createSession({ googleSubject: 'google-789', email: 'person@example.test', createdAt: Date.now() });
+    const sessionId = await store.createSession({ googleSubject: 'google-789', email: 'person@example.test', createdAt: Date.now() });
     const app = express();
     app.use('/auth', googleAuthRouter(config, store));
     const server = await new Promise<import('node:http').Server>(resolve => {

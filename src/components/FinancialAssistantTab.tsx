@@ -107,7 +107,7 @@ export const FinancialAssistantTab: React.FC<Props> = ({ profile, transactions, 
       const importedHoldings = extracted.holdings.flatMap((item, index) => {
         const shares = portfolioNumber(item.shares);
         if (!item.symbol || !shares || shares <= 0) return [];
-        const totalValue = moneyNumber(item.totalValue ?? item.value);
+        const totalValue = moneyNumber((item as { totalValue?: unknown; value?: unknown }).totalValue ?? (item as { value?: unknown }).value);
         const derivedPrice = totalValue !== undefined && totalValue >= 0 ? totalValue / shares : undefined;
         const currentPrice = moneyNumber(item.currentPrice) ?? derivedPrice;
         const avgCost = moneyNumber(item.avgCost) ?? currentPrice ?? 0;

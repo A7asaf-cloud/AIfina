@@ -16,4 +16,8 @@ export async function configureNativeShell(): Promise<void> {
   App.addListener('backButton', ({ canGoBack }) => {
     if (canGoBack) window.history.back();
   });
+  App.addListener('appUrlOpen', ({ url }) => {
+    // The backend returns to this registered private scheme after native OAuth.
+    if (url.startsWith('aifina://auth')) window.location.assign('/#' + (url.split('?')[1] ?? ''));
+  });
 }
