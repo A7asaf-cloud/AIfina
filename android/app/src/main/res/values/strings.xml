@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AIfina</string>
+    <string name="title_activity_main">AIfina</string>
+    <string name="package_name">ai.aifina.app</string>
+    <string name="custom_url_scheme">ai.aifina.app</string>
+</resources>

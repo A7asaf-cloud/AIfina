@@ -65,12 +65,12 @@ authRouter.post('/otp/request', async (req: Request, res: Response) => {
   if (!email || !email.includes('@') || !email.split('@')[1]?.includes('.'))
     return res.status(400).json({ detail: 'כתובת אימייל לא תקינה' });
 
-  const recent = getRecentOtps(email, OTP_WINDOW_MIN * 60_000);
+  const recent = await getRecentOtps(email, OTP_WINDOW_MIN * 60_000);
   if (recent.length >= OTP_RATE_LIMIT)
     return res.status(429).json({ detail: 'יותר מדי בקשות — נסה שוב בעוד 15 דקות' });
 
   const code = generateOtp();
-  saveOtp({
+  await saveOtp({
     id: crypto.randomUUID(), email,
     code: hashOtp(email, code),
     expiresAt: new Date(Date.now() + OTP_EXPIRE_MIN * 60_000).toISOString(),
@@ -96,20 +96,20 @@ authRouter.post('/otp/verify', async (req: Request, res: Response) => {
   if (code.length !== 6 || !/^\d+$/.test(code))
     return res.status(400).json({ detail: 'קוד חייב להיות 6 ספרות' });
 
-  const candidates = getUnusedValidOtps(email);
+  const candidates = await getUnusedValidOtps(email);
   const matched = candidates.find(r => verifyOtp(email, code, r.code));
   if (!matched)
     return res.status(401).json({ detail: 'קוד שגוי או שפג תוקפו' });
 
-  markOtpUsed(matched.id);
+  await markOtpUsed(matched.id);
 
-  let user = findAuthUserByEmail(email);
+  let user = await findAuthUserByEmail(email);
   if (!user) {
     user = makeUser({ id: crypto.randomUUID(), email, name: '' });
-    saveAuthUser(user);
+    await saveAuthUser(user);
   } else {
     user = { ...user, isVerified: true, updatedAt: new Date().toISOString() };
-    saveAuthUser(user);
+    await saveAuthUser(user);
   }
 
   const accessToken = issueSession(res, user);
@@ -179,7 +179,7 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
     const email = (info.email || '').toLowerCase().trim();
     if (!email || info.email_verified !== true || typeof info.sub !== 'string' || !info.sub) throw new Error('Unverified Google identity');
 
-    let user = findAuthUserByEmail(email);
+    let user = await findAuthUserByEmail(email);
     if (user?.googleId && user.googleId !== info.sub) throw new Error('Google identity mismatch');
     if (!user) {
       user = makeUser({
@@ -197,7 +197,7 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
         updatedAt: new Date().toISOString(),
       };
     }
-    saveAuthUser(user);
+    await saveAuthUser(user);
 
     const accessToken = issueSession(res, user);
     return res.redirect(`${frontendUrl}/#access_token=${accessToken}`);
@@ -209,20 +209,15 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
 
 
 // ── POST /auth/refresh ────────────────────────────────────────────────────────
-authRouter.post('/refresh', (req: Request, res: Response) => {
+authRouter.post('/refresh', async (req: Request, res: Response) => {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) return res.status(401).json({ detail: 'אין refresh token' });
 
   try {
     const payload = verifyRefreshToken(token);
 
-    let user = findAuthUserById(payload.sub);
-
-    // If user file was wiped (e.g. AI Studio restart) — recreate from JWT claims
-    if (!user) {
-      user = makeUser({ id: payload.sub, email: payload.email, tokenVersion: 0 });
-      saveAuthUser(user);
-    }
+    const user = await findAuthUserById(payload.sub);
+    if (!user) { clearCookie(res); return res.status(401).json({ detail: 'משתמש לא נמצא' }); }
 
     // Check logout-all: token version must match
     if ((payload.ver ?? 0) !== (user.tokenVersion || 0)) {
@@ -247,12 +242,12 @@ authRouter.post('/logout', (req: Request, res: Response) => {
 
 
 // ── POST /auth/logout-all ─────────────────────────────────────────────────────
-authRouter.post('/logout-all', (req: Request, res: Response) => {
+authRouter.post('/logout-all', async (req: Request, res: Response) => {
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ detail: 'לא מאומת' });
   try {
     const { sub: userId } = decodeAccessToken(auth.slice(7));
-    incrementTokenVersion(userId);  // invalidates all existing refresh tokens
+    await incrementTokenVersion(userId);  // invalidates all existing refresh tokens
     clearCookie(res);
     return res.json({ message: 'התנתקת מכל המכשירים' });
   } catch {
@@ -262,12 +257,12 @@ authRouter.post('/logout-all', (req: Request, res: Response) => {
 
 
 // ── GET /auth/me ──────────────────────────────────────────────────────────────
-authRouter.get('/me', (req: Request, res: Response) => {
+authRouter.get('/me', async (req: Request, res: Response) => {
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ detail: 'לא מאומת' });
   try {
     const { sub: userId } = decodeAccessToken(auth.slice(7));
-    const user = findAuthUserById(userId);
+    const user = await findAuthUserById(userId);
     if (!user) return res.status(404).json({ detail: 'משתמש לא נמצא' });
     return res.json(formatUser(user));
   } catch {
@@ -277,8 +272,8 @@ authRouter.get('/me', (req: Request, res: Response) => {
 
 
 // ── POST /auth/demo ───────────────────────────────────────────────────────────
-authRouter.post('/demo', (req: Request, res: Response) => {
-  const user = getOrCreateDemoUser();
+authRouter.post('/demo', async (req: Request, res: Response) => {
+  const user = await getOrCreateDemoUser();
   const accessToken = issueSession(res, user);
   return res.json({ access_token: accessToken, user: formatUser(user) });
 });

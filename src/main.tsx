@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { AuthProvider } from './auth/AuthContext.tsx';
 import './index.css';
+import { configureNativeShell } from './mobile';
+
+void configureNativeShell();
 
 interface Props {
   children: ReactNode;
