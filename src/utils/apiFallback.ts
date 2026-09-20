@@ -5,12 +5,10 @@
 import { CONFIG } from '../config';
 import { getMemToken } from '../auth/AuthContext';
 
-export async function generateGeminiContentClient(apiKey: string | undefined, contents: any): Promise<string> {
+export async function generateGeminiContentClient(contents: any): Promise<string> {
   const token = getMemToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  // Legacy user-supplied keys go only to our configured backend, never a public proxy.
-  if (apiKey?.trim()) headers['x-gemini-key'] = apiKey.trim();
 
   let response: Response;
   try {

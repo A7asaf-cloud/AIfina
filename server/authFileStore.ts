@@ -1,160 +1,19 @@
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import { getDatabase } from './database.js';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+export interface AuthUserRecord { id: string; email: string; name: string; avatarUrl: string; googleId: string; isVerified: boolean; createdAt: string; updatedAt: string; tokenVersion: number; }
+export interface OtpRecord { id: string; email: string; code: string; expiresAt: string; used: boolean; }
+type Row = Record<string, unknown>;
+const user = (row: Row): AuthUserRecord => ({ id: String(row.id), email: String(row.email), name: String(row.name ?? ''), avatarUrl: String(row.avatar_url ?? ''), googleId: String(row.google_id ?? ''), isVerified: Boolean(row.is_verified), tokenVersion: Number(row.token_version), createdAt: new Date(String(row.created_at)).toISOString(), updatedAt: new Date(String(row.updated_at)).toISOString() });
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+export async function findAuthUserByEmail(email: string): Promise<AuthUserRecord | undefined> { const q = await getDatabase().query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]); return q.rows[0] && user(q.rows[0]); }
+export async function findAuthUserById(id: string): Promise<AuthUserRecord | undefined> { const q = await getDatabase().query('SELECT * FROM users WHERE id = $1', [id]); return q.rows[0] && user(q.rows[0]); }
+export async function saveAuthUser(value: AuthUserRecord): Promise<void> {
+  await getDatabase().query(`INSERT INTO users (id,email,name,avatar_url,google_id,is_verified,token_version,created_at,updated_at) VALUES ($1,$2,$3,$4,NULLIF($5,''),$6,$7,$8,$9)
+    ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email,name=EXCLUDED.name,avatar_url=EXCLUDED.avatar_url,google_id=EXCLUDED.google_id,is_verified=EXCLUDED.is_verified,token_version=EXCLUDED.token_version,updated_at=EXCLUDED.updated_at`, [value.id, value.email.toLowerCase(), value.name, value.avatarUrl, value.googleId, value.isVerified, value.tokenVersion, value.createdAt, value.updatedAt]);
 }
-
-function readJson<T>(filename: string): T[] {
-  ensureDataDir();
-  const filePath = path.join(DATA_DIR, filename);
-  if (!fs.existsSync(filePath)) return [];
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return []; }
-}
-
-function writeJson<T>(filename: string, data: T[]): void {
-  ensureDataDir();
-  fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(data, null, 2), 'utf8');
-}
-
-// ── Auth user records ─────────────────────────────────────────────────────────
-export interface AuthUserRecord {
-  id: string;
-  email: string;
-  name: string;
-  avatarUrl: string;
-  googleId: string;
-  isVerified: boolean;
-  createdAt: string;
-  updatedAt: string;
-  tokenVersion: number;   // incremented on logout-all; old refresh tokens become invalid
-}
-
-const AUTH_USERS_FILE = 'auth_users.json';
-
-export function getAllAuthUsers(): AuthUserRecord[] {
-  return readJson<AuthUserRecord>(AUTH_USERS_FILE);
-}
-
-export function findAuthUserByEmail(email: string): AuthUserRecord | undefined {
-  return getAllAuthUsers().find(u => u.email === email.toLowerCase().trim());
-}
-
-export function findAuthUserById(id: string): AuthUserRecord | undefined {
-  return getAllAuthUsers().find(u => u.id === id);
-}
-
-export function saveAuthUser(user: AuthUserRecord): void {
-  const users = getAllAuthUsers();
-  const idx = users.findIndex(u => u.id === user.id);
-  if (idx >= 0) users[idx] = user; else users.push(user);
-  writeJson(AUTH_USERS_FILE, users);
-}
-
-export function getOrCreateDemoUser(): AuthUserRecord {
-  const email = 'demo@finance.il';
-  let user = findAuthUserByEmail(email);
-  if (!user) {
-    user = {
-      id: 'demo_user_id',
-      email,
-      name: 'ישראל ישראלי',
-      avatarUrl: '',
-      googleId: '',
-      isVerified: true,
-      tokenVersion: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    saveAuthUser(user);
-  }
-  return user;
-}
-
-export function incrementTokenVersion(userId: string): number {
-  const users = getAllAuthUsers();
-  const idx = users.findIndex(u => u.id === userId);
-  if (idx < 0) return 0;
-  users[idx].tokenVersion = (users[idx].tokenVersion || 0) + 1;
-  writeJson(AUTH_USERS_FILE, users);
-  return users[idx].tokenVersion;
-}
-
-// ── OTP records ───────────────────────────────────────────────────────────────
-export interface OtpRecord {
-  id: string;
-  email: string;
-  code: string;      // SHA-256 hash
-  expiresAt: string; // ISO
-  used: boolean;
-}
-
-const OTP_FILE = 'auth_otp_codes.json';
-
-export function getRecentOtps(email: string, windowMs: number): OtpRecord[] {
-  const cutoff = new Date(Date.now() - windowMs).toISOString();
-  return readJson<OtpRecord>(OTP_FILE).filter(
-    r => r.email === email && r.expiresAt > cutoff
-  );
-}
-
-export function saveOtp(record: OtpRecord): void {
-  const otps = readJson<OtpRecord>(OTP_FILE);
-  otps.push(record);
-  writeJson(OTP_FILE, otps);
-}
-
-export function getUnusedValidOtps(email: string): OtpRecord[] {
-  const now = new Date().toISOString();
-  return readJson<OtpRecord>(OTP_FILE)
-    .filter(r => r.email === email && !r.used && r.expiresAt > now)
-    .sort((a, b) => b.expiresAt.localeCompare(a.expiresAt));
-}
-
-export function markOtpUsed(id: string): void {
-  const otps = readJson<OtpRecord>(OTP_FILE).map(r => r.id === id ? { ...r, used: true } : r);
-  writeJson(OTP_FILE, otps);
-}
-
-// ── Refresh token records ─────────────────────────────────────────────────────
-export interface RefreshTokenRecord {
-  id: string;
-  userId: string;
-  token: string;     // SHA-256 hash
-  deviceInfo: string;
-  createdAt: string;
-  expiresAt: string;
-  revoked: boolean;
-}
-
-const RT_FILE = 'auth_refresh_tokens.json';
-
-export function saveRefreshToken(record: RefreshTokenRecord): void {
-  const tokens = readJson<RefreshTokenRecord>(RT_FILE);
-  tokens.push(record);
-  writeJson(RT_FILE, tokens);
-}
-
-export function findRefreshToken(hashedToken: string): RefreshTokenRecord | undefined {
-  const now = new Date().toISOString();
-  return readJson<RefreshTokenRecord>(RT_FILE).find(
-    r => r.token === hashedToken && !r.revoked && r.expiresAt > now
-  );
-}
-
-export function revokeRefreshToken(id: string): void {
-  const tokens = readJson<RefreshTokenRecord>(RT_FILE).map(r =>
-    r.id === id ? { ...r, revoked: true } : r
-  );
-  writeJson(RT_FILE, tokens);
-}
-
-export function revokeAllRefreshTokensForUser(userId: string): void {
-  const tokens = readJson<RefreshTokenRecord>(RT_FILE).map(r =>
-    r.userId === userId ? { ...r, revoked: true } : r
-  );
-  writeJson(RT_FILE, tokens);
-}
+export async function getOrCreateDemoUser(): Promise<AuthUserRecord> { const existing = await findAuthUserByEmail('demo@finance.il'); if (existing) return existing; const now = new Date().toISOString(); const value = { id: '00000000-0000-4000-8000-000000000001', email: 'demo@finance.il', name: 'ישראל ישראלי', avatarUrl: '', googleId: '', isVerified: true, tokenVersion: 0, createdAt: now, updatedAt: now }; await saveAuthUser(value); return value; }
+export async function incrementTokenVersion(id: string): Promise<number> { const q = await getDatabase().query('UPDATE users SET token_version=token_version+1,updated_at=now() WHERE id=$1 RETURNING token_version', [id]); return Number(q.rows[0]?.token_version ?? 0); }
+export async function getRecentOtps(email: string, windowMs: number): Promise<OtpRecord[]> { const q = await getDatabase().query('SELECT * FROM auth_otp_codes WHERE email=$1 AND created_at > now() - ($2 * interval \'1 millisecond\')', [email, windowMs]); return q.rows.map((r: Row) => ({ id: String(r.id), email: String(r.email), code: String(r.code_hash), expiresAt: new Date(String(r.expires_at)).toISOString(), used: Boolean(r.used_at) })); }
+export async function saveOtp(r: OtpRecord): Promise<void> { await getDatabase().query('INSERT INTO auth_otp_codes (id,email,code_hash,expires_at,used_at) VALUES ($1,$2,$3,$4,$5)', [r.id,r.email,r.code,r.expiresAt,r.used ? new Date() : null]); }
+export async function getUnusedValidOtps(email: string): Promise<OtpRecord[]> { const q = await getDatabase().query('SELECT * FROM auth_otp_codes WHERE email=$1 AND used_at IS NULL AND expires_at > now() ORDER BY expires_at DESC', [email]); return q.rows.map((r: Row) => ({ id: String(r.id), email: String(r.email), code: String(r.code_hash), expiresAt: new Date(String(r.expires_at)).toISOString(), used: false })); }
+export async function markOtpUsed(id: string): Promise<void> { await getDatabase().query('UPDATE auth_otp_codes SET used_at=now() WHERE id=$1 AND used_at IS NULL', [id]); }

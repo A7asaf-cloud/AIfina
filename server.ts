@@ -11,14 +11,17 @@ import {
   googleAuthRouter,
   isGoogleAuthConfigured,
   loadGoogleAuthConfig,
-  MemorySessionStore,
+  PostgresSessionStore,
 } from './server/google-oauth-module';
 import { scraperProxy } from './server/scraperProxy';
 import { decodeAccessToken } from './server/authUtils';
 import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
+import { initializeDatabase } from './server/database';
+import { deleteUserAccount, loadUserData, RevisionConflictError, saveUserData } from './server/userDataStore';
+import { findAuthUserById } from './server/authFileStore';
 
 dotenv.config();
-let googleSessionStore: MemorySessionStore | null = null;
+let googleSessionStore: PostgresSessionStore | null = null;
 
 // File Database Setup for multi-device sync
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -167,6 +170,7 @@ function writeUserDataOnServer(userId: string, data: any) {
 }
 
 async function startServer() {
+  await initializeDatabase();
   const app = express();
   const PORT = 3000;
 
@@ -177,7 +181,7 @@ async function startServer() {
   // Google OAuth is intentionally cookie/session based. It is registered first so
   // the legacy email/demo auth routes remain available without handling Google.
   if (isGoogleAuthConfigured()) {
-    googleSessionStore = new MemorySessionStore();
+    googleSessionStore = new PostgresSessionStore();
     app.use('/auth', googleAuthRouter(loadGoogleAuthConfig(), googleSessionStore));
   }
   app.get('/auth/google/status', (_req, res) => {
@@ -188,12 +192,14 @@ async function startServer() {
   app.get('/api/integrations/status', integrationAuth, integrationStatus);
 
   // ── Finance-scraper proxy (forwards /api/scraper/* → localhost:3001/api/*) ──
-  app.use('/api/scraper', scraperProxy);
+  // The legacy SQLite scraper is an optional, separately deployed integration.
+  // It is deliberately disabled by default so it cannot affect core persistence.
+  if (process.env.ENABLE_FINANCE_SCRAPER === 'true') app.use('/api/scraper', scraperProxy);
 
   // ── JWT middleware (enabled when JWT_SECRET is set) ───────────────────────────
-  app.use((req, res, next) => {
+  app.use(async (req, res, next) => {
     const googleCookie = process.env.COOKIE_SECURE === 'true' ? '__Host-app_session' : 'app_session';
-    const googleSession = googleSessionStore?.getSession(req.cookies?.[googleCookie] || '');
+    const googleSession = await googleSessionStore?.getSession(req.cookies?.[googleCookie] || '');
     if (googleSession) {
       (req as any).userId = googleSession.googleSubject;
       (req as any).userEmail = googleSession.email;
@@ -208,6 +214,7 @@ async function startServer() {
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ detail: 'לא מאומת' });
     try {
       const payload = decodeAccessToken(auth.slice(7));
+      if (!await findAuthUserById(payload.sub)) return res.status(401).json({ detail: 'משתמש לא נמצא' });
       (req as any).userId    = payload.sub;
       (req as any).userEmail = payload.email;
       next();
@@ -402,18 +409,8 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
     });
   });
 
-  // Helper to extract Gemini API key from headers, body, or environment
-  function getGeminiApiKey(req: express.Request): string | undefined {
-    if (serverAiKey()) return serverAiKey();
-    let key = (req.headers['x-gemini-key'] as string) || (req.headers['x-gemini-api-key'] as string) || req.body?.geminiApiKey;
-    if (key && typeof key === 'string') {
-      key = key.trim();
-    }
-    if (key && key !== 'undefined' && key !== 'null' && key.length > 5) {
-      return key;
-    }
-    return serverAiKey();
-  }
+  // AI credentials are server-only. Client supplied keys are intentionally ignored.
+  function getGeminiApiKey(_req?: express.Request): string | undefined { return serverAiKey(); }
 
   // Multi-model fallback helper for Gemini API calls
   async function generateGeminiContent(ai: GoogleGenAI, params: { contents: any; config?: any }) {
@@ -1003,76 +1000,42 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
   });
 
   // User Authentication and Sync Endpoints
-  app.get('/api/auth/accounts', (req, res) => {
-    try {
-      const users = readUsersOnServer();
-      const safeUsers = users.map((u: any) => ({
-        id: u.id,
-        username: u.username,
-        displayName: u.displayName,
-        createdAt: u.createdAt,
-        profile: u.profile,
-      }));
-      res.json(safeUsers);
-    } catch (e: any) {
-      res.status(500).json({ error: e.message || 'שגיאה בטעינת משתמשים' });
-    }
-  });
-
-  app.post('/api/auth/register', (req, res) => {
-    try {
-      const { account, initData } = req.body;
-      if (!account || !account.username) {
-        return res.status(400).json({ error: 'נתוני חשבון חסרים' });
-      }
-
-      const users = readUsersOnServer();
-      const exists = users.some((u: any) => u.username.toLowerCase() === account.username.toLowerCase());
-      if (exists) {
-        return res.status(400).json({ error: 'שם המשתמש כבר קיים בשרת' });
-      }
-
-      users.push(account);
-      writeUsersOnServer(users);
-
-      if (initData) {
-        writeUserDataOnServer(account.id, initData);
-      }
-
-      res.json({ success: true });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message || 'שגיאה ברישום משתמש בשרת' });
-    }
-  });
-
-  app.get('/api/user/load/:userId', (req, res) => {
+  app.get('/api/user/load/:userId', async (req, res) => {
     try {
       const userId = req.params.userId;
       const reqUserId = (req as any).userId;
       if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
-      const data = readUserDataOnServer(userId);
-      if (!data) {
+      const record = await loadUserData(userId);
+      if (!record) {
         return res.status(404).json({ error: 'לא נמצאו נתונים עבור משתמש זה' });
       }
-      res.json(data);
+      res.json(record);
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'שגיאה בטעינת נתונים' });
     }
   });
 
-  app.post('/api/user/save', (req, res) => {
+  app.post('/api/user/save', async (req, res) => {
     try {
-      const { userId, data } = req.body;
+      const { userId, data, expectedRevision } = req.body;
       if (!userId || !data) {
         return res.status(400).json({ error: 'נתונים חסרים לשמירה' });
       }
       const reqUserId = (req as any).userId;
       if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: 'אין הרשאה' });
-      writeUserDataOnServer(userId, data);
-      res.json({ success: true });
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 0) return res.status(400).json({ error: 'נדרשת גרסת נתונים תקינה' });
+      const revision = await saveUserData(userId, data, expectedRevision);
+      res.json({ success: true, revision });
     } catch (e: any) {
+      if (e instanceof RevisionConflictError) return res.status(409).json({ error: 'הנתונים השתנו במכשיר אחר. רעננו ונסו שוב.' });
       res.status(500).json({ error: e.message || 'שגיאה בשמירת נתונים' });
     }
+  });
+  app.delete('/api/user/account', async (req, res) => {
+    const userId = (req as any).userId;
+    if (!userId) return res.status(401).json({ error: 'לא מאומת' });
+    try { return (await deleteUserAccount(userId)) ? res.sendStatus(204) : res.sendStatus(404); }
+    catch { return res.status(500).json({ error: 'מחיקת החשבון נכשלה' }); }
   });
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

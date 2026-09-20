@@ -17,12 +17,12 @@ export class GoogleAuthService {
     private client: GoogleClient = new OAuth2Client(config.clientId, config.clientSecret, config.redirectUri),
   ) {}
 
-  begin(returnTo: string) {
+  async begin(returnTo: string) {
     const state = randomUrlSafe();
     const nonce = randomUrlSafe();
     const codeVerifier = randomUrlSafe(64);
     const pending: PendingLogin = { state, nonce, codeVerifier, createdAt: Date.now(), returnTo };
-    const pendingId = this.store.createPending(pending);
+    const pendingId = await this.store.createPending(pending);
     return {
       pendingId,
       url: this.client.generateAuthUrl({
@@ -40,7 +40,7 @@ export class GoogleAuthService {
 
   async complete(pendingId: string | undefined, state: string | undefined, code: string | undefined) {
     if (!pendingId || !state || !code) throw new Error('Invalid OAuth callback');
-    const pending = this.store.consumePending(pendingId);
+    const pending = await this.store.consumePending(pendingId);
     if (!pending || Date.now() - pending.createdAt > 10 * 60_000 || !safeEqual(pending.state, state)) {
       throw new Error('OAuth state validation failed');
     }
@@ -57,6 +57,6 @@ export class GoogleAuthService {
       picture: typeof payload.picture === 'string' ? payload.picture : undefined,
       createdAt: Date.now(),
     };
-    return { sessionId: this.store.createSession(user), user, returnTo: pending.returnTo };
+    return { sessionId: await this.store.createSession(user), user, returnTo: pending.returnTo };
   }
 }

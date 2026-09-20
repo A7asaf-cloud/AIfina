@@ -105,6 +105,7 @@ function hashStringSync(str: string): string {
 let saveLock = Promise.resolve();
 
 export class StorageService {
+  private static remoteRevisions = new Map<string, number>();
   static getAccounts(): UserAccount[] {
     try {
       const raw = localStorage.getItem(KEYS.USERS);
@@ -340,8 +341,8 @@ export class StorageService {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           credentials: 'include',
-          body: JSON.stringify({ userId, data: updated }),
-        }).catch((e) => console.error('Server sync failed:', e));
+          body: JSON.stringify({ userId, data: updated, expectedRevision: this.remoteRevisions.get(userId) ?? 0 }),
+        }).then(async response => { if (response.ok) this.remoteRevisions.set(userId, (await response.json()).revision); }).catch((e) => console.error('Server sync failed:', e));
       }
     } catch (e) {
       console.error('Error saving user data:', e);
@@ -357,8 +358,8 @@ export class StorageService {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       credentials: 'include',
-      body: JSON.stringify({ userId, data }),
-    }).catch((e) => console.error('Push to server failed:', e));
+      body: JSON.stringify({ userId, data, expectedRevision: this.remoteRevisions.get(userId) ?? 0 }),
+    }).then(async response => { if (response.ok) this.remoteRevisions.set(userId, (await response.json()).revision); }).catch((e) => console.error('Push to server failed:', e));
   }
 
   static async loadFromServer(userId: string, token: string): Promise<UserAppData | null> {
@@ -369,7 +370,9 @@ export class StorageService {
         credentials: 'include',
       });
       if (!res.ok) return null;
-      return await res.json();
+      const record = await res.json();
+      if (record?.data && Number.isInteger(record.revision)) { this.remoteRevisions.set(userId, record.revision); return record.data; }
+      return null;
     } catch (e) {
       console.error('Load from server failed:', e);
       return null;
