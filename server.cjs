@@ -103,11 +103,11 @@ var integrationStatus = (_req, res) => {
 
 // server.ts
 var import_cookie_parser = __toESM(require("cookie-parser"), 1);
-var import_path2 = __toESM(require("path"), 1);
+var import_path = __toESM(require("path"), 1);
 var import_vite = require("vite");
 var import_genai = require("@google/genai");
 var import_dotenv = __toESM(require("dotenv"), 1);
-var import_fs2 = __toESM(require("fs"), 1);
+var import_fs = __toESM(require("fs"), 1);
 
 // server/authRouter.ts
 var import_express = require("express");
@@ -122,98 +122,111 @@ function validGoogleState(received, expected) {
   return typeof received === "string" && typeof expected === "string" && /^[a-f0-9]{64}$/.test(received) && /^[a-f0-9]{64}$/.test(expected) && import_crypto2.default.timingSafeEqual(Buffer.from(received), Buffer.from(expected));
 }
 
-// server/authFileStore.ts
-var import_fs = __toESM(require("fs"), 1);
-var import_path = __toESM(require("path"), 1);
-var DATA_DIR = import_path.default.join(process.cwd(), "data");
-function ensureDataDir() {
-  if (!import_fs.default.existsSync(DATA_DIR)) import_fs.default.mkdirSync(DATA_DIR, { recursive: true });
+// server/database.ts
+var import_pg = require("pg");
+
+// server/migrations.ts
+var initialSchema = async (db) => {
+  await db.query(`CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL DEFAULT '', avatar_url TEXT NOT NULL DEFAULT '', google_id TEXT UNIQUE, is_verified BOOLEAN NOT NULL DEFAULT false, token_version INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());`);
+  await db.query(`CREATE TABLE user_financial_data (user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data JSONB NOT NULL, revision BIGINT NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());`);
+  await db.query("CREATE INDEX user_financial_data_data_idx ON user_financial_data USING GIN (data)");
+  await db.query(`CREATE TABLE auth_otp_codes (id UUID PRIMARY KEY, email TEXT NOT NULL, code_hash TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now());`);
+  await db.query("CREATE INDEX auth_otp_codes_email_idx ON auth_otp_codes(email, expires_at DESC)");
+  await db.query(`CREATE TABLE auth_sessions (id TEXT PRIMARY KEY, user_id UUID REFERENCES users(id) ON DELETE CASCADE, google_subject TEXT NOT NULL, email TEXT NOT NULL, name TEXT, picture TEXT, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());`);
+  await db.query("CREATE INDEX auth_sessions_user_idx ON auth_sessions(user_id, expires_at)");
+};
+var migrations = [{ id: "001_initial", up: initialSchema }];
+
+// server/database.ts
+var pool;
+function databaseUrl() {
+  const value = process.env.DATABASE_URL;
+  if (!value) throw new Error("DATABASE_URL is required. File and memory storage are not supported.");
+  return value;
 }
-function readJson(filename) {
-  ensureDataDir();
-  const filePath = import_path.default.join(DATA_DIR, filename);
-  if (!import_fs.default.existsSync(filePath)) return [];
+function getDatabase() {
+  if (!pool) {
+    pool = new import_pg.Pool({
+      connectionString: databaseUrl(),
+      ssl: process.env.DATABASE_SSL === "false" ? false : process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : void 0
+    });
+  }
+  return pool;
+}
+async function initializeDatabase() {
+  await withTransaction(async (client) => {
+    await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())");
+    for (const migration of migrations) {
+      const applied = await client.query("SELECT 1 FROM schema_migrations WHERE id = $1", [migration.id]);
+      if (!applied.rowCount) {
+        await migration.up(client);
+        await client.query("INSERT INTO schema_migrations (id) VALUES ($1)", [migration.id]);
+      }
+    }
+  });
+}
+async function withTransaction(work) {
+  const client = await getDatabase().connect();
   try {
-    return JSON.parse(import_fs.default.readFileSync(filePath, "utf8"));
-  } catch {
-    return [];
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 }
-function writeJson(filename, data) {
-  ensureDataDir();
-  import_fs.default.writeFileSync(import_path.default.join(DATA_DIR, filename), JSON.stringify(data, null, 2), "utf8");
+
+// server/authFileStore.ts
+var user = (row) => ({ id: String(row.id), email: String(row.email), name: String(row.name ?? ""), avatarUrl: String(row.avatar_url ?? ""), googleId: String(row.google_id ?? ""), isVerified: Boolean(row.is_verified), tokenVersion: Number(row.token_version), createdAt: new Date(String(row.created_at)).toISOString(), updatedAt: new Date(String(row.updated_at)).toISOString() });
+async function findAuthUserByEmail(email) {
+  const q = await getDatabase().query("SELECT * FROM users WHERE email = $1", [email.toLowerCase().trim()]);
+  return q.rows[0] && user(q.rows[0]);
 }
-var AUTH_USERS_FILE = "auth_users.json";
-function getAllAuthUsers() {
-  return readJson(AUTH_USERS_FILE);
+async function findAuthUserById(id) {
+  const q = await getDatabase().query("SELECT * FROM users WHERE id = $1", [id]);
+  return q.rows[0] && user(q.rows[0]);
 }
-function findAuthUserByEmail(email) {
-  return getAllAuthUsers().find((u) => u.email === email.toLowerCase().trim());
+async function saveAuthUser(value) {
+  await getDatabase().query(`INSERT INTO users (id,email,name,avatar_url,google_id,is_verified,token_version,created_at,updated_at) VALUES ($1,$2,$3,$4,NULLIF($5,''),$6,$7,$8,$9)
+    ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email,name=EXCLUDED.name,avatar_url=EXCLUDED.avatar_url,google_id=EXCLUDED.google_id,is_verified=EXCLUDED.is_verified,token_version=EXCLUDED.token_version,updated_at=EXCLUDED.updated_at`, [value.id, value.email.toLowerCase(), value.name, value.avatarUrl, value.googleId, value.isVerified, value.tokenVersion, value.createdAt, value.updatedAt]);
 }
-function findAuthUserById(id) {
-  return getAllAuthUsers().find((u) => u.id === id);
-}
-function saveAuthUser(user) {
-  const users = getAllAuthUsers();
-  const idx = users.findIndex((u) => u.id === user.id);
-  if (idx >= 0) users[idx] = user;
-  else users.push(user);
-  writeJson(AUTH_USERS_FILE, users);
-}
-function getOrCreateDemoUser() {
-  const email = "demo@finance.il";
-  let user = findAuthUserByEmail(email);
-  if (!user) {
-    user = {
-      id: "demo_user_id",
-      email,
-      name: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
-      avatarUrl: "",
-      googleId: "",
-      isVerified: true,
-      tokenVersion: 0,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    saveAuthUser(user);
-  }
-  return user;
-}
-function incrementTokenVersion(userId) {
-  const users = getAllAuthUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx < 0) return 0;
-  users[idx].tokenVersion = (users[idx].tokenVersion || 0) + 1;
-  writeJson(AUTH_USERS_FILE, users);
-  return users[idx].tokenVersion;
-}
-var OTP_FILE = "auth_otp_codes.json";
-function getRecentOtps(email, windowMs) {
-  const cutoff = new Date(Date.now() - windowMs).toISOString();
-  return readJson(OTP_FILE).filter(
-    (r) => r.email === email && r.expiresAt > cutoff
-  );
-}
-function saveOtp(record) {
-  const otps = readJson(OTP_FILE);
-  otps.push(record);
-  writeJson(OTP_FILE, otps);
-}
-function getUnusedValidOtps(email) {
+async function getOrCreateDemoUser() {
+  const existing = await findAuthUserByEmail("demo@finance.il");
+  if (existing) return existing;
   const now = (/* @__PURE__ */ new Date()).toISOString();
-  return readJson(OTP_FILE).filter((r) => r.email === email && !r.used && r.expiresAt > now).sort((a, b) => b.expiresAt.localeCompare(a.expiresAt));
+  const value = { id: "00000000-0000-4000-8000-000000000001", email: "demo@finance.il", name: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9", avatarUrl: "", googleId: "", isVerified: true, tokenVersion: 0, createdAt: now, updatedAt: now };
+  await saveAuthUser(value);
+  return value;
 }
-function markOtpUsed(id) {
-  const otps = readJson(OTP_FILE).map((r) => r.id === id ? { ...r, used: true } : r);
-  writeJson(OTP_FILE, otps);
+async function incrementTokenVersion(id) {
+  const q = await getDatabase().query("UPDATE users SET token_version=token_version+1,updated_at=now() WHERE id=$1 RETURNING token_version", [id]);
+  return Number(q.rows[0]?.token_version ?? 0);
+}
+async function getRecentOtps(email, windowMs) {
+  const q = await getDatabase().query("SELECT * FROM auth_otp_codes WHERE email=$1 AND created_at > now() - ($2 * interval '1 millisecond')", [email, windowMs]);
+  return q.rows.map((r) => ({ id: String(r.id), email: String(r.email), code: String(r.code_hash), expiresAt: new Date(String(r.expires_at)).toISOString(), used: Boolean(r.used_at) }));
+}
+async function saveOtp(r) {
+  await getDatabase().query("INSERT INTO auth_otp_codes (id,email,code_hash,expires_at,used_at) VALUES ($1,$2,$3,$4,$5)", [r.id, r.email, r.code, r.expiresAt, r.used ? /* @__PURE__ */ new Date() : null]);
+}
+async function getUnusedValidOtps(email) {
+  const q = await getDatabase().query("SELECT * FROM auth_otp_codes WHERE email=$1 AND used_at IS NULL AND expires_at > now() ORDER BY expires_at DESC", [email]);
+  return q.rows.map((r) => ({ id: String(r.id), email: String(r.email), code: String(r.code_hash), expiresAt: new Date(String(r.expires_at)).toISOString(), used: false }));
+}
+async function markOtpUsed(id) {
+  await getDatabase().query("UPDATE auth_otp_codes SET used_at=now() WHERE id=$1 AND used_at IS NULL", [id]);
 }
 
 // server/authEmail.ts
 var import_nodemailer = __toESM(require("nodemailer"), 1);
 async function sendOtpEmail(toEmail, code) {
   const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  if (!host || !user) {
+  const user2 = process.env.SMTP_USER;
+  if (!host || !user2) {
     console.warn(`[DEV] OTP for ${toEmail}: ${code}  (SMTP \u05DC\u05D0 \u05DE\u05D5\u05D2\u05D3\u05E8 \u2014 \u05DE\u05D5\u05D3\u05E4\u05E1 \u05DC-log)`);
     return;
   }
@@ -221,9 +234,9 @@ async function sendOtpEmail(toEmail, code) {
     host,
     port: parseInt(process.env.SMTP_PORT || "587"),
     secure: false,
-    auth: { user, pass: process.env.SMTP_PASS || "" }
+    auth: { user: user2, pass: process.env.SMTP_PASS || "" }
   });
-  const from = process.env.FROM_EMAIL || user;
+  const from = process.env.FROM_EMAIL || user2;
   const html = `<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <body style="margin:0;padding:0;background:#020617;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -283,10 +296,10 @@ function setCookie(res, token) {
 function clearCookie(res) {
   res.clearCookie(COOKIE_NAME, { path: "/auth" });
 }
-function issueSession(res, user) {
-  const refreshToken = createRefreshToken(user.id, user.email, user.tokenVersion || 0);
+function issueSession(res, user2) {
+  const refreshToken = createRefreshToken(user2.id, user2.email, user2.tokenVersion || 0);
   setCookie(res, refreshToken);
-  return createAccessToken(user.id, user.email);
+  return createAccessToken(user2.id, user2.email);
 }
 function formatUser(u) {
   return { id: u.id, email: u.email, name: u.name, avatarUrl: u.avatarUrl, isVerified: u.isVerified };
@@ -308,11 +321,11 @@ authRouter.post("/otp/request", async (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
   if (!email || !email.includes("@") || !email.split("@")[1]?.includes("."))
     return res.status(400).json({ detail: "\u05DB\u05EA\u05D5\u05D1\u05EA \u05D0\u05D9\u05DE\u05D9\u05D9\u05DC \u05DC\u05D0 \u05EA\u05E7\u05D9\u05E0\u05D4" });
-  const recent = getRecentOtps(email, OTP_WINDOW_MIN * 6e4);
+  const recent = await getRecentOtps(email, OTP_WINDOW_MIN * 6e4);
   if (recent.length >= OTP_RATE_LIMIT)
     return res.status(429).json({ detail: "\u05D9\u05D5\u05EA\u05E8 \u05DE\u05D3\u05D9 \u05D1\u05E7\u05E9\u05D5\u05EA \u2014 \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D1\u05E2\u05D5\u05D3 15 \u05D3\u05E7\u05D5\u05EA" });
   const code = generateOtp();
-  saveOtp({
+  await saveOtp({
     id: import_crypto3.default.randomUUID(),
     email,
     code: hashOtp(email, code),
@@ -332,21 +345,21 @@ authRouter.post("/otp/verify", async (req, res) => {
   const code = (req.body.code || "").trim();
   if (code.length !== 6 || !/^\d+$/.test(code))
     return res.status(400).json({ detail: "\u05E7\u05D5\u05D3 \u05D7\u05D9\u05D9\u05D1 \u05DC\u05D4\u05D9\u05D5\u05EA 6 \u05E1\u05E4\u05E8\u05D5\u05EA" });
-  const candidates = getUnusedValidOtps(email);
+  const candidates = await getUnusedValidOtps(email);
   const matched = candidates.find((r) => verifyOtp(email, code, r.code));
   if (!matched)
     return res.status(401).json({ detail: "\u05E7\u05D5\u05D3 \u05E9\u05D2\u05D5\u05D9 \u05D0\u05D5 \u05E9\u05E4\u05D2 \u05EA\u05D5\u05E7\u05E4\u05D5" });
-  markOtpUsed(matched.id);
-  let user = findAuthUserByEmail(email);
-  if (!user) {
-    user = makeUser({ id: import_crypto3.default.randomUUID(), email, name: "" });
-    saveAuthUser(user);
+  await markOtpUsed(matched.id);
+  let user2 = await findAuthUserByEmail(email);
+  if (!user2) {
+    user2 = makeUser({ id: import_crypto3.default.randomUUID(), email, name: "" });
+    await saveAuthUser(user2);
   } else {
-    user = { ...user, isVerified: true, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-    saveAuthUser(user);
+    user2 = { ...user2, isVerified: true, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    await saveAuthUser(user2);
   }
-  const accessToken = issueSession(res, user);
-  return res.json({ access_token: accessToken, user: formatUser(user) });
+  const accessToken = issueSession(res, user2);
+  return res.json({ access_token: accessToken, user: formatUser(user2) });
 });
 authRouter.get("/google/status", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -398,10 +411,10 @@ authRouter.get("/google/callback", async (req, res) => {
     const info = await infoRes.json();
     const email = (info.email || "").toLowerCase().trim();
     if (!email || info.email_verified !== true || typeof info.sub !== "string" || !info.sub) throw new Error("Unverified Google identity");
-    let user = findAuthUserByEmail(email);
-    if (user?.googleId && user.googleId !== info.sub) throw new Error("Google identity mismatch");
-    if (!user) {
-      user = makeUser({
+    let user2 = await findAuthUserByEmail(email);
+    if (user2?.googleId && user2.googleId !== info.sub) throw new Error("Google identity mismatch");
+    if (!user2) {
+      user2 = makeUser({
         id: import_crypto3.default.randomUUID(),
         email,
         name: info.name || "",
@@ -409,37 +422,37 @@ authRouter.get("/google/callback", async (req, res) => {
         googleId: info.sub || ""
       });
     } else {
-      user = {
-        ...user,
-        googleId: info.sub || user.googleId,
-        name: info.name || user.name,
-        avatarUrl: info.picture || user.avatarUrl,
+      user2 = {
+        ...user2,
+        googleId: info.sub || user2.googleId,
+        name: info.name || user2.name,
+        avatarUrl: info.picture || user2.avatarUrl,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
     }
-    saveAuthUser(user);
-    const accessToken = issueSession(res, user);
+    await saveAuthUser(user2);
+    const accessToken = issueSession(res, user2);
     return res.redirect(`${frontendUrl}/#access_token=${accessToken}`);
   } catch (err) {
     console.error("Google OAuth authentication failed");
     return res.redirect(`${process.env.FRONTEND_URL || "https://aifina.ai.studio/"}/#auth_error=google_failed`);
   }
 });
-authRouter.post("/refresh", (req, res) => {
+authRouter.post("/refresh", async (req, res) => {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) return res.status(401).json({ detail: "\u05D0\u05D9\u05DF refresh token" });
   try {
     const payload = verifyRefreshToken(token);
-    let user = findAuthUserById(payload.sub);
-    if (!user) {
-      user = makeUser({ id: payload.sub, email: payload.email, tokenVersion: 0 });
-      saveAuthUser(user);
+    const user2 = await findAuthUserById(payload.sub);
+    if (!user2) {
+      clearCookie(res);
+      return res.status(401).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
     }
-    if ((payload.ver ?? 0) !== (user.tokenVersion || 0)) {
+    if ((payload.ver ?? 0) !== (user2.tokenVersion || 0)) {
       clearCookie(res);
       return res.status(401).json({ detail: "Token \u05D1\u05D5\u05D8\u05DC \u2014 \u05D9\u05E9 \u05DC\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DE\u05D7\u05D3\u05E9" });
     }
-    const accessToken = issueSession(res, user);
+    const accessToken = issueSession(res, user2);
     return res.json({ access_token: accessToken });
   } catch {
     clearCookie(res);
@@ -450,34 +463,34 @@ authRouter.post("/logout", (req, res) => {
   clearCookie(res);
   return res.json({ message: "\u05D4\u05EA\u05E0\u05EA\u05E7\u05EA \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4" });
 });
-authRouter.post("/logout-all", (req, res) => {
+authRouter.post("/logout-all", async (req, res) => {
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
   try {
     const { sub: userId } = decodeAccessToken(auth.slice(7));
-    incrementTokenVersion(userId);
+    await incrementTokenVersion(userId);
     clearCookie(res);
     return res.json({ message: "\u05D4\u05EA\u05E0\u05EA\u05E7\u05EA \u05DE\u05DB\u05DC \u05D4\u05DE\u05DB\u05E9\u05D9\u05E8\u05D9\u05DD" });
   } catch {
     return res.status(401).json({ detail: "Access token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF" });
   }
 });
-authRouter.get("/me", (req, res) => {
+authRouter.get("/me", async (req, res) => {
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
   try {
     const { sub: userId } = decodeAccessToken(auth.slice(7));
-    const user = findAuthUserById(userId);
-    if (!user) return res.status(404).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
-    return res.json(formatUser(user));
+    const user2 = await findAuthUserById(userId);
+    if (!user2) return res.status(404).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
+    return res.json(formatUser(user2));
   } catch {
     return res.status(401).json({ detail: "Access token \u05DC\u05D0 \u05EA\u05E7\u05D9\u05DF" });
   }
 });
-authRouter.post("/demo", (req, res) => {
-  const user = getOrCreateDemoUser();
-  const accessToken = issueSession(res, user);
-  return res.json({ access_token: accessToken, user: formatUser(user) });
+authRouter.post("/demo", async (req, res) => {
+  const user2 = await getOrCreateDemoUser();
+  const accessToken = issueSession(res, user2);
+  return res.json({ access_token: accessToken, user: formatUser(user2) });
 });
 
 // server/google-oauth-module/config.ts
@@ -515,31 +528,36 @@ function safeEqual(a, b) {
 }
 
 // server/google-oauth-module/session-store.ts
-var MemorySessionStore = class {
-  constructor() {
-    this.pending = /* @__PURE__ */ new Map();
-    this.sessions = /* @__PURE__ */ new Map();
-  }
-  createPending(value) {
-    const id = randomUrlSafe();
-    this.pending.set(id, value);
+var import_crypto5 = __toESM(require("crypto"), 1);
+var PostgresSessionStore = class {
+  async createPending(value) {
+    const id = `pending:${randomUrlSafe()}`;
+    await getDatabase().query("INSERT INTO auth_sessions (id,google_subject,email,name,picture,expires_at) VALUES ($1,$2,$3,$4,$5,$6)", [id, value.state, "", JSON.stringify(value), null, new Date(Date.now() + 10 * 6e4)]);
     return id;
   }
-  consumePending(id) {
-    const value = this.pending.get(id);
-    this.pending.delete(id);
-    return value;
+  async consumePending(id) {
+    const q = await getDatabase().query("DELETE FROM auth_sessions WHERE id=$1 AND expires_at > now() RETURNING name", [id]);
+    try {
+      return q.rows[0] ? JSON.parse(q.rows[0].name) : void 0;
+    } catch {
+      return void 0;
+    }
   }
-  createSession(value) {
+  async createSession(value) {
+    const db = getDatabase();
+    const user2 = await db.query(`INSERT INTO users (id,email,name,avatar_url,google_id,is_verified) VALUES ($1,$2,$3,$4,$5,true)
+    ON CONFLICT (google_id) DO UPDATE SET email=EXCLUDED.email,name=EXCLUDED.name,avatar_url=EXCLUDED.avatar_url,is_verified=true,updated_at=now() RETURNING id`, [import_crypto5.default.randomUUID(), value.email.toLowerCase(), value.name ?? "", value.picture ?? "", value.googleSubject]);
     const id = randomUrlSafe();
-    this.sessions.set(id, value);
+    await db.query("INSERT INTO auth_sessions (id,user_id,google_subject,email,name,picture,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7)", [id, user2.rows[0].id, value.googleSubject, value.email, value.name ?? null, value.picture ?? null, new Date(Date.now() + 7 * 24 * 60 * 6e4)]);
     return id;
   }
-  getSession(id) {
-    return this.sessions.get(id);
+  async getSession(id) {
+    const q = await getDatabase().query("SELECT user_id,email,name,picture,created_at FROM auth_sessions WHERE id=$1 AND expires_at > now()", [id]);
+    const r = q.rows[0];
+    return r ? { googleSubject: r.user_id, email: r.email, name: r.name ?? void 0, picture: r.picture ?? void 0, createdAt: new Date(r.created_at).getTime() } : void 0;
   }
-  deleteSession(id) {
-    this.sessions.delete(id);
+  async deleteSession(id) {
+    await getDatabase().query("DELETE FROM auth_sessions WHERE id=$1", [id]);
   }
 };
 
@@ -551,12 +569,12 @@ var GoogleAuthService = class {
     this.store = store;
     this.client = client;
   }
-  begin(returnTo) {
+  async begin(returnTo) {
     const state = randomUrlSafe();
     const nonce = randomUrlSafe();
     const codeVerifier = randomUrlSafe(64);
     const pending = { state, nonce, codeVerifier, createdAt: Date.now(), returnTo };
-    const pendingId = this.store.createPending(pending);
+    const pendingId = await this.store.createPending(pending);
     return {
       pendingId,
       url: this.client.generateAuthUrl({
@@ -573,7 +591,7 @@ var GoogleAuthService = class {
   }
   async complete(pendingId, state, code) {
     if (!pendingId || !state || !code) throw new Error("Invalid OAuth callback");
-    const pending = this.store.consumePending(pendingId);
+    const pending = await this.store.consumePending(pendingId);
     if (!pending || Date.now() - pending.createdAt > 10 * 6e4 || !safeEqual(pending.state, state)) {
       throw new Error("OAuth state validation failed");
     }
@@ -583,14 +601,14 @@ var GoogleAuthService = class {
     if (!payload || payload.nonce !== pending.nonce || payload.email_verified !== true || typeof payload.sub !== "string" || typeof payload.email !== "string") {
       throw new Error("Google identity token validation failed");
     }
-    const user = {
+    const user2 = {
       googleSubject: payload.sub,
       email: payload.email,
       name: typeof payload.name === "string" ? payload.name : void 0,
       picture: typeof payload.picture === "string" ? payload.picture : void 0,
       createdAt: Date.now()
     };
-    return { sessionId: this.store.createSession(user), user, returnTo: pending.returnTo };
+    return { sessionId: await this.store.createSession(user2), user: user2, returnTo: pending.returnTo };
   }
 };
 
@@ -610,8 +628,8 @@ function safeReturnTo(value) {
 function googleAuthRouter(config, store, auth = new GoogleAuthService(config, store)) {
   const router2 = (0, import_express2.Router)();
   const names = cookieNames(config.cookieSecure);
-  router2.get("/google/start", (req, res) => {
-    const { pendingId, url } = auth.begin(safeReturnTo(req.query.returnTo));
+  router2.get("/google/start", async (req, res) => {
+    const { pendingId, url } = await auth.begin(safeReturnTo(req.query.returnTo));
     res.cookie(names.pending, pendingId, { ...cookieOptions(config.cookieSecure), maxAge: 10 * 6e4 });
     res.redirect(url);
   });
@@ -631,15 +649,15 @@ function googleAuthRouter(config, store, auth = new GoogleAuthService(config, st
       res.redirect("/login?error=google_sign_in_failed");
     }
   });
-  router2.get("/session", (req, res) => {
-    const current = store.getSession(cookie(req, names.session) ?? "");
+  router2.get("/session", async (req, res) => {
+    const current = await store.getSession(cookie(req, names.session) ?? "");
     res.json({ user: current ?? null });
   });
-  router2.post("/logout", (req, res) => {
+  router2.post("/logout", async (req, res) => {
     const origin = req.get("origin");
     if (origin && !config.appOrigins.includes(origin)) return res.sendStatus(403);
     const id = cookie(req, names.session);
-    if (id) store.deleteSession(id);
+    if (id) await store.deleteSession(id);
     res.clearCookie(names.session, cookieOptions(config.cookieSecure));
     return res.sendStatus(204);
   });
@@ -1128,147 +1146,41 @@ function getAllFunds(type) {
   return type ? STATIC_FUNDS.filter((f) => f.type === type) : STATIC_FUNDS;
 }
 
+// server/userDataStore.ts
+async function loadUserData(userId) {
+  const result = await getDatabase().query("SELECT data, revision FROM user_financial_data WHERE user_id = $1", [userId]);
+  return result.rows[0] && { data: result.rows[0].data, revision: Number(result.rows[0].revision) };
+}
+var RevisionConflictError = class extends Error {
+};
+async function saveUserData(userId, data, expectedRevision) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid financial data payload");
+  const result = await getDatabase().query(`INSERT INTO user_financial_data (user_id, data, revision) VALUES ($1, $2::jsonb, 1)
+    ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, revision = user_financial_data.revision + 1, updated_at = now()
+    WHERE user_financial_data.revision = $3 RETURNING revision`, [userId, JSON.stringify(data), expectedRevision]);
+  if (!result.rowCount) throw new RevisionConflictError("Financial data was changed on another device");
+  return Number(result.rows[0].revision);
+}
+async function deleteUserAccount(userId) {
+  return withTransaction(async (client) => (await client.query("DELETE FROM users WHERE id = $1", [userId])).rowCount === 1);
+}
+
 // server.ts
 import_dotenv.default.config();
 var googleSessionStore = null;
-var DATA_DIR2 = import_path2.default.join(process.cwd(), "data");
-if (!import_fs2.default.existsSync(DATA_DIR2)) {
-  import_fs2.default.mkdirSync(DATA_DIR2, { recursive: true });
+var DATA_DIR = import_path.default.join(process.cwd(), "data");
+if (!import_fs.default.existsSync(DATA_DIR)) {
+  import_fs.default.mkdirSync(DATA_DIR, { recursive: true });
 }
-var USERS_FILE = import_path2.default.join(DATA_DIR2, "users.json");
-function readUsersOnServer() {
-  if (!import_fs2.default.existsSync(USERS_FILE)) {
-    const demoProfile = {
-      name: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
-      netSalary: 16500,
-      grossSalary: 22e3,
-      salaryDay: 10,
-      creditDay: 1,
-      bankBalance: 24500,
-      creditDebt: 4200,
-      rent: 4800,
-      rentDay: 1,
-      hasKeren: true,
-      kerenEmp: 2.5,
-      kerenEr: 7.5,
-      hasPension: true,
-      pensionEmp: 6,
-      pensionEr: 14.83,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    const hashString = (str) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash |= 0;
-      }
-      return hash.toString();
-    };
-    const demoAccount = {
-      id: "demo_user_id",
-      username: "demo",
-      passwordHash: hashString("123456"),
-      displayName: "\u05D9\u05E9\u05E8\u05D0\u05DC \u05D9\u05E9\u05E8\u05D0\u05DC\u05D9",
-      email: "demo@finance.il",
-      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-      profile: demoProfile
-    };
-    const defaultBudgetPlan = [
-      { key: "\u05D3\u05D9\u05D5\u05E8", pct: 30, color: "#64748B", emoji: "\u{1F3E0}" },
-      { key: "\u05DE\u05D6\u05D5\u05DF \u05D5\u05E9\u05D5\u05E7", pct: 15, color: "#22C55E", emoji: "\u{1F6D2}" },
-      { key: "\u05EA\u05D7\u05D1\u05D5\u05E8\u05D4", pct: 10, color: "#3B82F6", emoji: "\u{1F68C}" },
-      { key: "\u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA", pct: 8, color: "#EAB308", emoji: "\u{1F4A1}" },
-      { key: "\u05D1\u05E8\u05D9\u05D0\u05D5\u05EA", pct: 5, color: "#14B8A6", emoji: "\u{1F3E5}" },
-      { key: "\u05D1\u05D9\u05D3\u05D5\u05E8", pct: 7, color: "#EC4899", emoji: "\u{1F3AC}" },
-      { key: "\u05D7\u05D9\u05E1\u05DB\u05D5\u05DF", pct: 15, color: "#F59E0B", emoji: "\u{1F4B0}" },
-      { key: "\u05E9\u05D5\u05E0\u05D5\u05EA", pct: 10, color: "#9CA3AF", emoji: "\u{1F4E6}" }
-    ];
-    const demoData = {
-      profile: demoProfile,
-      transactions: [
-        { id: 101, description: "\u05DE\u05E9\u05DB\u05D5\u05E8\u05EA \u05D7\u05D5\u05D3\u05E9\u05D9\u05EA", amount: 16500, date: "2026-07-10", cat: "\u05D4\u05DB\u05E0\u05E1\u05D4", color: "#10B981", emoji: "\u{1F4B0}", account: "\u05D1\u05E0\u05E7 \u05D4\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD", auto: true },
-        { id: 102, description: "\u05E9\u05DB\u05E8 \u05D3\u05D9\u05E8\u05D4 - \u05D9\u05D5\u05DC\u05D9", amount: -4800, date: "2026-07-01", cat: "\u05D3\u05D9\u05D5\u05E8", color: "#64748B", emoji: "\u{1F3E0}", account: "\u05D4\u05D5\u05E8\u05D0\u05EA \u05E7\u05D1\u05E2" },
-        { id: 103, description: "\u05E9\u05D5\u05E4\u05E8\u05E1\u05DC \u05D3\u05D9\u05DC \u05E8\u05E2\u05E0\u05E0\u05D4", amount: -680, date: "2026-07-24", cat: "\u05E1\u05D5\u05E4\u05E8\u05DE\u05E8\u05E7\u05D8", color: "#22C55E", emoji: "\u{1F6D2}", account: "Max" },
-        { id: 104, description: "\u05D5\u05D5\u05DC\u05D8 - \u05D2'\u05D9\u05E8\u05E3 \u05E1\u05D5\u05E9\u05D9", amount: -185, date: "2026-07-26", cat: "\u05DE\u05E1\u05E2\u05D3\u05D5\u05EA \u05D5\u05E7\u05E4\u05D4", color: "#F97316", emoji: "\u{1F37D}\uFE0F", account: "Max" },
-        { id: 105, description: "\u05D7\u05D1\u05E8\u05EA \u05D4\u05D7\u05E9\u05DE\u05DC", amount: -340, date: "2026-07-15", cat: "\u05D7\u05E9\u05D1\u05D5\u05E0\u05D5\u05EA \u05D1\u05D9\u05EA", color: "#EAB308", emoji: "\u{1F4A1}", account: "\u05D1\u05E0\u05E7 \u05D4\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD" },
-        { id: 106, description: "\u05E4\u05D6 - \u05D3\u05DC\u05E7 \u05DE\u05EA\u05D7\u05DD \u05E9\u05E4\u05D9\u05D9\u05DD", amount: -290, date: "2026-07-20", cat: "\u05D3\u05DC\u05E7 \u05D5\u05E8\u05DB\u05D1", color: "#84CC16", emoji: "\u26FD", account: "Max" },
-        { id: 107, description: "\u05E1\u05D5\u05E4\u05E8-\u05E4\u05D0\u05E8\u05DD \u05E7\u05E0\u05D9\u05D5\u05DF \u05E8\u05E0\u05E0\u05D9\u05DD", amount: -145, date: "2026-07-22", cat: "\u05D1\u05E8\u05D9\u05D0\u05D5\u05EA", color: "#14B8A6", emoji: "\u{1F3E5}", account: "Max" },
-        { id: 108, description: "\u05E4\u05E8\u05D8\u05E0\u05E8 \u05EA\u05E7\u05E9\u05D5\u05E8\u05EA", amount: -120, date: "2026-07-05", cat: "\u05EA\u05E7\u05E9\u05D5\u05E8\u05EA", color: "#06B6D4", emoji: "\u{1F4F1}", account: "\u05D4\u05D5\u05E8\u05D0\u05EA \u05E7\u05D1\u05E2" },
-        { id: 109, description: "\u05E0\u05D8\u05E4\u05DC\u05D9\u05E7\u05E1 \u05D7\u05D5\u05D3\u05E9\u05D9", amount: -65, date: "2026-07-03", cat: "\u05D1\u05D9\u05D3\u05D5\u05E8", color: "#EC4899", emoji: "\u{1F3AC}", account: "Max" },
-        { id: 110, description: "\u05D6\u05D0\u05E8\u05D4 \u05E7\u05E0\u05D9\u05D5\u05DF \u05E2\u05D6\u05E8\u05D9\u05D0\u05DC\u05D9", amount: -390, date: "2026-07-18", cat: "\u05E7\u05E0\u05D9\u05D5\u05EA", color: "#F59E0B", emoji: "\u{1F6CD}\uFE0F", account: "Max" }
-      ],
-      budgetPlan: defaultBudgetPlan,
-      investments: {
-        kerenValue: 84500,
-        kerenYTD: 6.8,
-        pensionValue: 24e4,
-        pensionYTD: 8.2,
-        savings: [
-          { id: 1, name: '\u05E4\u05E7"\u05DE \u05D7\u05D5\u05D3\u05E9\u05D9 \u05DE\u05EA\u05D7\u05D3\u05E9', bank: "\u05D1\u05E0\u05E7 \u05D4\u05E4\u05D5\u05E2\u05DC\u05D9\u05DD", value: 35e3, rate: 4.2 }
-        ],
-        moneyMarket: [
-          { id: 101, name: "\u05DE\u05D2\u05D3\u05DC \u05E9\u05E7\u05DC\u05D9\u05DD \u05DB\u05E1\u05E4\u05D9\u05EA", value: 5e4, yield: 4.6 }
-        ],
-        portfolioHoldings: [
-          { id: 201, symbol: "NVDA", name: "NVIDIA Corporation", shares: 25, avgCost: 110, color: "#22C55E" },
-          { id: 202, symbol: "AAPL", name: "Apple Inc.", shares: 15, avgCost: 195, color: "#3B82F6" },
-          { id: 203, symbol: "TEVA.TA", name: "Teva Pharmaceutical", shares: 300, avgCost: 14.5, color: "#8B5CF6" }
-        ],
-        portfolioCash: 2500,
-        portfolioHistory: [
-          { id: 1, type: "deposit", amount: 5e3, date: "2026-01-15" },
-          { id: 2, type: "buy", symbol: "NVDA", shares: 25, price: 110, cost: 2750, date: "2026-02-10" }
-        ]
-      },
-      snapshots: {
-        kerenValue: [
-          { date: "2026-01-01", value: 78e3 },
-          { date: "2026-04-01", value: 81200 },
-          { date: "2026-07-01", value: 84500 }
-        ],
-        pensionValue: [
-          { date: "2026-01-01", value: 22e4 },
-          { date: "2026-04-01", value: 231e3 },
-          { date: "2026-07-01", value: 24e4 }
-        ]
-      }
-    };
-    import_fs2.default.writeFileSync(USERS_FILE, JSON.stringify([demoAccount], null, 2), "utf8");
-    import_fs2.default.writeFileSync(import_path2.default.join(DATA_DIR2, "user_data_demo_user_id.json"), JSON.stringify(demoData, null, 2), "utf8");
-    return [demoAccount];
-  }
-  try {
-    return JSON.parse(import_fs2.default.readFileSync(USERS_FILE, "utf8"));
-  } catch (e) {
-    return [];
-  }
-}
-function writeUsersOnServer(users) {
-  import_fs2.default.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
-}
-function readUserDataOnServer(userId) {
-  const filePath = import_path2.default.join(DATA_DIR2, `user_data_${userId}.json`);
-  if (!import_fs2.default.existsSync(filePath)) {
-    return null;
-  }
-  try {
-    return JSON.parse(import_fs2.default.readFileSync(filePath, "utf8"));
-  } catch (e) {
-    return null;
-  }
-}
-function writeUserDataOnServer(userId, data) {
-  const filePath = import_path2.default.join(DATA_DIR2, `user_data_${userId}.json`);
-  import_fs2.default.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
-}
+var USERS_FILE = import_path.default.join(DATA_DIR, "users.json");
 async function startServer() {
+  await initializeDatabase();
   const app = (0, import_express4.default)();
   const PORT = 3e3;
   app.use(import_express4.default.json({ limit: "20mb" }));
   app.use((0, import_cookie_parser.default)());
   if (isGoogleAuthConfigured()) {
-    googleSessionStore = new MemorySessionStore();
+    googleSessionStore = new PostgresSessionStore();
     app.use("/auth", googleAuthRouter(loadGoogleAuthConfig(), googleSessionStore));
   }
   app.get("/auth/google/status", (_req, res) => {
@@ -1277,10 +1189,10 @@ async function startServer() {
   });
   app.use("/auth", authRouter);
   app.get("/api/integrations/status", integrationAuth, integrationStatus);
-  app.use("/api/scraper", router);
-  app.use((req, res, next) => {
+  if (process.env.ENABLE_FINANCE_SCRAPER === "true") app.use("/api/scraper", router);
+  app.use(async (req, res, next) => {
     const googleCookie = process.env.COOKIE_SECURE === "true" ? "__Host-app_session" : "app_session";
-    const googleSession = googleSessionStore?.getSession(req.cookies?.[googleCookie] || "");
+    const googleSession = await googleSessionStore?.getSession(req.cookies?.[googleCookie] || "");
     if (googleSession) {
       req.userId = googleSession.googleSubject;
       req.userEmail = googleSession.email;
@@ -1295,6 +1207,7 @@ async function startServer() {
     if (!auth.startsWith("Bearer ")) return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
     try {
       const payload = decodeAccessToken(auth.slice(7));
+      if (!await findAuthUserById(payload.sub)) return res.status(401).json({ detail: "\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0" });
       req.userId = payload.sub;
       req.userEmail = payload.email;
       next();
@@ -1461,15 +1374,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       }
     });
   });
-  function getGeminiApiKey(req) {
-    if (serverAiKey()) return serverAiKey();
-    let key = req.headers["x-gemini-key"] || req.headers["x-gemini-api-key"] || req.body?.geminiApiKey;
-    if (key && typeof key === "string") {
-      key = key.trim();
-    }
-    if (key && key !== "undefined" && key !== "null" && key.length > 5) {
-      return key;
-    }
+  function getGeminiApiKey(_req) {
     return serverAiKey();
   }
   async function generateGeminiContent(ai, params) {
@@ -1978,68 +1883,43 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
       return res.status(500).json({ error: error.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E0\u05D9\u05EA\u05D5\u05D7 AI" });
     }
   });
-  app.get("/api/auth/accounts", (req, res) => {
-    try {
-      const users = readUsersOnServer();
-      const safeUsers = users.map((u) => ({
-        id: u.id,
-        username: u.username,
-        displayName: u.displayName,
-        createdAt: u.createdAt,
-        profile: u.profile
-      }));
-      res.json(safeUsers);
-    } catch (e) {
-      res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05DE\u05E9\u05EA\u05DE\u05E9\u05D9\u05DD" });
-    }
-  });
-  app.post("/api/auth/register", (req, res) => {
-    try {
-      const { account, initData } = req.body;
-      if (!account || !account.username) {
-        return res.status(400).json({ error: "\u05E0\u05EA\u05D5\u05E0\u05D9 \u05D7\u05E9\u05D1\u05D5\u05DF \u05D7\u05E1\u05E8\u05D9\u05DD" });
-      }
-      const users = readUsersOnServer();
-      const exists = users.some((u) => u.username.toLowerCase() === account.username.toLowerCase());
-      if (exists) {
-        return res.status(400).json({ error: "\u05E9\u05DD \u05D4\u05DE\u05E9\u05EA\u05DE\u05E9 \u05DB\u05D1\u05E8 \u05E7\u05D9\u05D9\u05DD \u05D1\u05E9\u05E8\u05EA" });
-      }
-      users.push(account);
-      writeUsersOnServer(users);
-      if (initData) {
-        writeUserDataOnServer(account.id, initData);
-      }
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E8\u05D9\u05E9\u05D5\u05DD \u05DE\u05E9\u05EA\u05DE\u05E9 \u05D1\u05E9\u05E8\u05EA" });
-    }
-  });
-  app.get("/api/user/load/:userId", (req, res) => {
+  app.get("/api/user/load/:userId", async (req, res) => {
     try {
       const userId = req.params.userId;
       const reqUserId = req.userId;
       if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
-      const data = readUserDataOnServer(userId);
-      if (!data) {
+      const record = await loadUserData(userId);
+      if (!record) {
         return res.status(404).json({ error: "\u05DC\u05D0 \u05E0\u05DE\u05E6\u05D0\u05D5 \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05E2\u05D1\u05D5\u05E8 \u05DE\u05E9\u05EA\u05DE\u05E9 \u05D6\u05D4" });
       }
-      res.json(data);
+      res.json(record);
     } catch (e) {
       res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD" });
     }
   });
-  app.post("/api/user/save", (req, res) => {
+  app.post("/api/user/save", async (req, res) => {
     try {
-      const { userId, data } = req.body;
+      const { userId, data, expectedRevision } = req.body;
       if (!userId || !data) {
         return res.status(400).json({ error: "\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05D7\u05E1\u05E8\u05D9\u05DD \u05DC\u05E9\u05DE\u05D9\u05E8\u05D4" });
       }
       const reqUserId = req.userId;
       if (!reqUserId || reqUserId !== userId) return res.status(403).json({ error: "\u05D0\u05D9\u05DF \u05D4\u05E8\u05E9\u05D0\u05D4" });
-      writeUserDataOnServer(userId, data);
-      res.json({ success: true });
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 0) return res.status(400).json({ error: "\u05E0\u05D3\u05E8\u05E9\u05EA \u05D2\u05E8\u05E1\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05EA\u05E7\u05D9\u05E0\u05D4" });
+      const revision = await saveUserData(userId, data, expectedRevision);
+      res.json({ success: true, revision });
     } catch (e) {
+      if (e instanceof RevisionConflictError) return res.status(409).json({ error: "\u05D4\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05D4\u05E9\u05EA\u05E0\u05D5 \u05D1\u05DE\u05DB\u05E9\u05D9\u05E8 \u05D0\u05D7\u05E8. \u05E8\u05E2\u05E0\u05E0\u05D5 \u05D5\u05E0\u05E1\u05D5 \u05E9\u05D5\u05D1." });
       res.status(500).json({ error: e.message || "\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05E9\u05DE\u05D9\u05E8\u05EA \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD" });
+    }
+  });
+  app.delete("/api/user/account", async (req, res) => {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
+    try {
+      return await deleteUserAccount(userId) ? res.sendStatus(204) : res.sendStatus(404);
+    } catch {
+      return res.status(500).json({ error: "\u05DE\u05D7\u05D9\u05E7\u05EA \u05D4\u05D7\u05E9\u05D1\u05D5\u05DF \u05E0\u05DB\u05E9\u05DC\u05D4" });
     }
   });
   if (process.env.NODE_ENV !== "production") {
@@ -2049,10 +1929,10 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = import_path2.default.join(process.cwd(), "dist");
+    const distPath = import_path.default.join(process.cwd(), "dist");
     app.use(import_express4.default.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(import_path2.default.join(distPath, "index.html"));
+      res.sendFile(import_path.default.join(distPath, "index.html"));
     });
   }
   const host = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
