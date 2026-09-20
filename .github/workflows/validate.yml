@@ -43,5 +43,5 @@ jobs:
         with: { distribution: temurin, java-version: '21' }
       - run: npm ci
       - run: npm run mobile:sync
-      - run: ./gradlew assembleDebug
+      - run: bash ./gradlew assembleDebug
         working-directory: android
