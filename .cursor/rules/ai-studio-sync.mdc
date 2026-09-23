@@ -1,0 +1,15 @@
+---
+description: Keep the AI Studio deployment synchronized after every GitHub update
+alwaysApply: true
+---
+
+# AI Studio deployment workflow
+
+For every completed code change in AIfina:
+
+1. Run the relevant checks before publishing.
+2. Commit and push only the files changed for the requested work; do not include unrelated local changes.
+3. Open the AIfina Google AI Studio project and send: “Pull the latest commit from https://github.com/A7asaf-cloud/AIfina, do not modify any source files, run the production build, and restart the app server.”
+4. Confirm that AI Studio reports the pulled commit, a successful production build, and a running preview before reporting completion.
+5. If AI Studio returns an internal error, retry once and report the deployment as pending rather than successful.
+
