@@ -5,11 +5,11 @@
   --color-card: #FFFFFF;
   --color-income: #00C48C;
   --color-expense: #FF647C;
-  --color-primary: #4A6FFF;
-  --color-secondary: #9B59B6;
-  --color-muted: #8E9BB5;
-  --color-ink: #1A1D2E;
-  --color-line: #EDF0F7;
+  --color-primary: #2F6B59;
+  --color-secondary: #5C7A70;
+  --color-muted: #64706B;
+  --color-ink: #17211D;
+  --color-line: #E3E9E5;
   --font-sans: 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -105,7 +105,13 @@ html[data-theme='dark'] .v2-nav-message { background:#20372a; }
 html[data-theme='dark'] .v2-transaction-row, html[data-theme='dark'] .v2-upcoming-row { border-color:#2a3931; }
 
 /* Product-wide layout safeguards and dark interface */
-:root { --radius-card: 18px; --radius-control: 12px; --shadow-card: 0 8px 24px rgba(20, 35, 27, .06); }
+:root {
+  --radius-card: 18px;
+  --radius-control: 12px;
+  --shadow-card: 0 8px 24px rgba(23, 33, 29, .055);
+  --color-primary-strong: #245849;
+  --color-soft-accent: #E7F0EC;
+}
 *, *::before, *::after { min-width: 0; }
 button, input, select, textarea { max-width: 100%; }
 input, select, textarea { min-height: 44px; border-radius: var(--radius-control) !important; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
@@ -113,21 +119,25 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--colo
 input:focus, select:focus, textarea:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent); }
 button { min-height: 40px; }
 .bg-card { box-shadow: var(--shadow-card); }
+.text-muted { line-height: 1.55; }
+h1, h2, h3, p { overflow-wrap: anywhere; }
 
+/* A quiet, high-contrast palette: neutral surfaces with one restrained accent. */
 html[data-theme='dark'] {
-  --color-surface: #0b1110;
-  --color-card: #141d1a;
-  --color-income: #48d6a5;
-  --color-expense: #ff8294;
-  --color-primary: #7c9cff;
-  --color-secondary: #c29bea;
-  --color-muted: #9eadA5;
-  --color-ink: #f1f6f2;
-  --color-line: #263630;
+  --color-surface: #101315;
+  --color-card: #181C1E;
+  --color-income: #50B99A;
+  --color-expense: #E77A86;
+  --color-primary: #7EAA9D;
+  --color-secondary: #91A7A0;
+  --color-muted: #A8B3AE;
+  --color-ink: #F2F5F3;
+  --color-line: #2D3532;
   --shadow-card: 0 12px 30px rgba(0, 0, 0, .22);
   color-scheme: dark;
 }
-html[data-theme='dark'] body { background: radial-gradient(circle at 80% 0, #192820 0, transparent 28rem), #0b1110; }
+
+html[data-theme='dark'] body { background: radial-gradient(circle at 80% 0, #1E2824 0, transparent 28rem), #101315; }
 html[data-theme='dark'] .aifina-shell { background: transparent; color: var(--color-ink); }
 html[data-theme='dark'] .v2-navigation { background: rgba(15, 23, 20, .94); border-color: #263630; box-shadow: -12px 0 30px rgba(0,0,0,.12); }
 html[data-theme='dark'] .v2-nav-item { color: #aebdb4; }
