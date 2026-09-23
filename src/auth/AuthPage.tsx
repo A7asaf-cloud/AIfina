@@ -109,7 +109,7 @@ export default function AuthPage() {
               window.location.assign('/auth/google/start?returnTo=/');
             }}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm py-3 rounded-2xl transition border border-line mb-4 disabled:opacity-60"
+            className="google-sign-in w-full flex items-center justify-center gap-3 font-semibold text-sm py-3 rounded-2xl transition mb-4 disabled:opacity-60"
           >
             <GoogleIcon />
             Continue with Google

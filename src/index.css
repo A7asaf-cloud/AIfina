@@ -169,6 +169,12 @@ html[data-theme='dark'] .ai-composer { background: #141d1a; border-color: #26363
 html[data-theme='dark'] .ai-message.bot { background: #1a2720; color: #eef6ef; border-color: #304139; }
 html[data-theme='dark'] .ai-chip { background: #18231d; border-color: #31443a; color: #d5e4d8; }
 html[data-theme='dark'] .ai-upload { background: #1c2b22; border-color: #365040; color: #b9d9c1; }
+
+/* Google requires its familiar light surface; it must remain readable in dark mode. */
+.google-sign-in { background:#FFF; border:1px solid #D7DDD9; color:#202124; box-shadow:0 1px 2px rgba(20,32,26,.08); }
+.google-sign-in:hover:not(:disabled) { background:#F7F8F7; border-color:#BFC9C3; }
+html[data-theme='dark'] .google-sign-in { background:#FFF !important; border-color:#D7DDD9 !important; color:#202124 !important; box-shadow:0 2px 10px rgba(0,0,0,.2); }
+html[data-theme='dark'] .google-sign-in:hover:not(:disabled) { background:#F7F8F7 !important; }
 @media (max-width: 639px) {
   :root { --radius-card: 16px; }
   .aifina-main { padding-inline: 14px !important; }
