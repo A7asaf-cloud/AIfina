@@ -1174,6 +1174,58 @@ async function deleteUserAccount(userId) {
   return withTransaction(async (client) => (await client.query("DELETE FROM users WHERE id = $1", [userId])).rowCount === 1);
 }
 
+// server/feezback.ts
+var import_node_crypto2 = __toESM(require("node:crypto"), 1);
+var base64Url = (value) => Buffer.from(value).toString("base64url");
+function feezbackIsConfigured() {
+  return Boolean(process.env.FEEZBACK_TPP_ID?.trim() && process.env.FEEZBACK_PRIVATE_KEY?.trim());
+}
+async function createFeezbackConsentLink(userId, appOrigin) {
+  const tppId = process.env.FEEZBACK_TPP_ID?.trim();
+  const privateKey = process.env.FEEZBACK_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const env = process.env.FEEZBACK_ENV === "production" ? "production" : "integration";
+  if (!tppId || !privateKey) throw new Error("Open Banking is not configured on this server.");
+  const now = Math.floor(Date.now() / 1e3);
+  const context = import_node_crypto2.default.randomUUID();
+  const payload = {
+    sub: userId,
+    iss: `tpp/${tppId}`,
+    srv: "ais/user",
+    iat: now,
+    exp: now + 30 * 60,
+    ttl: 1800,
+    flow: {
+      id: "aifina",
+      dataBaskets: ["ACCOUNTS", "BALANCES", "TRANSACTIONS"],
+      accountTypes: ["CACC", "CARD", "SVGS", "LOAN", "SCTS"],
+      timePeriods: ["TWELVE_MONTHS"],
+      userWasAuthenticated: true,
+      context,
+      redirects: {
+        success: `${appOrigin}/connections?openBanking=success`,
+        failure: `${appOrigin}/connections?openBanking=failed`,
+        ttlExpired: `${appOrigin}/connections?openBanking=expired`
+      }
+    }
+  };
+  const encodedHeader = base64Url(JSON.stringify({ alg: "RS512", typ: "JWT" }));
+  const encodedPayload = base64Url(JSON.stringify(payload));
+  const signed = `${encodedHeader}.${encodedPayload}`;
+  const signature = import_node_crypto2.default.sign("RSA-SHA512", Buffer.from(signed), privateKey);
+  const token = `${signed}.${base64Url(signature)}`;
+  const endpoint = env === "production" ? "https://lgs-prod.feezback.cloud/link" : "https://lgs-integ01.feezback.cloud/link";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token })
+  });
+  if (!response.ok) throw new Error(`Open Banking link service returned ${response.status}.`);
+  const body = await response.json();
+  const link = body.link || body.url;
+  if (!link || !/^https:\/\//.test(link)) throw new Error("Open Banking link service returned an invalid link.");
+  return { link, context, expiresAt: new Date((now + 1800) * 1e3).toISOString() };
+}
+
 // server.ts
 import_dotenv.default.config();
 var googleSessionStore = null;
@@ -1228,6 +1280,18 @@ async function startServer() {
     if (req.userId) return next();
     return res.status(401).json({ detail: "\u05DC\u05D0 \u05DE\u05D0\u05D5\u05DE\u05EA" });
   };
+  app.post("/api/open-banking/consent-link", requireAppAuth, async (req, res) => {
+    if (!feezbackIsConfigured()) return res.status(503).json({ error: "Open Banking is awaiting provider onboarding." });
+    try {
+      const origin = process.env.APP_URL || process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
+      const link = await createFeezbackConsentLink(req.userId, origin.replace(/\/$/, ""));
+      res.setHeader("Cache-Control", "no-store");
+      res.json(link);
+    } catch (error) {
+      console.error("Open Banking consent-link request failed");
+      res.status(502).json({ error: "Could not start the secure bank connection." });
+    }
+  });
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
