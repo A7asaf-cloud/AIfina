@@ -19,6 +19,7 @@ import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
 import { initializeDatabase } from './server/database';
 import { deleteUserAccount, loadUserData, RevisionConflictError, saveUserData } from './server/userDataStore';
 import { findAuthUserById } from './server/authFileStore';
+import { createFeezbackConsentLink, feezbackIsConfigured } from './server/feezback';
 
 dotenv.config();
 let googleSessionStore: PostgresSessionStore | null = null;
@@ -230,6 +231,22 @@ async function startServer() {
     if ((req as any).userId) return next();
     return res.status(401).json({ detail: 'לא מאומת' });
   };
+
+  // Generates a Feezback consent link. The browser only receives the resulting
+  // one-time link; organisation credentials and the signed JWT stay server-side.
+  app.post('/api/open-banking/consent-link', requireAppAuth, async (req, res) => {
+    if (!feezbackIsConfigured()) return res.status(503).json({ error: 'Open Banking is awaiting provider onboarding.' });
+    try {
+      const origin = process.env.APP_URL || process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+      const link = await createFeezbackConsentLink((req as any).userId, origin.replace(/\/$/, ''));
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(link);
+    } catch (error) {
+      // Do not expose provider details, tokens or certificate errors to clients.
+      console.error('Open Banking consent-link request failed');
+      res.status(502).json({ error: 'Could not start the secure bank connection.' });
+    }
+  });
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {
