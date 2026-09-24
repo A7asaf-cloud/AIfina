@@ -1,4 +1,7 @@
 import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { configuredAiModel, serverAiKey, integrationAuth, integrationStatus } from './server/integrationConfig';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -16,13 +19,21 @@ import {
 import { scraperProxy } from './server/scraperProxy';
 import { decodeAccessToken } from './server/authUtils';
 import { searchFunds, getAllFunds, getFundById } from './server/fundsApi';
-import { initializeDatabase } from './server/database';
+import { closeDatabase, initializeDatabase } from './server/database';
 import { deleteUserAccount, loadUserData, RevisionConflictError, saveUserData } from './server/userDataStore';
 import { findAuthUserById } from './server/authFileStore';
 import { createFeezbackConsentLink, feezbackIsConfigured } from './server/feezback';
 
 dotenv.config();
 let googleSessionStore: PostgresSessionStore | null = null;
+
+function validateProductionEnvironment(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  const required = ['DATABASE_URL', 'JWT_SECRET', 'SESSION_SECRET', 'APP_ORIGINS'];
+  const missing = required.filter(name => !process.env[name] || process.env[name]?.startsWith('replace-with-'));
+  if (missing.length) throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  if (process.env.COOKIE_SECURE !== 'true') throw new Error('COOKIE_SECURE must be true in production');
+}
 
 // File Database Setup for multi-device sync
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -171,10 +182,16 @@ function writeUserDataOnServer(userId: string, data: any) {
 }
 
 async function startServer() {
+  validateProductionEnvironment();
   await initializeDatabase();
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
+  const allowedOrigins = (process.env.APP_ORIGINS || 'http://localhost:3000').split(',').map(value => value.trim()).filter(Boolean);
 
+  app.set('trust proxy', 1);
+  app.use(helmet({ contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false }));
+  app.use(cors({ origin(origin, callback) { if (!origin || allowedOrigins.includes(origin)) return callback(null, true); return callback(new Error('Origin not allowed')); }, credentials: true }));
+  app.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
   app.use(express.json({ limit: '20mb' }));
   app.use(cookieParser());
 
@@ -1069,9 +1086,12 @@ ${descriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
   }
 
   const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
-  app.listen(PORT, host, () => {
+  const server = app.listen(PORT, host, () => {
     console.log(`Server running on http://${host}:${PORT}`);
   });
+  const shutdown = async () => { server.close(async () => { await closeDatabase(); process.exit(0); }); };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 }
 
 startServer();
