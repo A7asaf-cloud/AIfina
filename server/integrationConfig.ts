@@ -19,6 +19,15 @@ export const integrationAuth: RequestHandler = (req, res, next) => {
 };
 export const integrationStatus: RequestHandler = (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  const provider = process.env.OPEN_BANKING_PROVIDER?.trim().toLowerCase() || 'hapoalim';
+  const mode = process.env.OPEN_BANKING_MODE?.trim().toLowerCase() || 'not_configured';
+  const connectUrl = process.env.OPEN_BANKING_CONNECT_URL?.trim();
   res.json({ ai: { configured: Boolean(serverAiKey()), model: configuredAiModel() },
-    openBanking: { status: 'requires_provider_approval', provider: 'Feezback', documentationUrl: 'https://docs.feezback.cloud/docs/introduction-to-open-banking-data' }, imports: { available: true } });
+    openBanking: {
+      provider,
+      mode,
+      configured: Boolean(connectUrl),
+      // This is public documentation only. Provider credentials and certificates remain server-side.
+      documentationUrl: provider === 'hapoalim' ? 'https://poalimdev.co.il/get-started' : undefined,
+    }, imports: { available: true } });
 };
